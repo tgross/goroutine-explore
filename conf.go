@@ -1,3 +1,7 @@
+// Copyright (c) linuxerwang and goroutine-explore contributors
+// SPDX-License-Identifier: BSD-2-Clause
+// SPDX-License-Identifier: BlueOak-1.0.0
+
 package main
 
 import (
@@ -15,7 +19,7 @@ func getConfDir() string {
 		log.Fatal(err)
 	}
 
-	dir := filepath.Join(userDir, "goroutine-inspect")
+	dir := filepath.Join(userDir, "goroutine-explore")
 	if _, err := os.Stat(dir); os.IsNotExist(err) {
 		if err = os.MkdirAll(dir, os.ModePerm); err != nil {
 			log.Fatal(err)

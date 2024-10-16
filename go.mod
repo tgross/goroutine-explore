@@ -1,4 +1,4 @@
-module github.com/tgross/goroutine-inspect
+module github.com/tgross/goroutine-explore
 
 go 1.22.1
 

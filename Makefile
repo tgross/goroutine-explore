@@ -6,11 +6,11 @@ SHELL := /bin/bash
 GO_SRC := $(wildcard ./*.go)
 
 .PHONY: build
-build: dist/goroutine-inspect
+build: dist/goroutine-explore
 
-dist/goroutine-inspect: $(GO_SRC)
+dist/goroutine-explore: $(GO_SRC)
 	@mkdir -p ./dist
-	go build -trimpath -o dist/goroutine-inspect .
+	go build -trimpath -o dist/goroutine-explore .
 
 .PHONY: test
 test:

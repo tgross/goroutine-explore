@@ -1,3 +1,6 @@
+// Copyright (c) goroutine-explore contributors
+// SPDX-License-Identifier: BlueOak-1.0.0
+
 package main
 
 import (

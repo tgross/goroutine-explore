@@ -1,26 +1,24 @@
-# goroutine-inspect
+# goroutine-explore
 
-An interactive tool to analyze Golang goroutine dump.
+An interactive tool for analyzing Golang goroutine dumps.
 
-_Note: this is my personal fork of [linuxerwang/goroutine-inspect] and
-has no support or guarantee that breaking behavior changes won't
-change at any time._
+_Note: this is a fork of [linuxerwang/goroutine-inspect] and is undergoing
+significant rewrite to have a new expression language and more flexible
+goroutine dump ingest. Expect frequent breaking behavior changes until 1.0.0._
 
 ## Build and Run
 
-Upstream does not use go modules, so the package has been renamed in
-`go.mod` so that installation with current toolchains works as
-expected. Install this fork with:
+Install with:
 
 ```bash
-go install github.com/tgross/goroutine-inspect@latest
+go install github.com/tgross/goroutine-explore@latest
 ```
 
-Or build and run from source with:
+Or build and run from a source checkout with:
 
 ```bash
-go build .
-./goroutine-inspect
+make build
+make install
 ```
 
 ## Workspace
