@@ -11,6 +11,7 @@
 *.out
 
 # Build output
+build/
 goroutine-explore
 
 # Testing (temporary)

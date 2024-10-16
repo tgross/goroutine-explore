@@ -5,6 +5,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"io"
 	"log"
@@ -47,6 +48,14 @@ func init() {
 }
 
 func main() {
+	var version bool
+	flag.BoolVar(&version, "version", false, "display the version")
+	flag.Parse()
+	if version {
+		fmt.Println(Version())
+		os.Exit(0)
+	}
+
 	var err error
 	line, err = createLiner()
 	if err != nil {
@@ -202,3 +211,16 @@ const (
 	fgBlue  = "\x1b[38;05;4m"
 	reset   = "\x1b[0m"
 )
+
+var (
+	buildVersion = "0.1.0+dev"
+	buildCommit  string
+)
+
+func Version() string {
+	out := "goroutine-explore v" + buildVersion
+	if buildCommit != "" {
+		out += " (" + buildCommit + ")"
+	}
+	return out
+}

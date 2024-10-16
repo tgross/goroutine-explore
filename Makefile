@@ -3,14 +3,27 @@ SHELL := /bin/bash
 .SHELLFLAGS := -o pipefail -euc
 .DEFAULT_GOAL := build
 
+GIT_COMMIT := $(shell git rev-parse --short HEAD)
+GIT_DIRTY := $(if $(shell git status --porcelain),+CHANGES)
+GIT_COMMIT_FLAG = main.buildCommit=$(GIT_COMMIT)$(GIT_DIRTY)
+GO_LDFLAGS = "-X $(GIT_COMMIT_FLAG)"
+
 GO_SRC := $(wildcard ./*.go)
 
 .PHONY: build
-build: dist/goroutine-explore
+build: build/goroutine-explore
 
-dist/goroutine-explore: $(GO_SRC)
-	@mkdir -p ./dist
-	go build -trimpath -o dist/goroutine-explore .
+build/goroutine-explore: $(GO_SRC)
+	@mkdir -p ./build
+	go build -trimpath -ldflags $(GO_LDFLAGS) -o build/goroutine-explore .
+
+.PHONY: install
+install:
+	go install -trimpath  -ldflags $(GO_LDFLAGS) .
+
+.PHONY: run
+run: build
+	./build/goroutine-explore
 
 .PHONY: test
 test:
@@ -24,4 +37,4 @@ check:
 
 .PHONY: clean
 clean:
-	rm -rf ./dist
+	rm -rf ./build
