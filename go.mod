@@ -1,6 +1,6 @@
 module github.com/tgross/goroutine-explore
 
-go 1.22.1
+go 1.25
 
 require (
 	github.com/Knetic/govaluate v3.0.0+incompatible
