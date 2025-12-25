@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"runtime/debug"
 	"sort"
 	"strings"
 
@@ -212,15 +213,17 @@ const (
 	reset   = "\x1b[0m"
 )
 
-var (
-	buildVersion = "0.1.0+dev"
-	buildCommit  string
-)
-
 func Version() string {
-	out := "goroutine-explore v" + buildVersion
-	if buildCommit != "" {
-		out += " (" + buildCommit + ")"
+	info, _ := debug.ReadBuildInfo()
+	version := info.Main.Version
+	out := "goroutine-explore " + version
+
+	for _, setting := range info.Settings {
+		if setting.Key == "vcs.revision" {
+			out += " (" + setting.Value + ")"
+			break
+		}
 	}
+
 	return out
 }

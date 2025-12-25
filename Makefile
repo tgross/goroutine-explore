@@ -3,11 +3,6 @@ SHELL := /bin/bash
 .SHELLFLAGS := -o pipefail -euc
 .DEFAULT_GOAL := build
 
-GIT_COMMIT := $(shell git rev-parse --short HEAD)
-GIT_DIRTY := $(if $(shell git status --porcelain),+CHANGES)
-GIT_COMMIT_FLAG = main.buildCommit=$(GIT_COMMIT)$(GIT_DIRTY)
-GO_LDFLAGS = "-X $(GIT_COMMIT_FLAG)"
-
 GO_SRC := $(wildcard ./*.go)
 GOBIN = $(shell go env GOBIN)
 GOBIN := $(if $(GOBIN),$(GOBIN),"$(shell go env GOPATH)/bin")
@@ -17,11 +12,11 @@ build: build/goroutine-explore
 
 build/goroutine-explore: $(GO_SRC)
 	@mkdir -p ./build
-	go build -trimpath -ldflags $(GO_LDFLAGS) -o build/goroutine-explore .
+	go build -trimpath -o build/goroutine-explore .
 
 .PHONY: install
 install:
-	go install -trimpath  -ldflags $(GO_LDFLAGS) .
+	go install -trimpath .
 
 .PHONY: dev
 dev: build/goroutine-inspect
