@@ -68,7 +68,7 @@ func main() {
 		if err != nil {
 			fmt.Println("could not save history file: %w", err)
 		}
-		line.Close()
+		_ = line.Close()
 	}()
 
 	for {
@@ -158,7 +158,7 @@ func printDir(wd string) {
 		fmt.Println(err)
 		return
 	}
-	defer f.Close()
+	defer f.Close() //nolint:errcheck
 
 	fis, err := f.Readdir(-1)
 	if err != nil {

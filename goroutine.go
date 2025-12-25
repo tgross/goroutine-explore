@@ -331,7 +331,7 @@ func (gd GoroutineDump) Save(fn string) error {
 	if err != nil {
 		return err
 	}
-	defer f.Close()
+	defer f.Close() //nolint:errcheck
 
 	for _, g := range gd.goroutines {
 		if err := g.Print(f); err != nil {

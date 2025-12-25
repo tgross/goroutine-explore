@@ -32,7 +32,7 @@ func load(fn string) (*GoroutineDump, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer f.Close()
+	defer f.Close() //nolint:errcheck
 	return loadFrom(f)
 }
 
