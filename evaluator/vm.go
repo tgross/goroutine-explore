@@ -30,17 +30,17 @@ func NewVM() *VM {
 }
 
 func (vm *VM) reset(chunk *Chunk) {
-	vm.ip = 0
+	vm.ip = -1
 	vm.chunk = chunk
 	vm.stack = make([]Value, 0, initialStackCap)
 }
 
 func (vm *VM) readByte() (Op, error) {
+	vm.ip++
 	if vm.ip >= len(vm.chunk.ops) {
 		return 0, ErrEOF
 	}
 	op := vm.chunk.ops[vm.ip]
-	vm.ip++
 	return op, nil
 }
 
@@ -429,7 +429,8 @@ func (vm *VM) handleNextGoroutine(addr uint) error {
 		dump.StartIter()
 
 	case TagGoroutine:
-		// subsequent calls: need to clean up the previous goroutine
+		// subsequent calls: need to clean up the previous goroutine; this is
+		// how we track that we're in the middle of a loop
 		_, err = vm.Pop()
 		if err != nil {
 			return fmt.Errorf("%w: %v", ErrUnexpectedStackState, err)
@@ -448,19 +449,17 @@ func (vm *VM) handleNextGoroutine(addr uint) error {
 	}
 
 	if dump.Len() == 0 {
-		vm.ip = int(addr)
+		vm.ip = int(addr) - 1
 		vm.regGoroutine = nil
 		return nil
 	}
 	g := dump.Next()
 	if g == nil {
-		vm.ip = int(addr)
+		vm.ip = int(addr) - 1
 		vm.regGoroutine = nil
 		return nil
 	}
 
-	// TODO: do we want a goroutine here or would be easier to stick this on the
-	// stack?
 	vm.regGoroutine = g
 	vm.Push(Value{Tag: TagGoroutine, Data: g})
 	return nil
@@ -511,13 +510,13 @@ func (vm *VM) handleConditionalJump(index uint, expected bool) error {
 			ErrInvalidType, val.Tag, val.Data, index)
 	}
 	if val.Data.(bool) == expected {
-		vm.ip = int(index)
+		vm.ip = int(index) - 1
 	}
 	return nil
 }
 
 func (vm *VM) handleJumpTo(addr uint) error {
-	vm.ip = int(addr)
+	vm.ip = int(addr) - 1
 	return nil
 }
 
