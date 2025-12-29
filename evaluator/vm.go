@@ -8,11 +8,16 @@ import (
 )
 
 const initialStackCap = 256
+const defaultGas = 1024 * 1024
 
 type VM struct {
 	chunk *Chunk
 	ip    int // instruction pointer in chunk
 	stack []Value
+
+	// gas is how many instructions can be retired before halting (prevents
+	// infinite loops)
+	gas int
 
 	// TODO: we should have a copy of the environment that we write to on each
 	// pass through run, which only gets flattened into the env when complete
@@ -26,6 +31,7 @@ func NewVM() *VM {
 	return &VM{
 		stack: make([]Value, 0, initialStackCap),
 		env:   make(map[string]Value),
+		gas:   defaultGas,
 	}
 }
 
@@ -78,6 +84,11 @@ func (vm *VM) Env(key string) (Value, error) {
 
 func (vm *VM) run() (Value, error) {
 	for {
+		vm.gas--
+		if vm.gas <= 0 {
+			return NoValue, fmt.Errorf("%w (%d)", ErrOutOfGas, defaultGas)
+		}
+
 		op, err := vm.readByte()
 		if err != nil {
 			break // only error this returns is EOF
@@ -159,6 +170,7 @@ func (vm *VM) run() (Value, error) {
 }
 
 var (
+	ErrOutOfGas                  = errors.New("processed more than maximum number of instructions")
 	ErrEmptyStack                = errors.New("tried to pop off empty stack")
 	ErrUnexpectedStackState      = errors.New("unexpected stack state")
 	ErrUnexpectedRegisterState   = errors.New("unexpected register state")
