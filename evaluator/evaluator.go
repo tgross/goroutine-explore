@@ -17,5 +17,6 @@ func Evaluate(compiler *Compiler, src string, env map[string]Value) (Value, erro
 	vm.reset(chunk)
 	val, err := vm.run()
 	// vm.debug()
+
 	return val, err
 }

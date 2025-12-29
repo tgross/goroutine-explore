@@ -8,39 +8,39 @@ func _() {
 	// An "invalid array index" compiler error signifies that the constant values have changed.
 	// Re-run the stringer command to generate them again.
 	var x [1]struct{}
-	_ = x[OpCodeAnd-0]
-	_ = x[OpCodeOr-1]
-	_ = x[OpCodeLoadNumber-2]
-	_ = x[OpCodeLoadString-3]
-	_ = x[OpCodeLoadIdentifier-4]
-	_ = x[OpCodeLoadGoroutineDump-5]
-	_ = x[OpCodeLoadEnv-6]
-	_ = x[OpCodeStoreEnv-7]
-	_ = x[OpCodeLoadFieldAccessor-8]
-	_ = x[OpCodeEqual-9]
-	_ = x[OpCodeGreater-10]
-	_ = x[OpCodeLess-11]
-	_ = x[OpCodePipe-12]
-	_ = x[OpCodeFunction-13]
-	_ = x[OpCodeNextGoroutine-14]
-	_ = x[OpCodeInitDump-15]
-	_ = x[OpCodeTempDump-16]
-	_ = x[OpCodePushDump-17]
-	_ = x[OpCodeJumpIfTrue-18]
-	_ = x[OpCodeJumpIfFalse-19]
-	_ = x[OpCodeJumpTo-20]
-	_ = x[OpCodeLoadAttr-21]
-	_ = x[OpCodeAddGoroutine-22]
-	_ = x[OpCodeRemoveGoroutine-23]
-	_ = x[OpCodeStartIter-24]
-	_ = x[OpCodeAssignment-25]
-	_ = x[OpCodeReturn-26]
-	_ = x[OpCodeContains-27]
+	_ = x[OpCodeNoop-0]
+	_ = x[OpCodeLoadNumber-1]
+	_ = x[OpCodeLoadString-2]
+	_ = x[OpCodeLoadIdentifier-3]
+	_ = x[OpCodeLoadGoroutineDump-4]
+	_ = x[OpCodeLoadEnv-5]
+	_ = x[OpCodeStoreEnv-6]
+	_ = x[OpCodeLoadFieldAccessor-7]
+	_ = x[OpCodeEqual-8]
+	_ = x[OpCodeGreater-9]
+	_ = x[OpCodeLess-10]
+	_ = x[OpCodePipe-11]
+	_ = x[OpCodeFunction-12]
+	_ = x[OpCodeNextGoroutine-13]
+	_ = x[OpCodeInitDump-14]
+	_ = x[OpCodeTempDump-15]
+	_ = x[OpCodePushDump-16]
+	_ = x[OpCodeJumpIfTrue-17]
+	_ = x[OpCodeJumpIfFalse-18]
+	_ = x[OpCodeJumpTo-19]
+	_ = x[OpCodeLoadAttr-20]
+	_ = x[OpCodeAddGoroutine-21]
+	_ = x[OpCodeRemoveGoroutine-22]
+	_ = x[OpCodeStartIter-23]
+	_ = x[OpCodeAssignment-24]
+	_ = x[OpCodeReturn-25]
+	_ = x[OpCodeContains-26]
+	_ = x[OpCodePushBool-27]
 }
 
-const _OpCode_name = "OpCodeAndOpCodeOrOpCodeLoadNumberOpCodeLoadStringOpCodeLoadIdentifierOpCodeLoadGoroutineDumpOpCodeLoadEnvOpCodeStoreEnvOpCodeLoadFieldAccessorOpCodeEqualOpCodeGreaterOpCodeLessOpCodePipeOpCodeFunctionOpCodeNextGoroutineOpCodeInitDumpOpCodeTempDumpOpCodePushDumpOpCodeJumpIfTrueOpCodeJumpIfFalseOpCodeJumpToOpCodeLoadAttrOpCodeAddGoroutineOpCodeRemoveGoroutineOpCodeStartIterOpCodeAssignmentOpCodeReturnOpCodeContains"
+const _OpCode_name = "OpCodeNoopOpCodeLoadNumberOpCodeLoadStringOpCodeLoadIdentifierOpCodeLoadGoroutineDumpOpCodeLoadEnvOpCodeStoreEnvOpCodeLoadFieldAccessorOpCodeEqualOpCodeGreaterOpCodeLessOpCodePipeOpCodeFunctionOpCodeNextGoroutineOpCodeInitDumpOpCodeTempDumpOpCodePushDumpOpCodeJumpIfTrueOpCodeJumpIfFalseOpCodeJumpToOpCodeLoadAttrOpCodeAddGoroutineOpCodeRemoveGoroutineOpCodeStartIterOpCodeAssignmentOpCodeReturnOpCodeContainsOpCodePushBool"
 
-var _OpCode_index = [...]uint16{0, 9, 17, 33, 49, 69, 92, 105, 119, 142, 153, 166, 176, 186, 200, 219, 233, 247, 261, 277, 294, 306, 320, 338, 359, 374, 390, 402, 416}
+var _OpCode_index = [...]uint16{0, 10, 26, 42, 62, 85, 98, 112, 135, 146, 159, 169, 179, 193, 212, 226, 240, 254, 270, 287, 299, 313, 331, 352, 367, 383, 395, 409, 423}
 
 func (i OpCode) String() string {
 	idx := int(i) - 0

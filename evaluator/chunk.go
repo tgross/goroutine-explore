@@ -71,8 +71,7 @@ func (code Op) String() string {
 
 //go:generate stringer -type OpCode
 const (
-	OpCodeAnd OpCode = iota
-	OpCodeOr
+	OpCodeNoop OpCode = iota
 	OpCodeLoadNumber
 	OpCodeLoadString
 	OpCodeLoadIdentifier
@@ -99,6 +98,7 @@ const (
 	OpCodeAssignment
 	OpCodeReturn
 	OpCodeContains
+	OpCodePushBool
 
 	OpCodePatchPlaceholder = 0x000000000000ffff
 )

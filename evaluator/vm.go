@@ -107,9 +107,6 @@ func (vm *VM) run() (Value, error) {
 		case OpCodeContains:
 			err = vm.contains(instruction)
 
-		case OpCodeAnd, OpCodeOr:
-			err = vm.binaryLogic(instruction)
-
 		case OpCodeLoadIdentifier:
 			err = vm.loadEnv(operand)
 
@@ -157,6 +154,10 @@ func (vm *VM) run() (Value, error) {
 			err = vm.handleFieldAccessor(operand)
 		case OpCodeFunction:
 			err = vm.loadAndExecCommand()
+
+		case OpCodePushBool:
+			vm.Push(Value{Tag: TagBool, Data: operand == 1})
+
 		default:
 			return NoValue, fmt.Errorf("%w %s", ErrNoSuchOpCode, instruction)
 		}
@@ -182,35 +183,6 @@ var (
 	ErrExpectedCommand           = errors.New("expected valid command after command byte")
 	ErrNoSuchEnv                 = errors.New("no identifer with name")
 )
-
-// TODO: shouldn't we be short-circuiting evaluation?
-func (vm *VM) binaryLogic(instruction OpCode) error {
-
-	left, err := vm.popBool()
-	if err != nil {
-		return err
-	}
-	right, err := vm.popBool()
-	if err != nil {
-		return err
-	}
-
-	switch instruction {
-	case OpCodeAnd:
-		if right && left {
-			vm.Push(Value{Tag: TagBool, Data: true})
-			return nil
-		}
-	case OpCodeOr:
-		if right || left {
-			vm.Push(Value{Tag: TagBool, Data: true})
-			return nil
-		}
-	}
-
-	vm.Push(Value{Tag: TagBool, Data: false})
-	return nil
-}
 
 func (vm *VM) comparison(instruction OpCode) error {
 	right, err := vm.Pop()

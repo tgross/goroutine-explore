@@ -47,10 +47,6 @@ func newCompiler() *Compiler {
 		p.suffixPrecedenceTab[tok] = prec
 	}
 
-	setupBinary := func(tok TokenType, prec int) {
-		setupInfix(tok, prec, p.parseBinaryExpr)
-	}
-
 	setupPrefix(TokenLeftParen, 0, p.parseParenExpr)
 	setupPrefix(TokenIdentifer, 0, p.parseDumpAccessor)
 	setupPrefix(TokenFieldAccessor, 0, p.parseFieldAccessor)
@@ -61,21 +57,22 @@ func newCompiler() *Compiler {
 	setupPrefix(TokenKeywordWhere, 8, p.parseWhere)
 	setupPrefix(TokenKeywordDelete, 8, p.parseDelete)
 
-	setupBinary(TokenKeywordAnd, 3)
-	setupBinary(TokenKeywordOr, 3)
-	setupBinary(TokenEqual, 4)
-	setupBinary(TokenNotEqual, 4)
-	setupBinary(TokenGreaterEqualThan, 4)
-	setupBinary(TokenGreaterThan, 4)
-	setupBinary(TokenLessEqualThan, 4)
-	setupBinary(TokenLessThan, 4)
-	setupBinary(TokenKeywordContains, 4)
+	setupInfix(TokenKeywordAnd, 3, p.parseBinaryLogicExpr)
+	setupInfix(TokenKeywordOr, 3, p.parseBinaryLogicExpr)
+
+	setupInfix(TokenEqual, 4, p.parseCompareExpr)
+	setupInfix(TokenNotEqual, 4, p.parseCompareExpr)
+	setupInfix(TokenGreaterEqualThan, 4, p.parseCompareExpr)
+	setupInfix(TokenGreaterThan, 4, p.parseCompareExpr)
+	setupInfix(TokenLessEqualThan, 4, p.parseCompareExpr)
+	setupInfix(TokenLessThan, 4, p.parseCompareExpr)
+	setupInfix(TokenKeywordContains, 4, p.parseCompareExpr)
 
 	// TODO: do we need arithmetic operators at all?
-	setupBinary(TokenPlus, 2)
-	setupBinary(TokenMinus, 2)
-	setupBinary(TokenStar, 3)
-	setupBinary(TokenSlash, 3)
+	setupInfix(TokenPlus, 2, p.parseBinaryArithmeticExpr)
+	setupInfix(TokenMinus, 2, p.parseBinaryArithmeticExpr)
+	setupInfix(TokenStar, 3, p.parseBinaryArithmeticExpr)
+	setupInfix(TokenSlash, 3, p.parseBinaryArithmeticExpr)
 
 	setupInfix(TokenAssign, 10, p.parseAssignment)
 	setupInfix(TokenKeywordWhere, 8, p.parseWhere)
@@ -200,26 +197,76 @@ func (p *Compiler) parseNumber(tok Token) error {
 	return nil
 }
 
-func (p *Compiler) parseBinaryExpr(tok Token) error {
+func (p *Compiler) parseBinaryLogicExpr(tok Token) error {
+
+	var addrShort int
+
+	// after evaluating the left-hand side, if we can't short-circuit we jump to
+	// the right-hand side expression. Otherwise we push the bool back onto the
+	// stack and jump past the right-hand side expression.
+	switch tok.Type {
+	case TokenKeywordAnd:
+		addrShort = p.emitBytes(OpCodeJumpIfTrue, OpCodePatchPlaceholder)
+		p.emitBytes(OpCodePushBool, 0)
+	case TokenKeywordOr:
+		addrShort = p.emitBytes(OpCodeJumpIfFalse, OpCodePatchPlaceholder)
+		p.emitBytes(OpCodePushBool, 1)
+	}
+	addrLong := p.emitBytes(OpCodeJumpTo, OpCodePatchPlaceholder)
+
 	err := p.parseExpr(p.infixPrecedenceTab[tok.Type])
 	if err != nil {
 		return err
 	}
 
-	// TODO: currently we don't optimize for short-circuiting
+	offset := len(p.chunk.ops) - addrLong - 2
+	p.patchJump(addrShort, -offset)
+	p.patchJump(addrLong, 1)
+
+	return nil
+}
+
+func (p *Compiler) parseCompareExpr(tok Token) error {
+	err := p.parseExpr(p.infixPrecedenceTab[tok.Type])
+	if err != nil {
+		return err
+	}
+
 	switch tok.Type {
-	case TokenKeywordAnd:
-		p.emitByte(OpCodeAnd)
-	case TokenKeywordOr:
-		p.emitByte(OpCodeOr)
 	case TokenGreaterThan:
 		p.emitByte(OpCodeGreater)
+	case TokenLessThan:
+		p.emitByte(OpCodeLess)
 	case TokenEqual:
 		p.emitByte(OpCodeEqual)
+
+		// TODO: not implemented
+
+	// case TokenNotEqual:
+	// 	p.emitByte(OpCodeNotEqual)
+	// case TokenGreaterEqualThan:
+	// 	p.emitByte(OpCodeGreaterEqual)
+	// case TokenLessEqualThan:
+	// 	p.emitByte(OpCodeLessEqual)
+
 	case TokenKeywordContains:
 		p.emitByte(OpCodeContains)
 	}
 
+	return nil
+}
+
+func (p *Compiler) parseBinaryArithmeticExpr(tok Token) error {
+	err := p.parseExpr(p.infixPrecedenceTab[tok.Type])
+	if err != nil {
+		return err
+	}
+
+	switch tok.Type {
+	case TokenPlus, TokenMinus, TokenStar, TokenSlash:
+		// TODO: implement, if we even want these?
+		return nil
+	}
 	return nil
 }
 
@@ -259,9 +306,10 @@ func (p *Compiler) emitJump(jumpOp OpCode) int {
 }
 
 // patchJump takes an address and patches the instruction at that address to
-// point to the last OpCode in the chunk
-func (p *Compiler) patchJump(addr int) {
-	end := len(p.chunk.ops) - 1
+// point to the last OpCode in the chunk + any offset (to allow patching past
+// the current chunk)
+func (p *Compiler) patchJump(addr, offset int) {
+	end := len(p.chunk.ops) - 1 + offset
 	if addr > len(p.chunk.ops) {
 		panic(fmt.Sprintf("trying to patch too far back: len(chunk)=%d target=%d",
 			len(p.chunk.ops), addr))
@@ -330,7 +378,7 @@ func (p *Compiler) parseFilter(tok Token, keepOnMatch bool) error {
 	// when we run out of goroutines we need to jump to the end of the loop
 	// where we push the temporary dump onto the stack
 	p.emitByte(OpCodePushDump)
-	p.patchJump(addr)
+	p.patchJump(addr, 0)
 
 	return nil
 }

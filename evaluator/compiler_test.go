@@ -34,28 +34,30 @@ func TestCompiler_MultiPipeline(t *testing.T) {
 		encode(OpCodeJumpTo, 2),            // 08 jump to next goroutine
 		encode(OpCodePushDump, 0),          // 09 push to stack
 		encode(OpCodeTempDump, 0),          // 10 refresh scratch register
-		encode(OpCodeNextGoroutine, 22),    // 11 addr when done
+		encode(OpCodeNextGoroutine, 24),    // 11 addr when done
 		encode(OpCodeLoadFieldAccessor, 4), // 12 load .duration
 		encode(OpCodeLoadNumber, 5),        // 13 load 10
 		encode(OpCodeGreater, 0),           // 14 compare push bool to stack
-		encode(OpCodeLoadFieldAccessor, 6), // 15 load .trace
-		encode(OpCodeLoadString, 7),        // 16 load "keepAlive"
-		encode(OpCodeContains, 0),          // 17 compare push bool to stack
-		encode(OpCodeAnd, 0),               // 18 compare 2 from stack
-		encode(OpCodeJumpIfFalse, 11),      // 19 jump to next goroutine
-		encode(OpCodeAddGoroutine, 0),      // 20 keep
-		encode(OpCodeJumpTo, 11),           // 21 jump to next goroutine
-		encode(OpCodePushDump, 0),          // 22 push to stack
-		encode(OpCodeTempDump, 0),          // 23 refresh scratch register
-		encode(OpCodeNextGoroutine, 31),    // 24 addr when done
-		encode(OpCodeLoadFieldAccessor, 8), // 25 load .trace
-		encode(OpCodeLoadString, 9),        // 26 load "gRPC"
-		encode(OpCodeContains, 0),          // 27 compare push bool to stack
-		encode(OpCodeJumpIfTrue, 24),       // 28 jump to next goroutine
-		encode(OpCodeAddGoroutine, 0),      // 29 keep
-		encode(OpCodeJumpTo, 24),           // 30 jump to next goroutine
-		encode(OpCodePushDump, 0),          // 31 push to stack
-		encode(OpCodeAssignment, 0),        // 31 push to stack
+		encode(OpCodeJumpIfTrue, 18),       // 15 jump to next expr in "and"
+		encode(OpCodePushBool, 0),          // 16 push false
+		encode(OpCodeJumpTo, 21),           // 17 jump to end of "and"
+		encode(OpCodeLoadFieldAccessor, 6), // 18 load .trace
+		encode(OpCodeLoadString, 7),        // 19 load "keepAlive"
+		encode(OpCodeContains, 0),          // 20 compare push bool to stack
+		encode(OpCodeJumpIfFalse, 11),      // 21 jump to next goroutine
+		encode(OpCodeAddGoroutine, 0),      // 22 keep
+		encode(OpCodeJumpTo, 11),           // 23 jump to next goroutine
+		encode(OpCodePushDump, 0),          // 24 push to stack
+		encode(OpCodeTempDump, 0),          // 25 refresh scratch register
+		encode(OpCodeNextGoroutine, 33),    // 26 addr when done
+		encode(OpCodeLoadFieldAccessor, 8), // 27 load .trace
+		encode(OpCodeLoadString, 9),        // 28 load "gRPC"
+		encode(OpCodeContains, 0),          // 29 compare push bool to stack
+		encode(OpCodeJumpIfTrue, 26),       // 30 jump to next goroutine
+		encode(OpCodeAddGoroutine, 0),      // 31 keep
+		encode(OpCodeJumpTo, 26),           // 32 jump to next goroutine
+		encode(OpCodePushDump, 0),          // 33 push to stack
+		encode(OpCodeAssignment, 0),        // 34 push to stack
 	},
 		chunk.ops,
 	)
@@ -91,11 +93,11 @@ func TestCompiler_SimpleWhere(t *testing.T) {
 func TestCompiler_JumpPatch(t *testing.T) {
 	compiler := newCompiler()
 	compiler.chunk = NewChunk()
-	addr := compiler.emitJump(OpCodeJumpIfTrue)
-	compiler.emitByte(OpCode(0))
-	compiler.emitByte(OpCode(0))
-	compiler.emitByte(OpCode(0))
-	compiler.patchJump(addr)
+	addr := compiler.emitBytes(OpCodeJumpIfTrue, 0)
+	compiler.emitByte(OpCodeNoop)
+	compiler.emitByte(OpCodeNoop)
+	compiler.emitByte(OpCodeNoop)
+	compiler.patchJump(addr, 0)
 
 	fmt.Println(compiler.chunk.disassemble(0))
 	jumpOp, jumpAddr := compiler.chunk.ops[0].decode()
@@ -140,18 +142,20 @@ func TestCompiler_CompoundWhere(t *testing.T) {
 	must.Eq(t, []Op{
 		encode(OpCodeLoadGoroutineDump, 0), // 00 load g
 		encode(OpCodeTempDump, 0),          // 01 scratch register
-		encode(OpCodeNextGoroutine, 13),    // 02 next w/ addr to jump when done
+		encode(OpCodeNextGoroutine, 15),    // 02 next w/ addr to jump when done
 		encode(OpCodeLoadFieldAccessor, 1), // 03 load .duration
 		encode(OpCodeLoadNumber, 2),        // 04 load 2
 		encode(OpCodeGreater, 0),           // 05 compare push bool to stack
-		encode(OpCodeLoadFieldAccessor, 3), // 06 load .state
-		encode(OpCodeLoadString, 4),        // 07 load "select"
-		encode(OpCodeEqual, 0),             // 08 compare push bool to stack
-		encode(OpCodeAnd, 0),               // 09 compare 2 on stack
-		encode(OpCodeJumpIfFalse, 2),       // 10 skip and jump to next goroutine
-		encode(OpCodeAddGoroutine, 0),      // 11 keep
-		encode(OpCodeJumpTo, 2),            // 12 jump to next goroutine
-		encode(OpCodePushDump, 0),          // 13 push to stack
+		encode(OpCodeJumpIfTrue, 9),        // 06 jump to next expr in "and"
+		encode(OpCodePushBool, 0),          // 07 push false
+		encode(OpCodeJumpTo, 12),           // 08 jump to end of "and"
+		encode(OpCodeLoadFieldAccessor, 3), // 09 load .state
+		encode(OpCodeLoadString, 4),        // 10 load "select"
+		encode(OpCodeEqual, 0),             // 11 compare push bool to stack
+		encode(OpCodeJumpIfFalse, 2),       // 12 skip + jump to next goroutine
+		encode(OpCodeAddGoroutine, 0),      // 13 keep
+		encode(OpCodeJumpTo, 2),            // 14 jump to next goroutine
+		encode(OpCodePushDump, 0),          // 15 push to stack
 	},
 		chunk.ops,
 	)
@@ -170,22 +174,26 @@ func TestCompiler_ParentheticalWhere(t *testing.T) {
 	must.Eq(t, []Op{
 		encode(OpCodeLoadGoroutineDump, 0), // 00 load g
 		encode(OpCodeTempDump, 0),          // 01 scratch register
-		encode(OpCodeNextGoroutine, 17),    // 02 addr to jump to when done
+		encode(OpCodeNextGoroutine, 21),    // 02 addr to jump to when done
 		encode(OpCodeLoadFieldAccessor, 1), // 03 load .duration
 		encode(OpCodeLoadNumber, 2),        // 04 load 10
 		encode(OpCodeGreater, 0),           // 05 compare push bool to stack
-		encode(OpCodeLoadFieldAccessor, 3), // 06 load .state
-		encode(OpCodeLoadString, 4),        // 07 load "select"
-		encode(OpCodeEqual, 0),             // 08 compare push bool to stack
-		encode(OpCodeAnd, 0),               // 09 compare 2 from stack
-		encode(OpCodeLoadFieldAccessor, 5), // 10 load .state
-		encode(OpCodeLoadString, 6),        // 11 load "running"
-		encode(OpCodeEqual, 0),             // 12 compare push bool to stack
-		encode(OpCodeOr, 0),                // 13 compare previous comparisons
-		encode(OpCodeJumpIfFalse, 2),       // 14 skip, jump back to top of loop
-		encode(OpCodeAddGoroutine, 0),      // 15 keep this goroutine
-		encode(OpCodeJumpTo, 2),            // 16 unconditional jump
-		encode(OpCodePushDump, 0),          // 17 push to stack
+		encode(OpCodeJumpIfTrue, 9),        // 06 jump to next expr in "and"
+		encode(OpCodePushBool, 0),          // 07 push false
+		encode(OpCodeJumpTo, 12),           // 08 jump to end of "and"
+		encode(OpCodeLoadFieldAccessor, 3), // 09 load .state
+		encode(OpCodeLoadString, 4),        // 10 load "select"
+		encode(OpCodeEqual, 0),             // 11 compare push bool to stack
+		encode(OpCodeJumpIfFalse, 15),      // 12 jump to next expr in "or"
+		encode(OpCodePushBool, 1),          // 13 push true
+		encode(OpCodeJumpTo, 18),           // 14 jump to end of "or"
+		encode(OpCodeLoadFieldAccessor, 5), // 15 load .state
+		encode(OpCodeLoadString, 6),        // 16 load "running"
+		encode(OpCodeEqual, 0),             // 17 compare push bool to stack
+		encode(OpCodeJumpIfFalse, 2),       // 18 skip + goto next goroutine
+		encode(OpCodeAddGoroutine, 0),      // 19 keep this goroutine
+		encode(OpCodeJumpTo, 2),            // 20 unconditional jump
+		encode(OpCodePushDump, 0),          // 21 push to stack
 	},
 		chunk.ops,
 	)
