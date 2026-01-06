@@ -36,11 +36,25 @@ func _() {
 	_ = x[OpCodeReturn-25]
 	_ = x[OpCodeContains-26]
 	_ = x[OpCodePushBool-27]
+	_ = x[OpCodeFuncSave-28]
+	_ = x[OpCodeFuncLoad-29]
+	_ = x[OpCodeFuncShowDump-30]
+	_ = x[OpCodeFuncUnion-31]
+	_ = x[OpCodeFuncDiff-32]
+	_ = x[OpCodeFuncIntersect-33]
+	_ = x[OpCodeCommandEmpty-34]
+	_ = x[OpCodeCommandQuit-35]
+	_ = x[OpCodeCommandHelp-36]
+	_ = x[OpCodeCommandListDir-37]
+	_ = x[OpCodeCommandGetWorkingDir-38]
+	_ = x[OpCodeCommandVars-39]
+	_ = x[OpCodeCommandChangeDir-40]
+	_ = x[OpCodeCommandPragma-41]
 }
 
-const _OpCode_name = "OpCodeNoopOpCodeLoadNumberOpCodeLoadStringOpCodeLoadIdentifierOpCodeLoadGoroutineDumpOpCodeLoadEnvOpCodeStoreEnvOpCodeLoadFieldAccessorOpCodeEqualOpCodeGreaterOpCodeLessOpCodePipeOpCodeFunctionOpCodeNextGoroutineOpCodeInitDumpOpCodeTempDumpOpCodePushDumpOpCodeJumpIfTrueOpCodeJumpIfFalseOpCodeJumpToOpCodeLoadAttrOpCodeAddGoroutineOpCodeRemoveGoroutineOpCodeStartIterOpCodeAssignmentOpCodeReturnOpCodeContainsOpCodePushBool"
+const _OpCode_name = "OpCodeNoopOpCodeLoadNumberOpCodeLoadStringOpCodeLoadIdentifierOpCodeLoadGoroutineDumpOpCodeLoadEnvOpCodeStoreEnvOpCodeLoadFieldAccessorOpCodeEqualOpCodeGreaterOpCodeLessOpCodePipeOpCodeFunctionOpCodeNextGoroutineOpCodeInitDumpOpCodeTempDumpOpCodePushDumpOpCodeJumpIfTrueOpCodeJumpIfFalseOpCodeJumpToOpCodeLoadAttrOpCodeAddGoroutineOpCodeRemoveGoroutineOpCodeStartIterOpCodeAssignmentOpCodeReturnOpCodeContainsOpCodePushBoolOpCodeFuncSaveOpCodeFuncLoadOpCodeFuncShowDumpOpCodeFuncUnionOpCodeFuncDiffOpCodeFuncIntersectOpCodeCommandEmptyOpCodeCommandQuitOpCodeCommandHelpOpCodeCommandListDirOpCodeCommandGetWorkingDirOpCodeCommandVarsOpCodeCommandChangeDirOpCodeCommandPragma"
 
-var _OpCode_index = [...]uint16{0, 10, 26, 42, 62, 85, 98, 112, 135, 146, 159, 169, 179, 193, 212, 226, 240, 254, 270, 287, 299, 313, 331, 352, 367, 383, 395, 409, 423}
+var _OpCode_index = [...]uint16{0, 10, 26, 42, 62, 85, 98, 112, 135, 146, 159, 169, 179, 193, 212, 226, 240, 254, 270, 287, 299, 313, 331, 352, 367, 383, 395, 409, 423, 437, 451, 469, 484, 498, 517, 535, 552, 569, 589, 615, 632, 654, 673}
 
 func (i OpCode) String() string {
 	idx := int(i) - 0

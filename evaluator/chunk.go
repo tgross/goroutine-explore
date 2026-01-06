@@ -100,5 +100,23 @@ const (
 	OpCodeContains
 	OpCodePushBool
 
+	// functions
+	OpCodeFuncSave
+	OpCodeFuncLoad
+	OpCodeFuncShowDump
+	OpCodeFuncUnion
+	OpCodeFuncDiff
+	OpCodeFuncIntersect
+
+	// commands
+	OpCodeCommandEmpty
+	OpCodeCommandQuit
+	OpCodeCommandHelp
+	OpCodeCommandListDir
+	OpCodeCommandGetWorkingDir
+	OpCodeCommandVars
+	OpCodeCommandChangeDir
+	OpCodeCommandPragma
+
 	OpCodePatchPlaceholder = 0x000000000000ffff
 )

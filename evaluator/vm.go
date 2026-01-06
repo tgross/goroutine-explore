@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"os"
 	"strings"
 )
 
@@ -22,23 +23,35 @@ type VM struct {
 	// TODO: we should have a copy of the environment that we write to on each
 	// pass through run, which only gets flattened into the env when complete
 	env map[string]Value
+	cwd *os.Root
 
 	regGoroutine *Goroutine
 	regDumpDst   *GoroutineDump
 }
 
-func NewVM() *VM {
+type vmConfig struct {
+	cwd string
+}
+
+func NewVM(cfg *vmConfig) (*VM, error) {
+	root, err := os.OpenRoot(cfg.cwd)
+	if err != nil {
+		return nil, err
+	}
+
 	return &VM{
 		stack: make([]Value, 0, initialStackCap),
 		env:   make(map[string]Value),
+		cwd:   root,
 		gas:   defaultGas,
-	}
+	}, nil
 }
 
 func (vm *VM) reset(chunk *Chunk) {
 	vm.ip = -1
 	vm.chunk = chunk
 	vm.stack = make([]Value, 0, initialStackCap)
+	vm.gas = defaultGas
 }
 
 func (vm *VM) readByte() (Op, error) {
@@ -152,11 +165,40 @@ func (vm *VM) run() (Value, error) {
 
 		case OpCodeLoadFieldAccessor:
 			err = vm.handleFieldAccessor(operand)
-		case OpCodeFunction:
-			err = vm.loadAndExecCommand()
 
 		case OpCodePushBool:
 			vm.Push(Value{Tag: TagBool, Data: operand == 1})
+
+		case OpCodeCommandChangeDir:
+			err = vm.commandChangeDir(operand)
+			return NoValue, err
+
+		case OpCodeCommandEmpty:
+			vm.env = map[string]Value{}
+			return NoValue, nil
+
+		case OpCodeCommandGetWorkingDir:
+			return vm.commandGetWorkDir(), nil
+
+		case OpCodeCommandQuit:
+			// TODO: how do we expect caller to detect this and quit?
+			return NoValue, err
+
+		case OpCodeCommandHelp:
+			return vm.commandHelp(operand)
+
+		case OpCodeCommandListDir:
+		case OpCodeCommandVars:
+		case OpCodeCommandPragma:
+			// TODO: probably just need a function for each one?
+			//err = vm.loadAndExecCommand()
+
+		case OpCodeFuncUnion:
+		case OpCodeFuncDiff:
+		case OpCodeFuncIntersect:
+		case OpCodeFuncShowDump:
+		case OpCodeFuncLoad:
+		case OpCodeFuncSave:
 
 		default:
 			return NoValue, fmt.Errorf("%w %s", ErrNoSuchOpCode, instruction)
@@ -504,25 +546,44 @@ func (vm *VM) handleJumpTo(addr uint) error {
 	return nil
 }
 
-var commandCodes = []string{
-	"cd", "empty", "exit", "help", "ls", "pwd", "pragma", "quit", "vars",
+func (vm *VM) commandGetWorkDir() Value {
+	return Value{
+		Tag:  TagString,
+		Data: vm.cwd.Name(),
+	}
 }
 
-var commandFns = map[string]Command{}
-
-func (vm *VM) loadAndExecCommand() error {
-	index, err := vm.readByte()
+func (vm *VM) commandChangeDir(index uint) error {
+	con, err := vm.fetchConstant(index)
 	if err != nil {
-		return fmt.Errorf("%w: missing index byte", ErrExpectedCommand)
+		return err
 	}
-	if int(index) > len(commandCodes) {
-		return fmt.Errorf("%w: no such command with index %d", ErrExpectedCommand, index)
+	path, ok := con.(string)
+	if !ok {
+		return fmt.Errorf("cd requires a string argument")
 	}
-
-	name := commandCodes[index]
-	cmd := commandFns[name]
-	return cmd(vm)
+	root, err := os.OpenRoot(path)
+	if err != nil {
+		return err
+	}
+	vm.cwd = root
+	return nil
 }
 
-// Commands have side-effects on the VM state
-type Command func(*VM) error
+func (vm *VM) commandHelp(index uint) (Value, error) {
+	// TODO: what about when we have no topic?
+	con, err := vm.fetchConstant(index)
+	if err != nil {
+		return NoValue, err
+	}
+	topic, ok := con.(string)
+	if !ok {
+		return NoValue, fmt.Errorf("help topics must be strings")
+	}
+
+	return Value{
+		Tag: TagString,
+		// TODO: lookup help for topic here?
+		Data: fmt.Sprintf("help for topic: %s", topic),
+	}, nil
+}

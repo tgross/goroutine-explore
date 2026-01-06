@@ -9,7 +9,7 @@ import (
 )
 
 func TestVM_BasicStackOps(t *testing.T) {
-	vm := NewVM()
+	vm, _ := NewVM(&vmConfig{cwd: t.TempDir()})
 
 	vm.Push(Value{Tag: TagNumber, Data: 1})
 	vm.Push(Value{Tag: TagNumber, Data: 2})
@@ -47,7 +47,7 @@ func TestVM_SimpleWhere(t *testing.T) {
 		},
 		constants: []any{"g1", "g", ".duration", 10},
 	}
-	vm := NewVM()
+	vm, _ := NewVM(&vmConfig{cwd: t.TempDir()})
 	vm.reset(chunk)
 
 	gd := &GoroutineDump{}
@@ -78,7 +78,7 @@ func TestVM_SimpleWhere(t *testing.T) {
 }
 
 func TestVM_DemoFunction(t *testing.T) {
-	vm := NewVM()
+	vm, _ := NewVM(&vmConfig{cwd: t.TempDir()})
 	vm.stack = []Value{
 		{Tag: TagBool, Data: nil},
 	}

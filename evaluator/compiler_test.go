@@ -198,3 +198,93 @@ func TestCompiler_ParentheticalWhere(t *testing.T) {
 		chunk.ops,
 	)
 }
+
+func TestCompiler_NestedExpressions(t *testing.T) {
+	src := `g1 union (g2 where .duration > 10) | show`
+	body := strings.NewReader(src)
+
+	tokenizer := NewTokenizer(body)
+	compiler := newCompiler()
+	chunk, err := compiler.Compile(tokenizer)
+	fmt.Println(chunk.disassemble(0))
+	must.NoError(t, err)
+
+	must.Eq(t, []Op{
+		encode(OpCodeLoadGoroutineDump, 0), // 00 load g1
+		encode(OpCodeLoadGoroutineDump, 1), // 01 load g2
+		encode(OpCodeTempDump, 0),          // 02 setup scratch register
+		encode(OpCodeNextGoroutine, 10),    // 03 addr when done
+		encode(OpCodeLoadFieldAccessor, 2), // 04 load .duration
+		encode(OpCodeLoadNumber, 3),        // 05 load 10
+		encode(OpCodeGreater, 0),           // 06 compare push bool to stack
+		encode(OpCodeJumpIfFalse, 3),       // 07 addr if false
+		encode(OpCodeAddGoroutine, 0),      // 08 keep
+		encode(OpCodeJumpTo, 3),            // 09 unconditional jump to addr
+		encode(OpCodePushDump, 0),          // 10 push temp dump to stack
+		encode(OpCodeFuncUnion, 0),         // 11 union
+	}, chunk.ops)
+}
+
+func TestCompiler_Paths(t *testing.T) {
+	testCases := []struct {
+		name       string
+		src        string
+		expect     []Op
+		expectPath string
+	}{
+		{
+			name: "unquoted with spaces",
+			src:  `cd /path to directory`,
+			expect: []Op{
+				encode(OpCodeLoadString, 0),
+				encode(OpCodeCommandChangeDir, 0), // cd
+			},
+			// TODO: having this parse rather than error kinda sucks
+			expectPath: `/pathtodirectory`,
+		},
+		{
+			name: "quoted with spaces",
+			src:  `cd "/path to directory"`,
+			expect: []Op{
+				encode(OpCodeLoadString, 0),
+				encode(OpCodeCommandChangeDir, 0), // cd
+			},
+			expectPath: `/path to directory`,
+		},
+		{
+			name: "unquoted without spaces",
+			src:  `cd /path/to/direct.ory`,
+			expect: []Op{
+				encode(OpCodeLoadString, 0),
+				encode(OpCodeCommandChangeDir, 0), // cd
+			},
+			expectPath: `/path/to/direct.ory`,
+		},
+		{
+			name: "unquoted piped",
+			src:  `load /path/to/dump.txt | show 100 10`,
+			expect: []Op{
+				encode(OpCodeLoadString, 0),
+				encode(OpCodeFuncLoad, 0),     // load
+				encode(OpCodeLoadNumber, 1),   // 100
+				encode(OpCodeLoadNumber, 2),   // 10
+				encode(OpCodeFuncShowDump, 0), // show
+			},
+			expectPath: `/path/to/dump.txt`,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			body := strings.NewReader(tc.src)
+			tokenizer := NewTokenizer(body)
+			compiler := newCompiler()
+			chunk, err := compiler.Compile(tokenizer)
+			must.NoError(t, err)
+
+			fmt.Println(chunk.disassemble(0))
+			must.Eq(t, tc.expect, chunk.ops)
+			must.Eq(t, tc.expectPath, chunk.constants[0].(string))
+		})
+	}
+}

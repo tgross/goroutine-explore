@@ -4,6 +4,7 @@ import (
 	"iter"
 	"strings"
 	"testing"
+	"text/scanner"
 
 	"github.com/shoenig/test/must"
 )
@@ -19,29 +20,99 @@ func TestTokenizer_SmokeTest(t *testing.T) {
 	t.Cleanup(stop)
 
 	expectedTypes := []TokenType{
-		TokenIdentifer,     // g
-		TokenKeywordWhere,  // where
-		TokenLeftParen,     // (
-		TokenFieldAccessor, // .duration
-		TokenGreaterThan,   // >
-		TokenNumber,        // 10
-		TokenKeywordAnd,    // and
-		TokenFieldAccessor, // .state
-		TokenEqual,         // ==
-		TokenString,        // "select"
-		TokenRightParen,    // )
-		TokenPipe,          // |
-		TokenFunction,      // union
-		TokenIdentifer,     // g1
-		TokenPipe,          // |
-		TokenFunction,      // as
-		TokenIdentifer,     // g2
-		TokenPipe,          // |
-		TokenFunction,      // show
+		TokenIdentifier,     // g
+		TokenKeywordWhere,   // where
+		TokenLeftParen,      // (
+		TokenFieldAccessor,  // .duration
+		TokenGreaterThan,    // >
+		TokenNumber,         // 10
+		TokenKeywordAnd,     // and
+		TokenFieldAccessor,  // .state
+		TokenEqual,          // ==
+		TokenString,         // "select"
+		TokenRightParen,     // )
+		TokenPipe,           // |
+		TokenFunctionBinary, // union
+		TokenIdentifier,     // g1
+		TokenPipe,           // |
+		TokenFunction,       // as
+		TokenIdentifier,     // g2
+		TokenPipe,           // |
+		TokenFunction,       // show
 	}
 
+	got := testCollectTokens(t, next)
 	gotTypes := []TokenType{}
+	for _, token := range got {
+		gotTypes = append(gotTypes, token.Type)
+	}
+	must.Eq(t, expectedTypes, gotTypes)
+}
 
+func TestTokenizer_CommandArgs(t *testing.T) {
+	testCases := []struct {
+		src    string
+		expect []Token
+	}{
+		{
+			src: `pragma show.dedup number`,
+			expect: []Token{
+				Token{TokenCommand, `pragma`, scanner.Position{
+					Filename: "", Offset: 0, Line: 1, Column: 1}},
+				Token{TokenFunction, `show`, scanner.Position{
+					Filename: "", Offset: 7, Line: 1, Column: 8}},
+				Token{TokenFieldAccessor, `.dedup`, scanner.Position{
+					Filename: "", Offset: 11, Line: 1, Column: 12}},
+				Token{TokenIdentifier, `number`, scanner.Position{
+					Filename: "", Offset: 18, Line: 1, Column: 19}},
+			},
+		},
+		{
+			src: `cd "/foo/bar"`,
+			expect: []Token{
+				Token{TokenCommand, `cd`, scanner.Position{
+					Filename: "", Offset: 0, Line: 1, Column: 1}},
+				Token{TokenString, `/foo/bar`, scanner.Position{
+					Filename: "", Offset: 3, Line: 1, Column: 4}},
+			},
+		},
+		{
+			src: `cd /foo/bar`,
+			expect: []Token{
+				Token{TokenCommand, `cd`, scanner.Position{
+					Filename: "", Offset: 0, Line: 1, Column: 1}},
+				Token{TokenSlash, `/`, scanner.Position{
+					Filename: "", Offset: 3, Line: 1, Column: 4}},
+				Token{TokenIdentifier, `foo`, scanner.Position{
+					Filename: "", Offset: 4, Line: 1, Column: 5}},
+				Token{TokenSlash, `/`, scanner.Position{
+					Filename: "", Offset: 7, Line: 1, Column: 8}},
+				Token{TokenIdentifier, `bar`, scanner.Position{
+					Filename: "", Offset: 8, Line: 1, Column: 9}},
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run("", func(t *testing.T) {
+			body := strings.NewReader(tc.src)
+			tokenizer := NewTokenizer(body)
+			next, stop := iter.Pull2(tokenizer.Tokens())
+			t.Cleanup(stop)
+
+			got := testCollectTokens(t, next)
+			must.Eq(t, tc.expect, got)
+		})
+	}
+}
+
+// testCollectTokens is a helper that consumes the entire tokenizer and returns
+// a slice of tokens
+func testCollectTokens(
+	t *testing.T, next func() (Token, error, bool),
+) []Token {
+	t.Helper()
+	got := []Token{}
 DONE:
 	for {
 		token, err, ok := next()
@@ -53,10 +124,8 @@ DONE:
 			must.EqError(t, err, ErrEOF.Error())
 			break DONE
 		default:
-			t.Logf("[%02x] %s\n", token.Type, token)
-			gotTypes = append(gotTypes, token.Type)
+			got = append(got, token)
 		}
 	}
-
-	must.Eq(t, expectedTypes, gotTypes)
+	return got
 }

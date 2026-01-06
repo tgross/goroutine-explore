@@ -48,7 +48,7 @@ func newCompiler() *Compiler {
 	}
 
 	setupPrefix(TokenLeftParen, 0, p.parseParenExpr)
-	setupPrefix(TokenIdentifer, 0, p.parseDumpAccessor)
+	setupPrefix(TokenIdentifier, 0, p.parseDumpAccessor)
 	setupPrefix(TokenFieldAccessor, 0, p.parseFieldAccessor)
 	setupPrefix(TokenString, 0, p.parseString)
 	setupPrefix(TokenNumber, 0, p.parseNumber)
@@ -67,6 +67,7 @@ func newCompiler() *Compiler {
 	setupInfix(TokenLessEqualThan, 4, p.parseCompareExpr)
 	setupInfix(TokenLessThan, 4, p.parseCompareExpr)
 	setupInfix(TokenKeywordContains, 4, p.parseCompareExpr)
+	setupInfix(TokenFunctionBinary, 2, p.parseBinaryFunction)
 
 	// TODO: do we need arithmetic operators at all?
 	setupInfix(TokenPlus, 2, p.parseBinaryArithmeticExpr)
@@ -78,6 +79,8 @@ func newCompiler() *Compiler {
 	setupInfix(TokenKeywordWhere, 8, p.parseWhere)
 	setupInfix(TokenKeywordDelete, 8, p.parseDelete)
 
+	//setupInfix(TokenComma, 9, p.parseComma)
+
 	setupSuffix(TokenPipe, 2, p.parsePipeExpr)
 
 	return p
@@ -86,8 +89,14 @@ func newCompiler() *Compiler {
 func (p *Compiler) Compile(tokenizer *Tokenizer) (*Chunk, error) {
 	p.chunk = NewChunk()
 	p.tokenizer = tokenizer
-	err := p.parseExpr(0)
-	if err != nil {
+	for {
+		err := p.parseExpr(0)
+		if err == nil {
+			continue
+		}
+		if errors.Is(err, ErrEOF) && len(p.chunk.ops) > 0 {
+			break
+		}
 		// we may have a partial chunk here, so returning it makes debugging
 		// easier even though this isn't ideomatic
 		return p.chunk, err
@@ -171,6 +180,11 @@ func (p *Compiler) parseDumpAccessor(tok Token) error {
 		// assignment will consume this token from the last constant
 		p.createConst(tok.Lexeme)
 		return nil
+	}
+	if next.Type == TokenComma {
+		p.createConst(tok.Lexeme)
+		p.consume(TokenComma)
+		// TODO: need to read to next item
 	}
 
 	p.emitLoadConst(OpCodeLoadGoroutineDump, tok.Lexeme)
@@ -276,6 +290,43 @@ func (p *Compiler) parseParenExpr(tok Token) error {
 		return err
 	}
 	return p.expect(TokenRightParen)
+}
+
+func (p *Compiler) expectNoMoreArgs() error {
+	_, err := p.tokenizer.Peek()
+	if err == nil {
+		return ErrTooManyArgs
+	}
+	if errors.Is(err, ErrEOF) {
+		return nil
+	}
+	return err
+}
+
+func (p *Compiler) consume(want TokenType) (Token, error) {
+	tok, err := p.tokenizer.Peek()
+	if err != nil {
+		return EmptyToken, err
+	}
+	if tok.Type != want {
+		// TODO: we didn't implement stringer for Token but if we're going to
+		// return it in errors we probably should
+		return EmptyToken, fmt.Errorf("expected %v, got %s", want, tok)
+	}
+	tok, err = p.tokenizer.Next()
+	return tok, err
+}
+
+func (p *Compiler) maybeConsume(want TokenType) (Token, error) {
+	tok, err := p.tokenizer.Peek()
+	if err != nil {
+		return EmptyToken, nil
+	}
+	if tok.Type != want {
+		return EmptyToken, nil
+	}
+	tok, err = p.tokenizer.Next()
+	return tok, err
 }
 
 func (p *Compiler) expect(want TokenType) error {
@@ -389,48 +440,177 @@ func (p *Compiler) parseFilter(tok Token, keepOnMatch bool) error {
 func (p *Compiler) parseCommand(tok Token) error {
 	name := tok.Lexeme
 	switch name {
+	case "empty":
+		p.emitByte(OpCodeCommandEmpty)
+	case "exit", "quit":
+		p.emitByte(OpCodeCommandQuit)
+	case "help":
+		p.emitByte(OpCodeCommandHelp)
 	case "ls":
-		// TODO, etc.
-	default:
-	}
-	return nil
-}
-
-var funcCodes = []string{
-	"as", "delete", "diff", "intersect", "load", "save", "show", "union",
-}
-
-func (p *Compiler) parseFunction(tok Token) error {
-	name := tok.Lexeme
-	for {
-		err := p.parseExpr(1)
+		p.emitByte(OpCodeCommandListDir)
+	case "pwd":
+		p.emitByte(OpCodeCommandGetWorkingDir)
+	case "vars":
+		p.emitByte(OpCodeCommandVars)
+	case "cd":
+		err := p.parsePath()
+		if err != nil {
+			return fmt.Errorf("invalid arguments for cd: %w", err)
+		}
+		p.emitByte(OpCodeCommandChangeDir)
+	case "pragma":
+		err := p.parsePragma()
 		if err != nil {
 			return err
 		}
+		p.emitByte(OpCodeCommandPragma)
+	default:
+		panic("unknown command") // TODO
+	}
+
+	return nil
+}
+
+var ErrTooManyArgs = errors.New("too many arguments")
+var ErrExpectedPath = errors.New("expected a path argument")
+
+func (p *Compiler) parsePath() error {
+	var ok bool
+	path := ""
+
+	for {
 		tok, err := p.tokenizer.Peek()
 		if tok.Type == TokenPipe || errors.Is(err, ErrEOF) {
 			break
 		}
-		_, err = p.tokenizer.Next()
+		tok, err = p.tokenizer.Next()
 		if err != nil {
 			return err
 		}
+		ok = true
+		path += tok.Lexeme
 	}
-	// TODO: this is a little goofy because we'll end up needing another map in
-	// the VM to go from the function-specific OpCode to a function. Should we
-	// just have an OpCode for each function?
-	var fnCode OpCode
-	for i, fn := range funcCodes {
-		if fn == name {
-			fnCode = OpCode(i)
-			break
-		}
-	}
-	if fnCode == OpCode(0) {
-		return fmt.Errorf("unknown function: %v", name)
+	if !ok { // empty!
+		return ErrExpectedPath
 	}
 
-	p.emitBytes(OpCodeFunction, uint(fnCode))
+	p.parseString(Token{Type: TokenString, Lexeme: path})
+	return nil
+}
+
+func (p *Compiler) parsePragma() error {
+	return nil // TODO
+}
+
+var funcCodes = []string{
+	"diff", "intersect", "union",
+}
+
+func (p *Compiler) parseFunction(tok Token) error {
+	switch tok.Lexeme {
+	case "load":
+		err := p.parsePath()
+		if err != nil {
+			return err
+		}
+		p.emitByte(OpCodeFuncLoad)
+		return nil
+	case "save":
+		err := p.parsePath()
+		if err != nil {
+			return err
+		}
+		p.emitByte(OpCodeFuncSave)
+		return nil
+	case "as":
+		tok, err := p.consume(TokenIdentifier)
+		if err != nil {
+			return err
+		}
+		nameIdx := p.createConst(tok.Lexeme)
+		p.emitBytes(OpCodeAssignment, uint(nameIdx))
+		return nil
+	case "show":
+		tokCount, err := p.maybeConsume(TokenNumber)
+		if err != nil {
+			return err
+		}
+		if tokCount == EmptyToken {
+			p.emitLoadConst(OpCodeLoadNumber, 0) // TODO: pragma?
+		} else {
+			_ = p.parseNumber(tokCount)
+		}
+
+		tokOffset, err := p.maybeConsume(TokenNumber)
+		if err != nil {
+			return err
+		}
+		if tokOffset == EmptyToken {
+			p.emitLoadConst(OpCodeLoadNumber, 0) // TODO: pragma?
+		} else {
+			_ = p.parseNumber(tokOffset)
+		}
+		p.emitByte(OpCodeFuncShowDump)
+		return nil
+	default:
+		panic("no such function")
+	}
+	// TODO: I think we can just bail here?
+
+	// for {
+	// 	err := p.parseExpr(1)
+	// 	if err != nil {
+	// 		return err
+	// 	}
+	// 	tok, err := p.tokenizer.Peek()
+	// 	if tok.Type == TokenPipe || errors.Is(err, ErrEOF) {
+	// 		break
+	// 	}
+	// 	_, err = p.tokenizer.Next()
+	// 	if err != nil {
+	// 		return err
+	// 	}
+	// }
+	// // TODO: this is a little goofy because we'll end up needing another map in
+	// // the VM to go from the function-specific OpCode to a function. Should we
+	// // just have an OpCode for each function?
+	// var fnCode OpCode
+	// for i, fn := range funcCodes {
+	// 	if fn == name {
+	// 		fnCode = OpCode(i)
+	// 		break
+	// 	}
+	// }
+	// if fnCode == OpCode(0) {
+	// 	// TODO: this is always a programmer error?
+	// 	return fmt.Errorf("unknown function: %v", name)
+	// }
+
+	// p.emitBytes(OpCodeFunction, uint(fnCode))
+	// return nil
+}
+
+func (p *Compiler) parseBinaryFunction(tok Token) error {
+	name := tok.Lexeme
+
+	err := p.parseExpr(2) // TODO: what precedence?
+	if err != nil && !errors.Is(err, ErrEOF) {
+		return err
+	}
+
+	switch name {
+	case "union":
+		p.emitByte(OpCodeFuncUnion)
+	case "intersect":
+		p.emitByte(OpCodeFuncIntersect)
+	case "diff":
+		p.emitByte(OpCodeFuncDiff)
+
+	default:
+		// TODO: this is always a programmer error?
+		panic("no such binary function")
+	}
+
 	return nil
 }
 

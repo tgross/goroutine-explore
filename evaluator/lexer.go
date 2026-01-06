@@ -49,21 +49,22 @@ const (
 	TokenGreaterEqualThan // 16
 
 	// literals
-	TokenIdentifer // 17
-	TokenString    // 18
-	TokenNumber    // 19
+	TokenIdentifier // 17
+	TokenString     // 18
+	TokenNumber     // 19
 
 	TokenKeywordAnd // 20
 	TokenKeywordOr  // 21
 
-	TokenCommand       // 22
-	TokenFunction      // 23
-	TokenKeywordWhere  // 24
-	TokenKeywordDelete // 25
-	TokenKeywordFrom   // 26
-	TokenFieldAccessor // 27
+	TokenCommand        // 22
+	TokenFunction       // 23
+	TokenKeywordWhere   // 24
+	TokenKeywordDelete  // 25
+	TokenKeywordFrom    // 26
+	TokenFunctionBinary // 27
+	TokenFieldAccessor  // 28
 
-	TokenKeywordContains // 28
+	TokenKeywordContains // 29
 )
 
 type Tokenizer struct {
@@ -146,7 +147,7 @@ func (s *Tokenizer) next() (Token, error) {
 	switch tok {
 	case scanner.Ident:
 
-		token.Type = TokenIdentifer
+		token.Type = TokenIdentifier
 		// we can't detect these invalid single-char identifiers in the scanner
 		if token.Lexeme == "." || token.Lexeme == "$" {
 			// TODO: return a rich error here explaining why with location
@@ -168,13 +169,16 @@ func (s *Tokenizer) next() (Token, error) {
 			token.Type = TokenKeywordDelete
 		case "from":
 			token.Type = TokenKeywordFrom
-		case "as", "diff", "intersect", "load", "save", "show", "union":
-			// TODO: will need more of these, obviously
+		case "as", "load", "save", "show":
 			token.Type = TokenFunction
+		case "diff", "intersect", "union":
+			token.Type = TokenFunctionBinary
 		case "contains":
 			// TODO: need other string operators
 			token.Type = TokenKeywordContains
 		case "cd", "empty", "exit", "help", "ls", "pwd", "pragma", "quit", "vars":
+			// TODO: if we encounter a command, should we just bail out of the
+			// compiler entirely?
 			token.Type = TokenCommand
 		}
 		// TODO: can't we just hard-code the accessors?

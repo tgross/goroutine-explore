@@ -34,6 +34,10 @@ run: build
 test:
 	go test -v -count=1 ./...
 
+.PHONY: bench
+bench:
+	go test -v -benchmem -bench '^Benchmark' -run '^$$' ./...
+
 .PHONY: check
 check:
 	go vet ./...

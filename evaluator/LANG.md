@@ -39,7 +39,7 @@ Filter the goroutine dump by an expression.
 Print the details of the result and save them to a file.
 
 ```
->>> show g2
+>>> g2 show
 goroutine 72 [select, 25 minutes]: 5 times: [72, 54755, 76757, 299, 201]
 google.golang.org/grpc/transport.(*http2Server).keepalive(0xc4202f0420)
         google.golang.org/grpc/transport/http2_server.go:919 +0x488
@@ -100,10 +100,10 @@ pipeline or filter expression.
   if the argument is `-`
 
 * `empty`: Erases all variables in the workspace, with confirmation (y/N). You
-  can bypass confirmation by setting `pragma empty:confirm false`.
+  can bypass confirmation by setting `pragma empty.confirm false`.
 
 * `exit`: Exits the shell, with confirmation (y/N). You can bypass confirmation
-  by exiting via `Ctrl-D` or by setting `pragma exit:confirm false`.
+  by exiting via `Ctrl-D` or by setting `pragma exit.confirm false`.
 
 * `help`: Show a summary of available commands and functions.
 
@@ -115,27 +115,27 @@ pipeline or filter expression.
   current value. Using `pragma` without any arguments prints a summary of the
   available configurations and their current values.
 
-  * `empty:confirm` (default value: `true`): If set to `false`, disable the
+  * `empty.confirm` (default value: `true`): If set to `false`, disable the
     confirmation prompt on the `empty` command.
 
-  * `exit:confirm` (default value: `true`): If set to `false`, disable the
+  * `exit.confirm` (default value: `true`): If set to `false`, disable the
     confirmation prompt on the `exit` command.
 
-  * `ls:format` (default value: `none`): Format flags to pass to the `ls`
+  * `ls.format` (default value: `none`): Format flags to pass to the `ls`
     command. If set, the `ls` command will invoke the parent shell's `ls`
     command with these flags instead of listing the directory itself.
 
-  * `show:dedup` (default value: `ids`): Controls how the `show` command
+  * `show.dedup` (default value: `ids`): Controls how the `show` command
     deduplicates goroutines. The default behavior lists the IDs of duplicates
     with each goroutine stack. You can set this to `number` to show only the
     number of duplicates without the IDs. Or you can set this to `none` to stop
     deduplication entirely.
 
-  * `show:color` (default value: `true`): Controls whether the `show` command
+  * `show.color` (default value: `true`): Controls whether the `show` command
     adds color to the output. If you have the `NOCOLOR` environment variable
     set, this pragma defaults to `false` instead.
 
-  * `vars:display` (default value: `count`): Controls the output of the `vars`
+  * `vars.display` (default value: `count`): Controls the output of the `vars`
     command. By default, `vars` shows the total number of goroutines in each
     dump. If set to `summary`, the `vars` command will print a summary
     instead. If set to `none`, the `vars` command will only print the names of
@@ -144,7 +144,7 @@ pipeline or filter expression.
 * `quit`: Exits the shell. Alias for `exit`.
 
 * `vars`: Show all the variables in the workspace, along with a count of
-  goroutines in the dump. This behavior can be modified by the `vars:display`
+  goroutines in the dump. This behavior can be modified by the `vars.display`
   pragma.
 
 ```
@@ -331,9 +331,9 @@ you'll want to assign the result to a variable.
 ### Save a goroutine dump to a file
 
 The `save` function takes a dump and a file path, and saves the dump in text
-format equivalent to that written by the Go runtime's
-[pprof](https://pkg.go.dev/runtime/pprof#Profile) with the `debug=2` flag. The
-`save` accepts absolute paths or paths relative to the working directory.
+format equivalent to that written by the Go runtime's [`pprof`][] with the
+`debug=2` flag. The `save` accepts absolute paths or paths relative to the
+working directory.
 
 ```
 >>> g save "goroutine-dump.txt"
@@ -356,10 +356,10 @@ command.
 
 The `show` function takes a dump and prints the goroutine stack for every
 goroutine in the dump in a format equivalent to that written by the Go runtime's
-[pprof](https://pkg.go.dev/runtime/pprof#Profile) with the `debug=2` flag.
+[`pprof`][] with the `debug=2` flag.
 
 By default, `show` will deduplicate goroutines with the same header and stack
-and list the duplicate IDs. You can adjust this behavior with the `show:dedup`
+and list the duplicate IDs. You can adjust this behavior with the `show.dedup`
 pragma. The default value (`ids`) lists the IDs of duplicates with each
 goroutine stack. You can set this to `number` to show only the number of
 duplicates without the IDs. Or you can set this to `none` to stop deduplication
@@ -375,11 +375,11 @@ is first but if only one of the two arguments is passed, `show` treats it as a
 >>> g1 show 100 10
 ```
 
-Paging via `offset` and `limit` respects the `show:dedup` pragma such that only
+Paging via `offset` and `limit` respects the `show.dedup` pragma such that only
 the displayed goroutine stacks count towards the offset and limit. For example,
 a stack with 100 duplicates would only count 1 towards a limit of 10 if
-`show:dedup ids` or `show:dedup number`, but only 10 of the goroutines would be
-shown if `show:dedup none`.
+`show.dedup ids` or `show.dedup number`, but only 10 of the goroutines would be
+shown if `show.dedup none`.
 
 ### Filter expressions
 
@@ -407,8 +407,8 @@ expressions can contain any of the following:
 * Grouping (`(`, `)`): Parentheses can be used in combination with logical
   operators to create subexpressions.
 * Logical operators (`and`, `or`): Short-circuiting operators.
-* Numeric comparison (`>`, `>=`, `<`, `<=`, `==`, `!=`): can be applied to the numeric
-  fields `.id`, `.dups`, `.lines`, and `.duration`.
+* Numeric comparison (`>`, `>=`, `<`, `<=`, `==`, `!=`): can be applied to the
+  numeric fields `.id`, `.dups`, `.lines`, and `.duration`.
 * String comparison (`==`, `!=`): can be applied to string fields `.state` and `.trace`.
 * Regex comparison (`=~`, `!~`): These use Go's standard
   [`regexp`](https://pkg.go.dev/regexp) flavor of regex. The left side is a
@@ -426,6 +426,9 @@ Filter expressions can also use the following helper functions.
 Example:
 
 ```
+>>> g2 = g1 where lower .trace contains "handleStream"
+
+
 >>> g2 = g1 where lower .trace contains "handleStream"
 ```
 
@@ -510,4 +513,5 @@ The `intersect` expression takes two goroutine dumps and returns a goroutine dum
 ```
 
 [linuxerwang/goroutine-inspect]: https://github.com/linuxerwang/goroutine-inspect
-[`liner`]: (https://github.com/peterh/liner?tab=readme-ov-file#line-editing)
+[`liner`]: https://github.com/peterh/liner?tab=readme-ov-file#line-editing
+[`pprof`]: https://pkg.go.dev/runtime/pprof#Profile

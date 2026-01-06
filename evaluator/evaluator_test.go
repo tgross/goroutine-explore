@@ -169,7 +169,7 @@ created by net/http.(*connReader).startBackgroundRead in goroutine 37
 				t.Skip("TODO not yet implemented")
 			}
 			c := newCompiler()
-			got, err := Evaluate(c, tc.src, env)
+			got, err := Evaluate(c, tc.src, env, t.TempDir())
 			if tc.expectErrMsg != "" {
 				test.Eq(t, NoValue, got)
 				test.EqError(t, err, tc.expectErrMsg)
@@ -232,8 +232,9 @@ created by os/signal.Notify.func1.1 in goroutine 1
 
 	length := 0
 	c := newCompiler()
+	cwd := b.TempDir()
 	for b.Loop() {
-		got, err := Evaluate(c, src, env)
+		got, err := Evaluate(c, src, env, cwd)
 		must.NoError(b, err)
 		dump, ok := got.Data.(*GoroutineDump)
 		must.True(b, ok, must.Sprintf("did not return dump: %v", dump))
