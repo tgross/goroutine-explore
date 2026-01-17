@@ -284,7 +284,6 @@ following lines show equivalent `where` function calls:
 | `delete`    | dump    | filter expression                               |
 | `diff`      | 3 dumps | variable pointing to dump                       |
 | `intersect` | dump    | variable pointing to dump                       |
-| `limit`     | dump    | variable pointing to dump                       |
 | `load`      | dump    | string path (note: load ignores any input dump) |
 | `save`      | dump    | string path                                     |
 | `show`      | dump    | [offset, limit]                                 |
@@ -515,3 +514,52 @@ The `intersect` expression takes two goroutine dumps and returns a goroutine dum
 [linuxerwang/goroutine-inspect]: https://github.com/linuxerwang/goroutine-inspect
 [`liner`]: https://github.com/peterh/liner?tab=readme-ov-file#line-editing
 [`pprof`]: https://pkg.go.dev/runtime/pprof#Profile
+
+## Grammar
+
+Grammar in Wirth syntax notation.
+
+```
+REQUEST = COMMAND | EXPR .
+
+COMMAND = "cd" STRING
+        | "help" TOPIC
+        | ( "empty" | "exit" | "quit" | "pwd" | "vars" | "ls" )
+        | "pragma" PRAGMA ( IDENTIFIER | DIGITS ) .
+
+VAR    = IDENTIFIER .
+FIELD  = "." IDENTIFIER .
+PRAGMA = IDENTIFIER "." IDENTIFIER .
+TOPIC  = IDENTIFIER .
+
+DIGITS = { 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 }
+IDENTIFIER = (\w)
+STRING = \" (\w) \"
+COMPARE_OPERATOR = > | >= | == | <= | <
+
+EXPR = VAR
+     | PREFIX_FUN
+     | BINARY_FUN
+     | EXPR "|" EXPR
+     | [ASSIGN] EXPR .
+
+INNER_EXPR = VAR | "(" EXPR ")" .
+
+ASSIGN = VAR [{ "," VAR }]  "="
+
+PREFIX_FUN = "where" [INNER_EXPR] PREDICATE
+           | "delete" [INNER_EXPR] PREDICATE
+           | "load" STRING
+           | "save" [INNER_EXPR] STRING
+           | "show" [INNER_EXPR] [{DIGITS}] .
+
+BINARY_FUN = [INNER_EXPR] "union" [INNER_EXPR]
+           | [INNER_EXPR] "intersect" [INNER_EXPR]
+           | [INNER_EXPR] "diff" [INNER_EXPR]
+           | [INNER_EXPR] "as" VAR .
+
+PREDICATE = ["not"] "(" PREDICATE ")"
+          | PREDICATE ("and" | "or") PREDICATE
+          | (DIGITS | STRING ) COMPARE_OPERATOR FIELD .
+          | FIELD COMPARE_OPERATOR (DIGITS | STRING) .
+```
