@@ -28,7 +28,7 @@ func (c *Chunk) disassemble(ip int) string {
 		comment := "\t"
 		code, idx := op.decode()
 		switch code {
-		case OpCodeAssignment, OpCodeLoadAttr, OpCodeLoadFieldAccessor,
+		case OpCodeAssignment, OpCodeLoadFieldAccessor,
 			OpCodeLoadNumber, OpCodeLoadString, OpCodeLoadGoroutineDump:
 			if idx <= uint(len(c.constants)) {
 				val := c.constants[idx]
@@ -72,51 +72,55 @@ func (code Op) String() string {
 //go:generate stringer -type OpCode
 const (
 	OpCodeNoop OpCode = iota
+
+	// loads (TODO: should we have a single untyped load op?)
+	OpCodeLoadGoroutineDump
+	OpCodeLoadFieldAccessor
 	OpCodeLoadNumber
 	OpCodeLoadString
-	OpCodeLoadIdentifier
-	OpCodeLoadGoroutineDump
-	OpCodeLoadEnv
-	OpCodeStoreEnv
-	OpCodeLoadFieldAccessor
+
+	// stores
+	OpCodeAssignment
+	OpCodePushBool
+	OpCodePushDump
+
+	// filter iteration
+	OpCodeAddGoroutine
+	OpCodeNextGoroutine
+	OpCodeTempDump
+
+	// comparisons
+	OpCodeContains
 	OpCodeEqual
 	OpCodeGreater
+	OpCodeGreaterEqual // TODO: split into multiple op codes?
 	OpCodeLess
-	OpCodePipe
-	OpCodeFunction
-	OpCodeNextGoroutine
-	OpCodeInitDump
-	OpCodeTempDump
-	OpCodePushDump
-	OpCodeJumpIfTrue
+	OpCodeLessEqual // TODO: split into multiple op codes?
+	OpCodeNotEqual  // TODO: split into multiple op codes?
+
+	// control flow
 	OpCodeJumpIfFalse
+	OpCodeJumpIfTrue
 	OpCodeJumpTo
-	OpCodeLoadAttr
-	OpCodeAddGoroutine
-	OpCodeRemoveGoroutine
-	OpCodeStartIter
-	OpCodeAssignment
-	OpCodeReturn
-	OpCodeContains
-	OpCodePushBool
+	OpCodePipe
 
 	// functions
-	OpCodeFuncSave
-	OpCodeFuncLoad
-	OpCodeFuncShowDump
-	OpCodeFuncUnion
 	OpCodeFuncDiff
 	OpCodeFuncIntersect
+	OpCodeFuncLoad
+	OpCodeFuncSave
+	OpCodeFuncShowDump
+	OpCodeFuncUnion
 
 	// commands
+	OpCodeCommandChangeDir
 	OpCodeCommandEmpty
-	OpCodeCommandQuit
+	OpCodeCommandGetWorkingDir
 	OpCodeCommandHelp
 	OpCodeCommandListDir
-	OpCodeCommandGetWorkingDir
-	OpCodeCommandVars
-	OpCodeCommandChangeDir
 	OpCodeCommandPragma
+	OpCodeCommandQuit
+	OpCodeCommandVars
 
 	OpCodePatchPlaceholder = 0x000000000000ffff
 )

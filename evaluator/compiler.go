@@ -176,7 +176,7 @@ func (p *Compiler) parseDumpAccessor(tok Token) error {
 	}
 	if next.Type == TokenComma {
 		p.createConst(tok.Lexeme)
-		p.consume(TokenComma)
+		_, _ = p.consume(TokenComma)
 		// TODO: need to read to next item
 	}
 
@@ -240,21 +240,18 @@ func (p *Compiler) parseCompareExpr(tok Token) error {
 	}
 
 	switch tok.Type {
-	case TokenGreaterThan:
-		p.emitByte(OpCodeGreater)
-	case TokenLessThan:
-		p.emitByte(OpCodeLess)
 	case TokenEqual:
 		p.emitByte(OpCodeEqual)
-		// TODO: not implemented
-
-	// case TokenNotEqual:
-	// 	p.emitByte(OpCodeNotEqual)
-	// case TokenGreaterEqualThan:
-	// 	p.emitByte(OpCodeGreaterEqual)
-	// case TokenLessEqualThan:
-	// 	p.emitByte(OpCodeLessEqual)
-
+	case TokenNotEqual:
+		p.emitByte(OpCodeNotEqual)
+	case TokenGreaterThan:
+		p.emitByte(OpCodeGreater)
+	case TokenGreaterEqualThan:
+		p.emitByte(OpCodeGreaterEqual)
+	case TokenLessThan:
+		p.emitByte(OpCodeLess)
+	case TokenLessEqualThan:
+		p.emitByte(OpCodeLessEqual)
 	case TokenKeywordContains:
 		p.emitByte(OpCodeContains)
 	}
@@ -340,13 +337,6 @@ func (p *Compiler) expect(want TokenType) error {
 // some peephole optimization on the chunk when we're done?
 func (p *Compiler) parsePipeExpr(tok Token) error {
 	return p.parseExpr(0)
-}
-
-// emitJump emits the jump OpCode passed in as well as a placeholder for the
-// address, which will be returned so that we can patch the address later
-func (p *Compiler) emitJump(jumpOp OpCode) int {
-	p.emitBytes(jumpOp, OpCodePatchPlaceholder)
-	return len(p.chunk.ops) - 1
 }
 
 // patchJump takes an address and patches the instruction at that address to
@@ -458,7 +448,7 @@ func (p *Compiler) parseCommand(tok Token) error {
 		panic("unknown command") // TODO
 	}
 
-	return nil
+	return p.expectNoMoreArgs()
 }
 
 var ErrTooManyArgs = errors.New("too many arguments")
@@ -484,7 +474,7 @@ func (p *Compiler) parsePath() error {
 		return ErrExpectedPath
 	}
 
-	p.parseString(Token{Type: TokenString, Lexeme: path})
+	_ = p.parseString(Token{Type: TokenString, Lexeme: path})
 	return nil
 }
 

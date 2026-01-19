@@ -3,7 +3,6 @@ package evaluator
 import (
 	"errors"
 	"fmt"
-	"math"
 	"os"
 	"strings"
 )
@@ -114,26 +113,19 @@ func (vm *VM) run() (Value, error) {
 		case OpCodeLoadString:
 			err = vm.loadString(operand)
 
-		case OpCodeGreater, OpCodeEqual:
+		case OpCodeGreater, OpCodeGreaterEqual,
+			OpCodeLess, OpCodeLessEqual,
+			OpCodeEqual, OpCodeNotEqual:
 			err = vm.comparison(instruction)
 
 		case OpCodeContains:
 			err = vm.contains(instruction)
 
-		case OpCodeLoadIdentifier:
-			err = vm.loadEnv(operand)
-
 		case OpCodeTempDump:
 			vm.regDumpDst = NewGoroutineDump()
 
 		case OpCodePushDump:
-			vm.Push(Value{
-				Tag:  TagDump,
-				Data: vm.regDumpDst,
-			})
-
-		case OpCodeStartIter:
-			err = vm.handleStartIter()
+			vm.pushDump(vm.regDumpDst)
 
 		case OpCodeNextGoroutine:
 			err = vm.handleNextGoroutine(operand)
@@ -147,9 +139,6 @@ func (vm *VM) run() (Value, error) {
 		case OpCodeJumpIfFalse:
 			err = vm.handleConditionalJump(operand, false)
 
-		case OpCodeStoreEnv:
-			err = vm.storeEnv(operand)
-
 		case OpCodeAssignment:
 			err = vm.handleAssignment(operand)
 
@@ -159,9 +148,6 @@ func (vm *VM) run() (Value, error) {
 
 		case OpCodeAddGoroutine:
 			vm.regDumpDst.Add(vm.regGoroutine)
-
-		case OpCodeLoadEnv:
-			err = vm.loadEnv(operand)
 
 		case OpCodeLoadFieldAccessor:
 			err = vm.handleFieldAccessor(operand)
@@ -245,22 +231,34 @@ func (vm *VM) comparison(instruction OpCode) error {
 	var val bool
 	switch left.Data.(type) {
 	case int:
-		switch instruction {
-		case OpCodeGreater:
-			val = left.Data.(int) > right.Data.(int)
-		case OpCodeEqual:
-			val = left.Data.(int) == right.Data.(int)
-		}
+		val = compare(left.Data.(int), right.Data.(int), instruction)
 	case string:
-		switch instruction {
-		case OpCodeGreater:
-			val = left.Data.(string) > right.Data.(string)
-		case OpCodeEqual:
-			val = left.Data.(string) == right.Data.(string)
-		}
+		val = compare(left.Data.(string), right.Data.(string), instruction)
 	}
 	vm.Push(Value{Tag: TagBool, Data: val})
 	return nil
+}
+
+type ordered interface {
+	~int | ~string
+}
+
+func compare[T ordered](left, right T, instruction OpCode) bool {
+	switch instruction {
+	case OpCodeLess:
+		return left < right
+	case OpCodeLessEqual:
+		return left <= right
+	case OpCodeGreater:
+		return left > right
+	case OpCodeGreaterEqual:
+		return left >= right
+	case OpCodeEqual:
+		return left == right
+	case OpCodeNotEqual:
+		return left != right
+	}
+	return false
 }
 
 func (vm *VM) contains(instruction OpCode) error {
@@ -288,18 +286,6 @@ func (vm *VM) contains(instruction OpCode) error {
 	}
 	vm.Push(Value{Tag: TagBool, Data: val})
 	return nil
-}
-
-func (vm *VM) popBool() (bool, error) {
-	val, err := vm.Pop()
-	if err != nil {
-		return false, err
-	}
-	if b, ok := val.Data.(bool); !ok {
-		return false, fmt.Errorf("%w pop bool", ErrInvalidType)
-	} else {
-		return b, nil
-	}
 }
 
 func (vm *VM) popDump() (*GoroutineDump, error) {
@@ -353,26 +339,6 @@ func (vm *VM) loadEnv(index uint) error {
 	return nil
 }
 
-func (vm *VM) storeEnv(index uint) error {
-	con, err := vm.fetchConstant(index)
-	if err != nil {
-		return err
-	}
-	name, ok := con.(string)
-	if !ok {
-		return fmt.Errorf(
-			"%w store: expected identifier got %v",
-			ErrInvalidType, con)
-	}
-	val, err := vm.Pop()
-	if err != nil {
-		return err
-	}
-
-	vm.env[name] = val
-	return nil
-}
-
 func (vm *VM) debug() {
 	fmt.Printf("chunk (ip=%d)\n", vm.ip)
 	fmt.Println(vm.chunk.disassemble(vm.ip))
@@ -418,11 +384,7 @@ func (vm *VM) handleUnion() error {
 		g.Add(rg)
 	}
 
-	vm.Push(Value{
-		Tag:  TagDump,
-		Data: g,
-	})
-
+	vm.pushDump(g)
 	return nil
 }
 
@@ -452,27 +414,6 @@ func (vm *VM) handleFieldAccessor(index uint) error {
 	case "state", ".state":
 		vm.Push(Value{Tag: TagString, Data: g.State})
 	}
-
-	return nil
-}
-
-func (vm *VM) handleStartIter() error {
-	val, err := vm.Peek()
-	if err != nil {
-		return err
-	}
-	if val.Tag != TagDump {
-		return vm.newInvalidTypeErr(TagDump, val.Tag)
-	}
-	dump := val.Data.(*GoroutineDump)
-	dump.StartIter()
-
-	// get the address we'll jump to when we're done
-	addr, err := vm.readAddr()
-	if err != nil {
-		return err
-	}
-	vm.Push(Value{Tag: TagNumber, Data: addr})
 
 	return nil
 }
@@ -536,6 +477,14 @@ func (vm *VM) handleNextGoroutine(addr uint) error {
 	return nil
 }
 
+func (vm *VM) pushDump(dump *GoroutineDump) {
+	dump.StartIter() // reset before we push it back onto the stack
+	vm.Push(Value{
+		Tag:  TagDump,
+		Data: dump,
+	})
+}
+
 // handleAssignment writes the object at the top of the stack to the
 // environment, but leaves it on the stack
 func (vm *VM) handleAssignment(index uint) error {
@@ -556,18 +505,6 @@ func (vm *VM) handleAssignment(index uint) error {
 
 	vm.env[name] = val
 	return nil
-}
-
-func (vm *VM) readAddr() (int, error) {
-	addr, err := vm.readByte()
-	if err != nil {
-		return 0, err
-	}
-	if addr > math.MaxInt {
-		return 0, fmt.Errorf(
-			"%w: address=%d", ErrOutOfStackBounds, addr)
-	}
-	return int(addr), nil
 }
 
 func (vm *VM) handleConditionalJump(index uint, expected bool) error {
