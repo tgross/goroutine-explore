@@ -202,7 +202,8 @@ func (s *Tokenizer) next() (Token, error) {
 	case ',':
 		token.Type = TokenComma
 
-		// TODO: do we even want arithmetic operators?
+		// we don't support arithmetic operators but needs these for parsing
+		// unquoted path strings
 	case '+':
 		token.Type = TokenPlus
 	case '-':

@@ -81,14 +81,6 @@ func newCompiler() *Compiler {
 	setupInfix(TokenKeywordDelete, BindingFunc, p.parseDelete)
 	setupInfix(TokenPipe, BindingPipe, p.parsePipeExpr)
 
-	//setupInfix(TokenComma, 9, p.parseComma)
-
-	// TODO: do we need arithmetic operators at all?
-	setupInfix(TokenPlus, 2, p.parseBinaryArithmeticExpr)
-	setupInfix(TokenMinus, 2, p.parseBinaryArithmeticExpr)
-	setupInfix(TokenStar, 3, p.parseBinaryArithmeticExpr)
-	setupInfix(TokenSlash, 3, p.parseBinaryArithmeticExpr)
-
 	return p
 }
 
@@ -256,20 +248,6 @@ func (p *Compiler) parseCompareExpr(tok Token) error {
 		p.emitByte(OpCodeContains)
 	}
 
-	return nil
-}
-
-func (p *Compiler) parseBinaryArithmeticExpr(tok Token) error {
-	err := p.parseExpr(p.infixPrecedenceTab[tok.Type])
-	if err != nil {
-		return err
-	}
-
-	switch tok.Type {
-	case TokenPlus, TokenMinus, TokenStar, TokenSlash:
-		// TODO: implement, if we even want these?
-		return nil
-	}
 	return nil
 }
 
