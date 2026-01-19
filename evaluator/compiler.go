@@ -16,9 +16,23 @@ type Compiler struct {
 	prefixPrecedenceTab map[TokenType]int
 	infixParseFns       map[TokenType]parseFn
 	infixPrecedenceTab  map[TokenType]int
-	suffixParseFns      map[TokenType]parseFn
-	suffixPrecedenceTab map[TokenType]int
 }
+
+type BindingPower = int
+
+const (
+	BindingNone BindingPower = iota
+	BindingAssignment
+	BindingPipe
+	BindingFunc
+	BindingOr
+	BindingAnd
+	BindingEq
+	BindingCompare
+	BindingUnary
+	BindingPrimary
+	BindingAtom
+)
 
 type parseFn func(Token) error
 
@@ -28,8 +42,6 @@ func newCompiler() *Compiler {
 		prefixPrecedenceTab: make(map[TokenType]int),
 		infixParseFns:       make(map[TokenType]parseFn),
 		infixPrecedenceTab:  make(map[TokenType]int),
-		suffixParseFns:      make(map[TokenType]parseFn),
-		suffixPrecedenceTab: make(map[TokenType]int),
 	}
 
 	setupPrefix := func(tok TokenType, prec int, parselet parseFn) {
@@ -42,32 +54,34 @@ func newCompiler() *Compiler {
 		p.infixPrecedenceTab[tok] = prec
 	}
 
-	setupSuffix := func(tok TokenType, prec int, parselet parseFn) {
-		p.suffixParseFns[tok] = parselet
-		p.suffixPrecedenceTab[tok] = prec
-	}
+	setupPrefix(TokenLeftParen, BindingNone, p.parseParenExpr)
+	setupInfix(TokenRightParen, BindingNone, nil)
+	setupPrefix(TokenIdentifier, BindingAtom, p.parseDumpAccessor)
+	setupPrefix(TokenFieldAccessor, BindingAtom, p.parseFieldAccessor)
+	setupPrefix(TokenString, BindingAtom, p.parseString)
+	setupPrefix(TokenNumber, BindingAtom, p.parseNumber)
+	setupPrefix(TokenFunction, BindingFunc, p.parseFunction)
+	setupPrefix(TokenKeywordWhere, BindingFunc, p.parseWhere)
+	setupPrefix(TokenKeywordDelete, BindingFunc, p.parseDelete)
 
-	setupPrefix(TokenLeftParen, 0, p.parseParenExpr)
-	setupPrefix(TokenIdentifier, 0, p.parseDumpAccessor)
-	setupPrefix(TokenFieldAccessor, 0, p.parseFieldAccessor)
-	setupPrefix(TokenString, 0, p.parseString)
-	setupPrefix(TokenNumber, 0, p.parseNumber)
-	setupPrefix(TokenFunction, 8, p.parseFunction)
-	setupPrefix(TokenCommand, 8, p.parseCommand)
-	setupPrefix(TokenKeywordWhere, 8, p.parseWhere)
-	setupPrefix(TokenKeywordDelete, 8, p.parseDelete)
+	setupInfix(TokenKeywordAnd, BindingAnd, p.parseBinaryLogicExpr)
+	setupInfix(TokenKeywordOr, BindingOr, p.parseBinaryLogicExpr)
 
-	setupInfix(TokenKeywordAnd, 3, p.parseBinaryLogicExpr)
-	setupInfix(TokenKeywordOr, 3, p.parseBinaryLogicExpr)
+	setupInfix(TokenEqual, BindingEq, p.parseCompareExpr)
+	setupInfix(TokenNotEqual, BindingEq, p.parseCompareExpr)
+	setupInfix(TokenGreaterEqualThan, BindingCompare, p.parseCompareExpr)
+	setupInfix(TokenGreaterThan, BindingCompare, p.parseCompareExpr)
+	setupInfix(TokenLessEqualThan, BindingCompare, p.parseCompareExpr)
+	setupInfix(TokenLessThan, BindingCompare, p.parseCompareExpr)
+	setupInfix(TokenKeywordContains, BindingCompare, p.parseCompareExpr)
+	setupInfix(TokenFunctionBinary, BindingFunc, p.parseBinaryFunction)
 
-	setupInfix(TokenEqual, 4, p.parseCompareExpr)
-	setupInfix(TokenNotEqual, 4, p.parseCompareExpr)
-	setupInfix(TokenGreaterEqualThan, 4, p.parseCompareExpr)
-	setupInfix(TokenGreaterThan, 4, p.parseCompareExpr)
-	setupInfix(TokenLessEqualThan, 4, p.parseCompareExpr)
-	setupInfix(TokenLessThan, 4, p.parseCompareExpr)
-	setupInfix(TokenKeywordContains, 4, p.parseCompareExpr)
-	setupInfix(TokenFunctionBinary, 2, p.parseBinaryFunction)
+	setupInfix(TokenAssign, BindingAssignment, p.parseAssignment)
+	setupInfix(TokenKeywordWhere, BindingFunc, p.parseWhere)
+	setupInfix(TokenKeywordDelete, BindingFunc, p.parseDelete)
+	setupInfix(TokenPipe, BindingPipe, p.parsePipeExpr)
+
+	//setupInfix(TokenComma, 9, p.parseComma)
 
 	// TODO: do we need arithmetic operators at all?
 	setupInfix(TokenPlus, 2, p.parseBinaryArithmeticExpr)
@@ -75,33 +89,22 @@ func newCompiler() *Compiler {
 	setupInfix(TokenStar, 3, p.parseBinaryArithmeticExpr)
 	setupInfix(TokenSlash, 3, p.parseBinaryArithmeticExpr)
 
-	setupInfix(TokenAssign, 10, p.parseAssignment)
-	setupInfix(TokenKeywordWhere, 8, p.parseWhere)
-	setupInfix(TokenKeywordDelete, 8, p.parseDelete)
-
-	//setupInfix(TokenComma, 9, p.parseComma)
-
-	setupSuffix(TokenPipe, 2, p.parsePipeExpr)
-
 	return p
 }
 
 func (p *Compiler) Compile(tokenizer *Tokenizer) (*Chunk, error) {
 	p.chunk = NewChunk()
 	p.tokenizer = tokenizer
-	for {
-		err := p.parseExpr(0)
-		if err == nil {
-			continue
-		}
-		if errors.Is(err, ErrEOF) && len(p.chunk.ops) > 0 {
-			break
-		}
-		// we may have a partial chunk here, so returning it makes debugging
-		// easier even though this isn't ideomatic
-		return p.chunk, err
+
+	tok, err := p.maybeConsume(TokenCommand)
+	if err != nil {
+		return nil, err
 	}
-	return p.chunk, nil
+	if tok != EmptyToken {
+		return p.chunk, p.parseCommand(tok)
+	}
+
+	return p.chunk, p.parseExpr(0)
 }
 
 func (p *Compiler) parseExpr(precedence int) error {
@@ -110,12 +113,15 @@ func (p *Compiler) parseExpr(precedence int) error {
 		return ErrEOF
 	}
 
+	// every expression will start with a prefix expression, even if it's
+	// actually an operand of a later infix expression
 	prefix, ok := p.prefixParseFns[tok.Type]
 	if !ok {
 		// TODO: this error message is terrible
 		return fmt.Errorf(
 			"expected an identifier or open paren: %+v", tok)
 	}
+
 	err = prefix(tok)
 	if err != nil {
 		return err
@@ -129,13 +135,9 @@ func (p *Compiler) parseExpr(precedence int) error {
 			}
 			return err
 		}
+
 		if infixPrec, ok := p.infixPrecedenceTab[tok.Type]; ok {
-			if precedence >= infixPrec {
-				break
-			}
-		}
-		if suffixPrec, ok := p.suffixPrecedenceTab[tok.Type]; ok {
-			if precedence >= suffixPrec {
+			if infixPrec < precedence {
 				break
 			}
 		}
@@ -145,17 +147,8 @@ func (p *Compiler) parseExpr(precedence int) error {
 			return err
 		}
 
-		suffix, ok := p.suffixParseFns[tok.Type]
-		if ok {
-			err = suffix(tok)
-			if err != nil {
-				return err
-			}
-			break
-		}
-
 		infix, ok := p.infixParseFns[tok.Type]
-		if !ok {
+		if !ok || infix == nil {
 			return nil
 		}
 		err = infix(tok)
@@ -228,7 +221,7 @@ func (p *Compiler) parseBinaryLogicExpr(tok Token) error {
 	}
 	addrLong := p.emitBytes(OpCodeJumpTo, OpCodePatchPlaceholder)
 
-	err := p.parseExpr(p.infixPrecedenceTab[tok.Type])
+	err := p.parseExpr(p.infixPrecedenceTab[tok.Type] + 1)
 	if err != nil {
 		return err
 	}
@@ -241,7 +234,7 @@ func (p *Compiler) parseBinaryLogicExpr(tok Token) error {
 }
 
 func (p *Compiler) parseCompareExpr(tok Token) error {
-	err := p.parseExpr(p.infixPrecedenceTab[tok.Type])
+	err := p.parseExpr(p.infixPrecedenceTab[tok.Type] + 1)
 	if err != nil {
 		return err
 	}
@@ -253,7 +246,6 @@ func (p *Compiler) parseCompareExpr(tok Token) error {
 		p.emitByte(OpCodeLess)
 	case TokenEqual:
 		p.emitByte(OpCodeEqual)
-
 		// TODO: not implemented
 
 	// case TokenNotEqual:
@@ -285,7 +277,7 @@ func (p *Compiler) parseBinaryArithmeticExpr(tok Token) error {
 }
 
 func (p *Compiler) parseParenExpr(tok Token) error {
-	err := p.parseExpr(0)
+	err := p.parseExpr(BindingPipe + 1)
 	if err != nil {
 		return err
 	}
@@ -344,9 +336,10 @@ func (p *Compiler) expect(want TokenType) error {
 }
 
 // TODO: there's currently no optimization of pipeline expressions, so we'll end
-// up shallow-copying the goroutine dump frequently on long pipelines
+// up shallow-copying the goroutine dump frequently on long pipelines. Maybe do
+// some peephole optimization on the chunk when we're done?
 func (p *Compiler) parsePipeExpr(tok Token) error {
-	return nil
+	return p.parseExpr(0)
 }
 
 // emitJump emits the jump OpCode passed in as well as a placeholder for the
@@ -379,7 +372,7 @@ func (p *Compiler) patchJump(addr, offset int) {
 func (p *Compiler) parseAssignment(tok Token) error {
 	nameIdx := len(p.chunk.constants) - 1
 	for {
-		err := p.parseExpr(1)
+		err := p.parseExpr(BindingAssignment)
 		if err != nil {
 			return err
 		}
@@ -410,7 +403,7 @@ func (p *Compiler) parseFilter(tok Token, keepOnMatch bool) error {
 	p.emitByte(OpCodeTempDump)
 	addr := p.emitBytes(OpCodeNextGoroutine, OpCodePatchPlaceholder)
 
-	err := p.parseExpr(1)
+	err := p.parseExpr(BindingFunc)
 	if err != nil && !errors.Is(err, ErrEOF) {
 		return err
 	}
@@ -434,9 +427,6 @@ func (p *Compiler) parseFilter(tok Token, keepOnMatch bool) error {
 	return nil
 }
 
-// TODO: unimplemented, but seems like it'll have the same issue as
-// parseFunction in terms of where we fan out from token to implementation in
-// the VM
 func (p *Compiler) parseCommand(tok Token) error {
 	name := tok.Lexeme
 	switch name {
@@ -502,10 +492,6 @@ func (p *Compiler) parsePragma() error {
 	return nil // TODO
 }
 
-var funcCodes = []string{
-	"diff", "intersect", "union",
-}
-
 func (p *Compiler) parseFunction(tok Token) error {
 	switch tok.Lexeme {
 	case "load":
@@ -553,47 +539,14 @@ func (p *Compiler) parseFunction(tok Token) error {
 		p.emitByte(OpCodeFuncShowDump)
 		return nil
 	default:
-		panic("no such function")
+		return fmt.Errorf("no such function %q", tok.Lexeme)
 	}
-	// TODO: I think we can just bail here?
-
-	// for {
-	// 	err := p.parseExpr(1)
-	// 	if err != nil {
-	// 		return err
-	// 	}
-	// 	tok, err := p.tokenizer.Peek()
-	// 	if tok.Type == TokenPipe || errors.Is(err, ErrEOF) {
-	// 		break
-	// 	}
-	// 	_, err = p.tokenizer.Next()
-	// 	if err != nil {
-	// 		return err
-	// 	}
-	// }
-	// // TODO: this is a little goofy because we'll end up needing another map in
-	// // the VM to go from the function-specific OpCode to a function. Should we
-	// // just have an OpCode for each function?
-	// var fnCode OpCode
-	// for i, fn := range funcCodes {
-	// 	if fn == name {
-	// 		fnCode = OpCode(i)
-	// 		break
-	// 	}
-	// }
-	// if fnCode == OpCode(0) {
-	// 	// TODO: this is always a programmer error?
-	// 	return fmt.Errorf("unknown function: %v", name)
-	// }
-
-	// p.emitBytes(OpCodeFunction, uint(fnCode))
-	// return nil
 }
 
 func (p *Compiler) parseBinaryFunction(tok Token) error {
 	name := tok.Lexeme
 
-	err := p.parseExpr(2) // TODO: what precedence?
+	err := p.parseExpr(BindingFunc)
 	if err != nil && !errors.Is(err, ErrEOF) {
 		return err
 	}

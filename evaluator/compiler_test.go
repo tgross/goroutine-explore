@@ -8,6 +8,48 @@ import (
 	"github.com/shoenig/test/must"
 )
 
+func TestCompiler_SimplePipeline(t *testing.T) {
+	/*
+	   parenthesized to show binding power:
+	   g2 = ((g1 where .state == "select") | (where .duration > 10))
+	*/
+	src := `g2 = g1 where .state == "select" |
+                    where .duration > 10`
+
+	body := strings.NewReader(src)
+
+	tokenizer := NewTokenizer(body)
+	compiler := newCompiler()
+	chunk, err := compiler.Compile(tokenizer)
+	must.NoError(t, err)
+
+	fmt.Println(chunk.disassemble(0))
+	must.Eq(t, []Op{
+		encode(OpCodeLoadGoroutineDump, 1), // 00 load g1
+		encode(OpCodeTempDump, 0),          // 01 scratch register
+		encode(OpCodeNextGoroutine, 9),     // 02 addr when done
+		encode(OpCodeLoadFieldAccessor, 2), // 03 load .state
+		encode(OpCodeLoadString, 3),        // 04 load "select"
+		encode(OpCodeEqual, 0),             // 05 compare push bool to stack
+		encode(OpCodeJumpIfFalse, 2),       // 06 jump to next goroutine
+		encode(OpCodeAddGoroutine, 0),      // 07 keep
+		encode(OpCodeJumpTo, 2),            // 08 jump to next goroutine
+		encode(OpCodePushDump, 0),          // 09 push to stack
+		encode(OpCodeTempDump, 0),          // 10 refresh scratch register
+		encode(OpCodeNextGoroutine, 18),    // 11 addr when done
+		encode(OpCodeLoadFieldAccessor, 4), // 12 load .duration
+		encode(OpCodeLoadNumber, 5),        // 13 load 10
+		encode(OpCodeGreater, 0),           // 14 compare push bool to stack
+		encode(OpCodeJumpIfFalse, 11),      // 15 jump to next goroutine
+		encode(OpCodeAddGoroutine, 0),      // 16 keep
+		encode(OpCodeJumpTo, 11),           // 17 jump to next goroutine
+		encode(OpCodePushDump, 0),          // 18 push to stack
+		encode(OpCodeAssignment, 0),        // 19 push to stack
+	},
+		chunk.ops,
+	)
+}
+
 func TestCompiler_MultiPipeline(t *testing.T) {
 
 	src := `g3 = g1 where .state == "select" |
@@ -222,6 +264,9 @@ func TestCompiler_NestedExpressions(t *testing.T) {
 		encode(OpCodeJumpTo, 3),            // 09 unconditional jump to addr
 		encode(OpCodePushDump, 0),          // 10 push temp dump to stack
 		encode(OpCodeFuncUnion, 0),         // 11 union
+		encode(OpCodeLoadNumber, 4),        // 12 load 0
+		encode(OpCodeLoadNumber, 5),        // 13 load 0
+		encode(OpCodeFuncShowDump, 0),      // 14 show
 	}, chunk.ops)
 }
 
