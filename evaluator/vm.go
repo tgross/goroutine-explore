@@ -412,11 +412,9 @@ func (vm *VM) handleUnion() error {
 	// method
 	g := NewGoroutineDump()
 	for _, lg := range left.goroutines {
-		fmt.Println(lg)
 		g.Add(lg)
 	}
 	for _, rg := range right.goroutines {
-		fmt.Println(rg)
 		g.Add(rg)
 	}
 

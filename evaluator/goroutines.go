@@ -1,5 +1,7 @@
 package evaluator
 
+import "fmt"
+
 /*
 The types in this file are placeholders until the evaluator gets wired up into
 the main application
@@ -35,7 +37,18 @@ func (gd *GoroutineDump) StartIter() {
 }
 
 func (gd *GoroutineDump) Len() int {
+	if gd == nil {
+		return 0
+	}
 	return len(gd.goroutines)
+}
+
+func (gd *GoroutineDump) String() string {
+	ids := make([]int, 0, len(gd.goroutines))
+	for _, g := range gd.goroutines {
+		ids = append(ids, g.ID)
+	}
+	return fmt.Sprintf("%v", ids)
 }
 
 type Goroutine struct {
