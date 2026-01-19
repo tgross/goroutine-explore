@@ -194,6 +194,8 @@ func (vm *VM) run() (Value, error) {
 			//err = vm.loadAndExecCommand()
 
 		case OpCodeFuncUnion:
+			err = vm.handleUnion()
+
 		case OpCodeFuncDiff:
 		case OpCodeFuncIntersect:
 		case OpCodeFuncShowDump:
@@ -300,6 +302,18 @@ func (vm *VM) popBool() (bool, error) {
 	}
 }
 
+func (vm *VM) popDump() (*GoroutineDump, error) {
+	val, err := vm.Pop()
+	if err != nil {
+		return nil, err
+	}
+	if b, ok := val.Data.(*GoroutineDump); !ok {
+		return nil, fmt.Errorf("%w pop bool", ErrInvalidType)
+	} else {
+		return b, nil
+	}
+}
+
 func (vm *VM) loadNumber(index uint) error {
 	con, err := vm.fetchConstant(index)
 	if err != nil {
@@ -381,6 +395,37 @@ func (vm *VM) debug() {
 func (vm *VM) newInvalidTypeErr(expected, got Tag) error {
 	vm.debug()
 	return fmt.Errorf("%w: expected %s got %s", ErrInvalidType, expected, got)
+}
+
+func (vm *VM) handleUnion() error {
+
+	left, err := vm.popDump()
+	if err != nil {
+		return err
+	}
+	right, err := vm.popDump()
+	if err != nil {
+		return err
+	}
+
+	// TODO: obviously we need to make sure these get de-duplicated in the Add
+	// method
+	g := NewGoroutineDump()
+	for _, lg := range left.goroutines {
+		fmt.Println(lg)
+		g.Add(lg)
+	}
+	for _, rg := range right.goroutines {
+		fmt.Println(rg)
+		g.Add(rg)
+	}
+
+	vm.Push(Value{
+		Tag:  TagDump,
+		Data: g,
+	})
+
+	return nil
 }
 
 func (vm *VM) handleFieldAccessor(index uint) error {
@@ -477,12 +522,14 @@ func (vm *VM) handleNextGoroutine(addr uint) error {
 	if dump.Len() == 0 {
 		vm.ip = int(addr) - 1
 		vm.regGoroutine = nil
+		_, _ = vm.Pop() // we're done: pop the dump off the stack
 		return nil
 	}
 	g := dump.Next()
 	if g == nil {
 		vm.ip = int(addr) - 1
 		vm.regGoroutine = nil
+		_, _ = vm.Pop() // we're done: pop the dump off the stack
 		return nil
 	}
 

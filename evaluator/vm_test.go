@@ -77,6 +77,55 @@ func TestVM_SimpleWhere(t *testing.T) {
 	must.Eq(t, "select", g.State)
 }
 
+func TestVM_NestedBinaryExpression(t *testing.T) {
+	// source: `g1 union (g2 where .duration > 10)
+	chunk := &Chunk{
+		ops: []Op{
+			encode(OpCodeLoadGoroutineDump, 0), // 00 load g1
+			encode(OpCodeLoadGoroutineDump, 1), // 01 load g2
+			encode(OpCodeTempDump, 0),          // 02 setup scratch register
+			encode(OpCodeNextGoroutine, 10),    // 03 addr when done
+			encode(OpCodeLoadFieldAccessor, 2), // 04 load .duration
+			encode(OpCodeLoadNumber, 3),        // 05 load 10
+			encode(OpCodeGreater, 0),           // 06 compare push bool to stack
+			encode(OpCodeJumpIfFalse, 3),       // 07 addr if false
+			encode(OpCodeAddGoroutine, 0),      // 08 keep
+			encode(OpCodeJumpTo, 3),            // 09 unconditional jump to addr
+			encode(OpCodePushDump, 0),          // 10 push temp dump to stack
+			encode(OpCodeFuncUnion, 0),         // 11 union
+		},
+		constants: []any{"g1", "g2", ".duration", 10},
+	}
+	vm, _ := NewVM(&vmConfig{cwd: t.TempDir()})
+	vm.reset(chunk)
+
+	g1 := &GoroutineDump{}
+	g1.Add(&Goroutine{ID: 1, Duration: 20, State: "select"})
+	g1.Add(&Goroutine{ID: 2, Duration: 0, State: "running"})
+	g2 := &GoroutineDump{}
+	g2.Add(&Goroutine{ID: 3, Duration: 20, State: "IO wait"})
+	g2.Add(&Goroutine{ID: 4, Duration: 0, State: "chan receive"})
+	g2.Add(&Goroutine{ID: 5, Duration: 0, State: "running"})
+
+	vm.env = map[string]Value{
+		"g1": {Tag: TagDump, Data: g1},
+		"g2": {Tag: TagDump, Data: g2},
+	}
+
+	result, err := vm.run()
+	vm.debug()
+	must.NoError(t, err)
+
+	must.Eq(t, TagDump, result.Tag)
+	g3, ok := result.Data.(*GoroutineDump)
+	must.True(t, ok)
+	must.Eq(t, 3, g3.Len())
+	g3.StartIter()
+	must.Eq(t, 3, g3.Next().ID)
+	must.Eq(t, 1, g3.Next().ID)
+	must.Eq(t, 2, g3.Next().ID)
+}
+
 func TestVM_DemoFunction(t *testing.T) {
 	vm, _ := NewVM(&vmConfig{cwd: t.TempDir()})
 	vm.stack = []Value{
