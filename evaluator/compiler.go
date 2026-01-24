@@ -3,6 +3,7 @@ package evaluator
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"strconv"
 )
 
@@ -22,6 +23,7 @@ type BindingPower = int
 
 const (
 	BindingNone BindingPower = iota
+	BindingComma
 	BindingAssignment
 	BindingPipe
 	BindingFunc
@@ -66,7 +68,6 @@ func newCompiler() *Compiler {
 
 	setupInfix(TokenKeywordAnd, BindingAnd, p.parseBinaryLogicExpr)
 	setupInfix(TokenKeywordOr, BindingOr, p.parseBinaryLogicExpr)
-
 	setupInfix(TokenEqual, BindingEq, p.parseCompareExpr)
 	setupInfix(TokenNotEqual, BindingEq, p.parseCompareExpr)
 	setupInfix(TokenGreaterEqualThan, BindingCompare, p.parseCompareExpr)
@@ -75,8 +76,6 @@ func newCompiler() *Compiler {
 	setupInfix(TokenLessThan, BindingCompare, p.parseCompareExpr)
 	setupInfix(TokenKeywordContains, BindingCompare, p.parseCompareExpr)
 	setupInfix(TokenFunctionBinary, BindingFunc, p.parseBinaryFunction)
-
-	setupInfix(TokenAssign, BindingAssignment, p.parseAssignment)
 	setupInfix(TokenKeywordWhere, BindingFunc, p.parseWhere)
 	setupInfix(TokenKeywordDelete, BindingFunc, p.parseDelete)
 	setupInfix(TokenPipe, BindingPipe, p.parsePipeExpr)
@@ -116,6 +115,9 @@ func (p *Compiler) parseExpr(precedence int) error {
 
 	err = prefix(tok)
 	if err != nil {
+		if errors.Is(err, ErrEOF) {
+			return nil
+		}
 		return err
 	}
 
@@ -148,32 +150,58 @@ func (p *Compiler) parseExpr(precedence int) error {
 			return err
 		}
 	}
-
 	return nil
 }
 
 func (p *Compiler) parseDumpAccessor(tok Token) error {
+	m := newMultiAssignment()
+	return p.parseDumpAccessorImpl(m, tok)
+}
+
+func (p *Compiler) parseDumpAccessorImpl(m MultiAssignment, tok Token) error {
+	tokIdx := p.createConst(tok.Lexeme)
+	m = append(m, tokIdx)
+
 	next, err := p.tokenizer.Peek()
 	if err != nil {
-		if err == ErrEOF {
+		if errors.Is(err, ErrEOF) {
+			if len(m) > 1 {
+				for _, idx := range m {
+					p.emitBytes(OpCodeLoadGoroutineDump, uint(idx))
+				}
+				return nil
+			}
 			p.emitLoadConst(OpCodeLoadGoroutineDump, tok.Lexeme)
 			return nil
 		}
 		return err
 	}
-	if next.Type == TokenAssign {
-		// assignment will consume this token from the last constant
-		p.createConst(tok.Lexeme)
+
+	switch next.Type {
+	case TokenAssign:
+		_, _ = p.consume(TokenAssign)
+		err := p.parseExpr(BindingAssignment)
+		if err != nil {
+			return err
+		}
+
+		if len(m) > 1 {
+			p.emitLoadConst(OpCodeAssignment, m)
+			return nil
+		}
+		p.emitLoadConst(OpCodeAssignment, tok.Lexeme)
+		return nil
+	case TokenComma:
+		_, _ = p.consume(TokenComma)
+		tok, err := p.consume(TokenIdentifier)
+		if err != nil {
+			return err
+		}
+		return p.parseDumpAccessorImpl(m, tok)
+	default:
+		p.emitLoadConst(OpCodeLoadGoroutineDump, tok.Lexeme)
 		return nil
 	}
-	if next.Type == TokenComma {
-		p.createConst(tok.Lexeme)
-		_, _ = p.consume(TokenComma)
-		// TODO: need to read to next item
-	}
-
-	p.emitLoadConst(OpCodeLoadGoroutineDump, tok.Lexeme)
-	return nil
 }
 
 func (p *Compiler) parseFieldAccessor(tok Token) error {
@@ -252,7 +280,7 @@ func (p *Compiler) parseCompareExpr(tok Token) error {
 }
 
 func (p *Compiler) parseParenExpr(tok Token) error {
-	err := p.parseExpr(BindingPipe + 1)
+	err := p.parseExpr(BindingNone + 1)
 	if err != nil {
 		return err
 	}
@@ -335,27 +363,6 @@ func (p *Compiler) patchJump(addr, offset int) {
 	}
 
 	p.chunk.ops[addr] = encode(op, uint(end))
-}
-
-func (p *Compiler) parseAssignment(tok Token) error {
-	nameIdx := len(p.chunk.constants) - 1
-	for {
-		err := p.parseExpr(BindingAssignment)
-		if err != nil {
-			return err
-		}
-		tok, err := p.tokenizer.Peek()
-		if tok.Type == TokenPipe || errors.Is(err, ErrEOF) {
-			break
-		}
-		_, err = p.tokenizer.Next()
-		if err != nil {
-			return err
-		}
-	}
-
-	p.emitBytes(OpCodeAssignment, uint(nameIdx))
-	return nil
 }
 
 func (p *Compiler) parseWhere(tok Token) error {
@@ -546,13 +553,17 @@ func (p *Compiler) emitBytes(op OpCode, val uint) int {
 }
 
 func (p *Compiler) emitLoadConst(op OpCode, x any) int {
-	p.chunk.constants = append(p.chunk.constants, x)
-	p.emitBytes(op, uint(len(p.chunk.constants)-1))
-	return len(p.chunk.ops) - 1
+	idx := p.createConst(x)
+	p.emitBytes(op, uint(idx))
+	return idx
 }
 
-// TODO: we don't de-duplicate
 func (p *Compiler) createConst(x any) int {
+	idx := slices.Index(p.chunk.constants, x)
+	if idx > -1 {
+		return idx
+	}
+
 	p.chunk.constants = append(p.chunk.constants, x)
 	return len(p.chunk.constants) - 1
 }

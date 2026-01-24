@@ -30,20 +30,20 @@ type TokenType = uint8
 const (
 	TokenInvalid    TokenType = iota // 0
 	TokenPipe                        // 1
-	TokenLeftParen                   // 3
-	TokenRightParen                  // 4
-	TokenPlus                        // 5
-	TokenMinus                       // 6
-	TokenStar                        // 7
-	TokenSlash                       // 8
-	TokenBang                        // 9
+	TokenLeftParen                   // 2
+	TokenRightParen                  // 3
+	TokenPlus                        // 4
+	TokenMinus                       // 5
+	TokenStar                        // 6
+	TokenSlash                       // 7
+	TokenBang                        // 8
 	TokenComma
 
 	// 1-or-2 char tokens
-	TokenAssign           // 10
-	TokenEqual            // 11
-	TokenNotEqual         // 12
-	TokenLessThan         // 13
+	TokenAssign           // 9
+	TokenEqual            // 10
+	TokenNotEqual         // 11
+	TokenLessThan         // 12
 	TokenLessEqualThan    // 14
 	TokenGreaterThan      // 15
 	TokenGreaterEqualThan // 16

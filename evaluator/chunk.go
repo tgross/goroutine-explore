@@ -31,8 +31,10 @@ func (c *Chunk) disassemble(ip int) string {
 		case OpCodeAssignment, OpCodeLoadFieldAccessor,
 			OpCodeLoadNumber, OpCodeLoadString, OpCodeLoadGoroutineDump:
 			if idx <= uint(len(c.constants)) {
-				val := c.constants[idx]
-				comment = fmt.Sprintf("\t// %v", val)
+				if len(c.constants) > int(idx) {
+					val := c.constants[idx]
+					comment = fmt.Sprintf("\t// %v", val)
+				}
 			}
 		}
 		b.WriteString(fmt.Sprintf("%s[%02d] %s%s\n", ipPrefix, instIndex, op, comment))
@@ -124,3 +126,14 @@ const (
 
 	OpCodePatchPlaceholder = 0x000000000000ffff
 )
+
+// MultiAssignment is stored as a constant and itself contains indexes into the
+// constants table. This lets us multi-assign by emitting an OpCodeAssignment
+// that the VM will then dereference into these values and pop items off the
+// stack. Like Go, you can use the _ sigil, which maps to a -1 xindex. In that
+// case, the VM will pop a value off the stack and drop it.
+type MultiAssignment []int
+
+func newMultiAssignment() MultiAssignment {
+	return []int{}
+}

@@ -14,6 +14,7 @@ const (
 	TagDump
 	TagGoroutine
 	TagAddress
+	TagDiff
 )
 
 type Value struct {

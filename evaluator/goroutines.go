@@ -1,11 +1,20 @@
 package evaluator
 
-import "fmt"
+import (
+	"fmt"
+	"slices"
+)
 
 /*
 The types in this file are placeholders until the evaluator gets wired up into
 the main application
 */
+
+type Diff struct {
+	Left   *GoroutineDump
+	Right  *GoroutineDump
+	Common *GoroutineDump
+}
 
 type GoroutineDump struct {
 	goroutines []*Goroutine
@@ -30,6 +39,21 @@ func (gd *GoroutineDump) Next() *Goroutine {
 	g := gd.goroutines[gd.iterIndex]
 	gd.iterIndex++
 	return g
+}
+
+func (gd *GoroutineDump) Copy() *GoroutineDump {
+	return &GoroutineDump{
+		goroutines: slices.Clone(gd.goroutines),
+	}
+}
+
+func (gd *GoroutineDump) Has(p *Goroutine) bool {
+	for _, g := range gd.goroutines {
+		if g.ID == p.ID {
+			return true // TODO: want an equality hash here
+		}
+	}
+	return false
 }
 
 func (gd *GoroutineDump) StartIter() {

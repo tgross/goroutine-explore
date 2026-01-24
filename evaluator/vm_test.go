@@ -202,3 +202,56 @@ func TestVM_BinaryExpression(t *testing.T) {
 		})
 	}
 }
+
+func TestVM_MultiAssignDiff(t *testing.T) {
+
+	// source: `g3, g4, g4 = g1 diff g2`
+	chunk := &Chunk{
+		ops: []Op{
+			encode(OpCodeLoadGoroutineDump, 4), // load g1
+			encode(OpCodeLoadGoroutineDump, 5), // load g2
+			encode(OpCodeFuncDiff, 0),          // diff
+			encode(OpCodeAssignment, 3),        // assign to g3, g4, g5
+		},
+		constants: []any{
+			"g3", "g4", "g5", MultiAssignment{0, 1, 2}, "g1", "g2"},
+	}
+	vm, _ := NewVM(&vmConfig{cwd: t.TempDir()})
+	vm.reset(chunk)
+
+	g1 := NewGoroutineDump()
+	g1.Add(&Goroutine{ID: 1, Duration: 20, State: "select"})
+	g1.Add(&Goroutine{ID: 2, Duration: 0, State: "running"})
+
+	g2 := NewGoroutineDump()
+	g2.Add(&Goroutine{ID: 1, Duration: 20, State: "select"})
+	g2.Add(&Goroutine{ID: 3, Duration: 10, State: "IO wait"})
+
+	vm.env = map[string]Value{
+		"g1": {Tag: TagDump, Data: g1},
+		"g2": {Tag: TagDump, Data: g2},
+	}
+
+	_, err := vm.run()
+	vm.debug()
+	must.NoError(t, err)
+
+	gd3 := expectDumpFromEnv(t, vm.env, "g3")
+	must.Eq(t, "[2]", gd3.String())
+
+	gd4 := expectDumpFromEnv(t, vm.env, "g4")
+	must.Eq(t, "[3]", gd4.String())
+
+	gd5 := expectDumpFromEnv(t, vm.env, "g5")
+	must.Eq(t, "[1 1]", gd5.String())
+}
+
+func expectDumpFromEnv(t *testing.T, env map[string]Value, name string) *GoroutineDump {
+	t.Helper()
+	val, ok := env[name]
+	must.True(t, ok, must.Sprintf("%s was not written to env", name))
+	must.Eq(t, TagDump, val.Tag)
+	gd, ok := val.Data.(*GoroutineDump)
+	must.True(t, ok)
+	return gd
+}

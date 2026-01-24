@@ -13,8 +13,8 @@ func TestCompiler_SimplePipeline(t *testing.T) {
 	   parenthesized to show binding power:
 	   g2 = ((g1 where .state == "select") | (where .duration > 10))
 	*/
-	src := `g2 = g1 where .state == "select" |
-                    where .duration > 10`
+	src := `g2 = (g1 where .state == "select" |
+                    where .duration > 10)`
 
 	body := strings.NewReader(src)
 
@@ -52,9 +52,9 @@ func TestCompiler_SimplePipeline(t *testing.T) {
 
 func TestCompiler_MultiPipeline(t *testing.T) {
 
-	src := `g3 = g1 where .state == "select" |
+	src := `g3 = (g1 where .state == "select" |
                     where .duration > 10 and .trace contains "keepAlive" |
-                    delete .trace contains "gRPC"`
+                    delete .trace contains "gRPC")`
 
 	body := strings.NewReader(src)
 
@@ -64,6 +64,11 @@ func TestCompiler_MultiPipeline(t *testing.T) {
 	must.NoError(t, err)
 
 	fmt.Println(chunk.disassemble(0))
+
+	must.Eq(t, []any{
+		"g3", "g1", ".state", "select", ".duration", 10,
+		".trace", "keepAlive", "gRPC"}, chunk.constants)
+
 	must.Eq(t, []Op{
 		encode(OpCodeLoadGoroutineDump, 1), // 00 load g1
 		encode(OpCodeTempDump, 0),          // 01 scratch register
@@ -92,8 +97,8 @@ func TestCompiler_MultiPipeline(t *testing.T) {
 		encode(OpCodePushDump, 0),          // 24 push to stack
 		encode(OpCodeTempDump, 0),          // 25 refresh scratch register
 		encode(OpCodeNextGoroutine, 33),    // 26 addr when done
-		encode(OpCodeLoadFieldAccessor, 8), // 27 load .trace
-		encode(OpCodeLoadString, 9),        // 28 load "gRPC"
+		encode(OpCodeLoadFieldAccessor, 6), // 27 load .trace
+		encode(OpCodeLoadString, 8),        // 28 load "gRPC"
 		encode(OpCodeContains, 0),          // 29 compare push bool to stack
 		encode(OpCodeJumpIfTrue, 26),       // 30 jump to next goroutine
 		encode(OpCodeAddGoroutine, 0),      // 31 keep
@@ -204,7 +209,8 @@ func TestCompiler_CompoundWhere(t *testing.T) {
 }
 
 func TestCompiler_ParentheticalWhere(t *testing.T) {
-	src := `g where (.duration > 10 and .state == "select") or .state == "running"`
+	src := `g where (.duration > 10 and .state == "select")
+                    or .state == "running"`
 	body := strings.NewReader(src)
 
 	tokenizer := NewTokenizer(body)
@@ -212,6 +218,10 @@ func TestCompiler_ParentheticalWhere(t *testing.T) {
 	chunk, err := compiler.Compile(tokenizer)
 	fmt.Println(chunk.disassemble(0))
 	must.NoError(t, err)
+
+	must.Eq(t, []any{
+		"g", ".duration", 10,
+		".state", "select", "running"}, chunk.constants)
 
 	must.Eq(t, []Op{
 		encode(OpCodeLoadGoroutineDump, 0), // 00 load g
@@ -229,8 +239,8 @@ func TestCompiler_ParentheticalWhere(t *testing.T) {
 		encode(OpCodeJumpIfFalse, 15),      // 12 jump to next expr in "or"
 		encode(OpCodePushBool, 1),          // 13 push true
 		encode(OpCodeJumpTo, 18),           // 14 jump to end of "or"
-		encode(OpCodeLoadFieldAccessor, 5), // 15 load .state
-		encode(OpCodeLoadString, 6),        // 16 load "running"
+		encode(OpCodeLoadFieldAccessor, 3), // 15 load .state
+		encode(OpCodeLoadString, 5),        // 16 load "running"
 		encode(OpCodeEqual, 0),             // 17 compare push bool to stack
 		encode(OpCodeJumpIfFalse, 2),       // 18 skip + goto next goroutine
 		encode(OpCodeAddGoroutine, 0),      // 19 keep this goroutine
@@ -251,6 +261,8 @@ func TestCompiler_NestedExpressions(t *testing.T) {
 	fmt.Println(chunk.disassemble(0))
 	must.NoError(t, err)
 
+	must.Eq(t, []any{"g1", "g2", ".duration", 10, 0}, chunk.constants)
+
 	must.Eq(t, []Op{
 		encode(OpCodeLoadGoroutineDump, 0), // 00 load g1
 		encode(OpCodeLoadGoroutineDump, 1), // 01 load g2
@@ -265,7 +277,7 @@ func TestCompiler_NestedExpressions(t *testing.T) {
 		encode(OpCodePushDump, 0),          // 10 push temp dump to stack
 		encode(OpCodeFuncUnion, 0),         // 11 union
 		encode(OpCodeLoadNumber, 4),        // 12 load 0
-		encode(OpCodeLoadNumber, 5),        // 13 load 0
+		encode(OpCodeLoadNumber, 4),        // 13 load 0
 		encode(OpCodeFuncShowDump, 0),      // 14 show
 	}, chunk.ops)
 }
@@ -332,4 +344,48 @@ func TestCompiler_Paths(t *testing.T) {
 			must.Eq(t, tc.expectPath, chunk.constants[0].(string))
 		})
 	}
+}
+
+func TestCompiler_DiffMultiAssign(t *testing.T) {
+
+	src := `g3, g4, g5 = g1 diff g2` //`| l, r, c = diff g2`
+	body := strings.NewReader(src)
+
+	tokenizer := NewTokenizer(body)
+	compiler := newCompiler()
+	chunk, err := compiler.Compile(tokenizer)
+	must.NoError(t, err)
+
+	fmt.Println(chunk.disassemble(0))
+
+	must.Eq(t, []any{
+		"g3", "g4", "g5", "g1", "g2", MultiAssignment{0, 1, 2}},
+		chunk.constants)
+
+	must.Eq(t, []Op{
+		encode(OpCodeLoadGoroutineDump, 3), // 00 load g1
+		encode(OpCodeLoadGoroutineDump, 4), // 01 load g2
+		encode(OpCodeFuncDiff, 0),          // 02 diff func
+		encode(OpCodeAssignment, 5),        // 03 multi-assign g3, g4, g5
+	}, chunk.ops)
+}
+
+func TestCompiler_NoAssign(t *testing.T) {
+
+	src := `g1, g2`
+	body := strings.NewReader(src)
+
+	tokenizer := NewTokenizer(body)
+	compiler := newCompiler()
+	chunk, err := compiler.Compile(tokenizer)
+	must.NoError(t, err)
+
+	fmt.Println(chunk.disassemble(0))
+
+	must.Eq(t, []any{"g1", "g2"}, chunk.constants)
+
+	must.Eq(t, []Op{
+		encode(OpCodeLoadGoroutineDump, 0), // 00 load g1
+		encode(OpCodeLoadGoroutineDump, 1), // 01 load g2
+	}, chunk.ops)
 }

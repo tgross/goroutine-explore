@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"reflect"
 	"strings"
 )
 
@@ -183,6 +184,8 @@ func (vm *VM) run() (Value, error) {
 			err = vm.handleUnion()
 
 		case OpCodeFuncDiff:
+			err = vm.handleDiff()
+
 		case OpCodeFuncIntersect:
 		case OpCodeFuncShowDump:
 		case OpCodeFuncLoad:
@@ -197,6 +200,8 @@ func (vm *VM) run() (Value, error) {
 
 	}
 
+	// TODO: shouldn't we just pop everything off the stack so we can print it
+	// all?
 	return vm.Pop()
 }
 
@@ -212,6 +217,7 @@ var (
 	ErrExpectedJumpAddress       = errors.New("expected address for jump")
 	ErrExpectedCommand           = errors.New("expected valid command after command byte")
 	ErrNoSuchEnv                 = errors.New("no identifer with name")
+	ErrExpectedDiffAssign        = errors.New("assigning a diff must have 3 identifiers or \"_\"")
 )
 
 func (vm *VM) comparison(instruction OpCode) error {
@@ -282,7 +288,7 @@ func (vm *VM) contains(instruction OpCode) error {
 	default:
 		// TODO: actually needs to be a goroutine on one side and a string on
 		// the other, I think?
-		return fmt.Errorf("%w expected string for contains", ErrInvalidType)
+		return fmt.Errorf("%w: expected string for contains", ErrInvalidType)
 	}
 	vm.Push(Value{Tag: TagBool, Data: val})
 	return nil
@@ -294,7 +300,7 @@ func (vm *VM) popDump() (*GoroutineDump, error) {
 		return nil, err
 	}
 	if b, ok := val.Data.(*GoroutineDump); !ok {
-		return nil, fmt.Errorf("%w pop bool", ErrInvalidType)
+		return nil, fmt.Errorf("%w: expected a goroutine dump", ErrInvalidType)
 	} else {
 		return b, nil
 	}
@@ -328,12 +334,24 @@ func (vm *VM) fetchConstant(index uint) (any, error) {
 	return con, nil
 }
 
-func (vm *VM) loadEnv(index uint) error {
+func (vm *VM) fetchString(index uint) (string, error) {
 	con, err := vm.fetchConstant(index)
 	if err != nil {
-		return err
+		return "", err
 	}
-	name := con.(string)
+	val, ok := con.(string)
+	if !ok {
+		return "", ErrInvalidType
+	}
+	return val, nil
+}
+
+func (vm *VM) loadEnv(index uint) error {
+	name, err := vm.fetchString(index)
+	if err != nil {
+		return fmt.Errorf("%w: expected name of a variable or constant", err)
+	}
+
 	val := vm.env[name] // TODO: what if env is empty?
 	vm.Push(val)
 	return nil
@@ -388,19 +406,59 @@ func (vm *VM) handleUnion() error {
 	return nil
 }
 
-func (vm *VM) handleFieldAccessor(index uint) error {
-	con, err := vm.fetchConstant(index)
+func (vm *VM) handleDiff() error {
+	inRight, err := vm.popDump()
 	if err != nil {
 		return err
 	}
 
+	inLeft, err := vm.popDump()
+	if err != nil {
+		return err
+	}
+
+	left := NewGoroutineDump()
+	right := NewGoroutineDump()
+	common := NewGoroutineDump()
+	for _, lg := range inLeft.goroutines {
+		if inRight.Has(lg) {
+			common.Add(lg)
+		} else {
+			left.Add(lg)
+		}
+	}
+	for _, rg := range inRight.goroutines {
+		if inLeft.Has(rg) {
+			common.Add(rg)
+		} else {
+			right.Add(rg)
+		}
+	}
+
+	// we push a Diff and not a stack of three values because we want to be able
+	// to return a single item off the stack when the VM exits
+	vm.Push(Value{
+		Tag: TagDiff,
+		Data: &Diff{
+			Left:   left,
+			Right:  right,
+			Common: common,
+		},
+	})
+	return nil
+}
+
+func (vm *VM) handleFieldAccessor(index uint) error {
+	name, err := vm.fetchString(index)
+	if err != nil {
+		return fmt.Errorf("%w: expected name field", err)
+	}
 	g := vm.regGoroutine
 	if g == nil {
 		return fmt.Errorf("%w: no goroutine", ErrUnexpectedRegisterState)
 	}
 
-	str := con.(string)
-	switch str {
+	switch name {
 	case "id", ".id":
 		vm.Push(Value{Tag: TagNumber, Data: g.ID})
 	case "header", ".header":
@@ -492,18 +550,80 @@ func (vm *VM) handleAssignment(index uint) error {
 	if err != nil {
 		return err
 	}
-	name, ok := con.(string)
-	if !ok {
+	switch target := con.(type) {
+	case string:
+		val, err := vm.Peek()
+		if err != nil {
+			return err
+		}
+		vm.env[target] = val
+	case MultiAssignment:
+		return vm.handleMultiAssignment(target)
+	default:
 		return fmt.Errorf(
-			"%w assignment: expected identifier got %v",
+			"%w assignment: expected identifier or multi-assign but got %v",
 			ErrInvalidType, con)
 	}
-	val, err := vm.Peek()
+
+	return nil
+}
+
+func (vm *VM) assign(index int, val Value) error {
+	if index >= 0 {
+		name, err := vm.fetchString(uint(index))
+		if err != nil {
+			return fmt.Errorf("%w assignment: expected variable name", err)
+		}
+		if name == "_" {
+			return nil
+		}
+		vm.env[name] = val
+	}
+	return nil
+}
+
+func (vm *VM) handleMultiAssignment(m MultiAssignment) error {
+
+	top, err := vm.Peek()
 	if err != nil {
 		return err
 	}
+	switch top.Tag {
+	case TagDiff:
+		if len(m) != 3 {
+			return ErrExpectedDiffAssign
+		}
+		val, _ := vm.Peek()
+		diff, ok := val.Data.(*Diff)
+		if !ok {
+			t := reflect.TypeOf(val.Data)
+			return fmt.Errorf("%w: diff value was a %v", ErrInvalidType, t)
+		}
+		err := vm.assign(m[0], Value{TagDump, diff.Left})
+		if err != nil {
+			return err
+		}
+		err = vm.assign(m[1], Value{TagDump, diff.Right})
+		if err != nil {
+			return err
+		}
+		err = vm.assign(m[2], Value{TagDump, diff.Common})
+		if err != nil {
+			return err
+		}
+	case TagDump:
+		for i, idx := range m {
+			val, err := vm.peekN(i)
+			if err != nil {
+				return err
+			}
+			err = vm.assign(idx, val)
+			if err != nil {
+				return err
+			}
+		}
+	}
 
-	vm.env[name] = val
 	return nil
 }
 
