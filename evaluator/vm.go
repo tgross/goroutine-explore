@@ -3,6 +3,7 @@ package evaluator
 import (
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"reflect"
 	"strings"
@@ -10,6 +11,16 @@ import (
 
 const initialStackCap = 256
 const defaultGas = 1024 * 1024
+
+type Pragma struct {
+	EmptyConfirm bool
+	ExitConfirm  bool
+	ListFormat   string
+	ShowColor    bool
+	ShowCount    int
+	ShowDedup    string
+	VarsDisplay  string
+}
 
 type VM struct {
 	chunk *Chunk
@@ -22,8 +33,11 @@ type VM struct {
 
 	// TODO: we should have a copy of the environment that we write to on each
 	// pass through run, which only gets flattened into the env when complete
-	env map[string]Value
-	cwd *os.Root
+	env    map[string]Value
+	pragma *Pragma
+	cwd    *os.Root
+	wOut   io.Writer // writer for output
+	wErr   io.Writer // writer for errors
 
 	regGoroutine *Goroutine
 	regDumpDst   *GoroutineDump
@@ -40,10 +54,11 @@ func NewVM(cfg *vmConfig) (*VM, error) {
 	}
 
 	return &VM{
-		stack: make([]Value, 0, initialStackCap),
-		env:   make(map[string]Value),
-		cwd:   root,
-		gas:   defaultGas,
+		stack:  make([]Value, 0, initialStackCap),
+		env:    make(map[string]Value),
+		pragma: &Pragma{},
+		cwd:    root,
+		gas:    defaultGas,
 	}, nil
 }
 
@@ -190,6 +205,8 @@ func (vm *VM) run() (Value, error) {
 			err = vm.handleIntersect()
 
 		case OpCodeFuncShowDump:
+			err = vm.handleShow()
+
 		case OpCodeFuncLoad:
 		case OpCodeFuncSave:
 
@@ -214,6 +231,7 @@ var (
 	ErrUnexpectedRegisterState   = errors.New("unexpected register state")
 	ErrOutOfStackBounds          = errors.New("jump outside of stack bounds")
 	ErrInvalidType               = errors.New("invalid type for operation")
+	ErrArgumentUnset             = errors.New("expected argument is unset")
 	ErrNoSuchOpCode              = errors.New("no such op code")
 	ErrExpectedConstantValueByte = errors.New("expected value after constant load byte")
 	ErrExpectedJumpAddress       = errors.New("expected address for jump")
@@ -298,6 +316,18 @@ func (vm *VM) contains(instruction OpCode) error {
 
 func (vm *VM) popDump() (*GoroutineDump, error) {
 	val, err := vm.Pop()
+	if err != nil {
+		return nil, err
+	}
+	if b, ok := val.Data.(*GoroutineDump); !ok {
+		return nil, fmt.Errorf("%w: expected a goroutine dump", ErrInvalidType)
+	} else {
+		return b, nil
+	}
+}
+
+func (vm *VM) peekDump() (*GoroutineDump, error) {
+	val, err := vm.Peek()
 	if err != nil {
 		return nil, err
 	}
@@ -712,4 +742,42 @@ func (vm *VM) commandHelp(index uint) (Value, error) {
 		// TODO: lookup help for topic here?
 		Data: fmt.Sprintf("help for topic: %s", topic),
 	}, nil
+}
+
+func (vm *VM) popArgNumeric() (int, error) {
+	val, err := vm.Pop()
+	if err != nil {
+		return -1, err
+	}
+	if val.Tag != TagNumber {
+		return -1, ErrInvalidType
+	}
+	arg, ok := val.Data.(int)
+	if !ok {
+		return -1, fmt.Errorf(
+			"%w: expected an index for a constant", ErrInvalidType)
+	}
+	return arg, nil
+}
+
+func (vm *VM) handleShow() error {
+	limit, err := vm.popArgNumeric()
+	if err != nil {
+		return err
+	}
+	if limit < 1 {
+		limit = vm.pragma.ShowCount
+	}
+	offset, err := vm.popArgNumeric()
+	if err != nil {
+		return err
+	}
+	dump, err := vm.peekDump()
+	if err != nil {
+		return err
+	}
+
+	out := dump.Show(limit, offset)
+	vm.wOut.Write([]byte(out))
+	return nil
 }

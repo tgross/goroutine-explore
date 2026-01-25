@@ -492,25 +492,30 @@ func (p *Compiler) parseFunction(tok Token) error {
 		p.emitBytes(OpCodeAssignment, uint(nameIdx))
 		return nil
 	case "show":
-		tokCount, err := p.maybeConsume(TokenNumber)
+		// limit argument
+		tokLimit, err := p.maybeConsume(TokenNumber)
 		if err != nil {
 			return err
 		}
-		if tokCount == EmptyToken {
-			p.emitLoadConst(OpCodeLoadNumber, 0) // TODO: pragma?
-		} else {
-			_ = p.parseNumber(tokCount)
+		if tokLimit == EmptyToken {
+			p.emitLoadConst(OpCodeLoadNumber, 0) // get default from pragma
+			p.emitLoadConst(OpCodeLoadNumber, 0) // get default from pragma
+			p.emitByte(OpCodeFuncShowDump)
+			return nil
 		}
 
+		// offset argument
 		tokOffset, err := p.maybeConsume(TokenNumber)
 		if err != nil {
 			return err
 		}
 		if tokOffset == EmptyToken {
-			p.emitLoadConst(OpCodeLoadNumber, 0) // TODO: pragma?
+			p.emitLoadConst(OpCodeLoadNumber, 0) // get default from pragma
 		} else {
 			_ = p.parseNumber(tokOffset)
 		}
+		_ = p.parseNumber(tokLimit)
+
 		p.emitByte(OpCodeFuncShowDump)
 		return nil
 	default:

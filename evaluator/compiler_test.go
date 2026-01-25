@@ -389,3 +389,57 @@ func TestCompiler_NoAssign(t *testing.T) {
 		encode(OpCodeLoadGoroutineDump, 1), // 01 load g2
 	}, chunk.ops)
 }
+
+func TestCompiler_Show(t *testing.T) {
+	testCases := []struct {
+		name         string
+		src          string
+		expectLimit  int
+		expectOffset int
+	}{
+		{
+			name:         "no args",
+			src:          `g1 | show`,
+			expectLimit:  0,
+			expectOffset: 0,
+		},
+		{
+			name:         "offset only",
+			src:          `g1 | show 0 3`,
+			expectLimit:  0,
+			expectOffset: 3,
+		},
+		{
+			name:         "limit only",
+			src:          `g1 | show 3`,
+			expectLimit:  3,
+			expectOffset: 0,
+		},
+		{
+			name:         "limit and offset",
+			src:          `g1 | show 10 3`,
+			expectLimit:  10,
+			expectOffset: 3,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			body := strings.NewReader(tc.src)
+			tokenizer := NewTokenizer(body)
+			compiler := newCompiler()
+			chunk, err := compiler.Compile(tokenizer)
+			must.NoError(t, err)
+
+			fmt.Println(chunk.disassemble(0))
+			must.Len(t, 4, chunk.ops)
+
+			_, operand := chunk.ops[2].decode()
+			must.Eq(t, tc.expectLimit, chunk.constants[operand].(int))
+
+			_, operand = chunk.ops[1].decode()
+			must.Eq(t, tc.expectOffset, chunk.constants[operand].(int))
+		})
+	}
+
+}

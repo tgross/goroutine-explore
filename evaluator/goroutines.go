@@ -67,10 +67,24 @@ func (gd *GoroutineDump) Len() int {
 	return len(gd.goroutines)
 }
 
+// String is a placeholder until we wire this all up to the REPL writer
 func (gd *GoroutineDump) String() string {
 	ids := make([]int, 0, len(gd.goroutines))
 	for _, g := range gd.goroutines {
 		ids = append(ids, g.ID)
+	}
+	return fmt.Sprintf("%v", ids)
+}
+
+// Show is a placeholder until we wire this all up to the REPL writer
+func (gd *GoroutineDump) Show(limit, offset int) string {
+	if limit < 1 {
+		return gd.String()
+	}
+
+	ids := make([]int, 0, len(gd.goroutines))
+	for i := offset; i < limit+offset && i < len(gd.goroutines); i++ {
+		ids = append(ids, gd.goroutines[i].ID)
 	}
 	return fmt.Sprintf("%v", ids)
 }

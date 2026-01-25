@@ -1,6 +1,7 @@
 package evaluator
 
 import (
+	"bytes"
 	"testing"
 
 	"github.com/shoenig/test/must"
@@ -287,6 +288,33 @@ func TestVM_MultiAssignDiff(t *testing.T) {
 
 	gd5 := expectDumpFromEnv(t, vm.env, "g5")
 	must.Eq(t, "[1 1]", gd5.String())
+}
+
+func TestVM_Show(t *testing.T) {
+	// source: `g1 | show 3 1`
+	chunk := &Chunk{
+		ops: []Op{
+			encode(OpCodeLoadGoroutineDump, 0), // load g1
+			encode(OpCodeLoadNumber, 1),        // load 1 (offset)
+			encode(OpCodeLoadNumber, 2),        // load 3 (limit)
+			encode(OpCodeFuncShowDump, 0),      // show
+		},
+		constants: []any{"g1", 1, 3},
+	}
+	vm, _ := NewVM(&vmConfig{cwd: t.TempDir()})
+	recorder := new(bytes.Buffer) // TODO: probably want test helper for this
+	vm.wOut = recorder
+	vm.reset(chunk)
+
+	g1 := NewGoroutineDump()
+	g1.Add(&Goroutine{ID: 1, Duration: 20, State: "select"})
+	g1.Add(&Goroutine{ID: 2, Duration: 0, State: "running"})
+	g1.Add(&Goroutine{ID: 3, Duration: 10, State: "IO wait"})
+	vm.env = map[string]Value{"g1": {Tag: TagDump, Data: g1}}
+
+	_, err := vm.run()
+	must.NoError(t, err)
+	must.Eq(t, `[2 3]`, string(recorder.Bytes()))
 }
 
 func expectDumpFromEnv(t *testing.T, env map[string]Value, name string) *GoroutineDump {

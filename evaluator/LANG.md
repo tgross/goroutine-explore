@@ -78,7 +78,7 @@ instruction will extend to multiple lines.
 
 ## Commands
 
-Commands change the working environment of the `goroutine-inspect`
+Commands change the working environment of the `goroutine-explore`
 shell. Commands must always come at the start of a line and cannot be part of a
 pipeline or filter expression.
 
@@ -125,15 +125,19 @@ pipeline or filter expression.
     command. If set, the `ls` command will invoke the parent shell's `ls`
     command with these flags instead of listing the directory itself.
 
+  * `show.color` (default value: `true`): Controls whether the `show` command
+    adds color to the output. If you have the `NOCOLOR` environment variable
+    set, this pragma defaults to `false` instead.
+
+  * `show.count` (default value: `0`): Controls the default value of the `show`
+    command's `count` argument. The default value of `0` shows all goroutines in
+    the dump.
+
   * `show.dedup` (default value: `ids`): Controls how the `show` command
     deduplicates goroutines. The default behavior lists the IDs of duplicates
     with each goroutine stack. You can set this to `number` to show only the
     number of duplicates without the IDs. Or you can set this to `none` to stop
     deduplication entirely.
-
-  * `show.color` (default value: `true`): Controls whether the `show` command
-    adds color to the output. If you have the `NOCOLOR` environment variable
-    set, this pragma defaults to `false` instead.
 
   * `vars.display` (default value: `count`): Controls the output of the `vars`
     command. By default, `vars` shows the total number of goroutines in each
@@ -156,7 +160,7 @@ g1  127
 
 ## Types
 
-The `goroutine-inspect` shell understands the following types:
+The `goroutine-explore` shell understands the following types:
 
 * goroutine: The stack trace of a single goroutine, along with its metadata such as ID and state.
 * goroutine dump: A collection of goroutines.
@@ -364,14 +368,14 @@ goroutine stack. You can set this to `number` to show only the number of
 duplicates without the IDs. Or you can set this to `none` to stop deduplication
 entirely.
 
-The `show` function takes the following optional number arguments: `offset` and
-`limit`. These allow you to page through a goroutine dump. The `offset` argument
-is first but if only one of the two arguments is passed, `show` treats it as a
-`limit` with no offset.
+The `show` function takes the following optional number arguments: `limit` and
+`offset`. These allow you to page through a goroutine dump. If `limit` is zero,
+then all goroutines starting at the `offset` will be shown. If `offset` is zero
+or missing, it is ignored and show starts from the beginning of the dump.
 
 ```
 # show 10 goroutines starting at offset 100
->>> g1 show 100 10
+>>> g1 show 10 100
 ```
 
 Paging via `offset` and `limit` respects the `show.dedup` pragma such that only
@@ -511,10 +515,6 @@ The `intersect` expression takes two goroutine dumps and returns a goroutine dum
         syscall: 2
 ```
 
-[linuxerwang/goroutine-inspect]: https://github.com/linuxerwang/goroutine-inspect
-[`liner`]: https://github.com/peterh/liner?tab=readme-ov-file#line-editing
-[`pprof`]: https://pkg.go.dev/runtime/pprof#Profile
-
 ## Grammar
 
 Grammar in Wirth syntax notation.
@@ -563,3 +563,8 @@ PREDICATE = ["not"] "(" PREDICATE ")"
           | (DIGITS | STRING ) COMPARE_OPERATOR FIELD .
           | FIELD COMPARE_OPERATOR (DIGITS | STRING) .
 ```
+
+
+[linuxerwang/goroutine-inspect]: https://github.com/linuxerwang/goroutine-inspect
+[`liner`]: https://github.com/peterh/liner?tab=readme-ov-file#line-editing
+[`pprof`]: https://pkg.go.dev/runtime/pprof#Profile
