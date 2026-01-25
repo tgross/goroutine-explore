@@ -77,17 +77,17 @@ func TestVM_SimpleWhere(t *testing.T) {
 
 func TestVM_BinaryExpression(t *testing.T) {
 
-	// these test cases should all have identical output
 	testCases := []struct {
 		name      string
 		ops       []Op
 		constants []any
 		g1Fn      func() *GoroutineDump
 		g2Fn      func() *GoroutineDump
+		expectFn  func(*testing.T, *GoroutineDump)
 	}{
 		{
 			// source: `g1 union g2`
-			name: "simple binary expression",
+			name: "simple union",
 			ops: []Op{
 				encode(OpCodeLoadGoroutineDump, 0), // 00 load g1
 				encode(OpCodeLoadGoroutineDump, 1), // 01 load g2
@@ -105,10 +105,17 @@ func TestVM_BinaryExpression(t *testing.T) {
 				g2.Add(&Goroutine{ID: 3, Duration: 20, State: "IO wait"})
 				return g2
 			},
+			expectFn: func(t *testing.T, g *GoroutineDump) {
+				must.Eq(t, 3, g.Len())
+				must.Eq(t, 3, g.Next().ID)
+				must.Eq(t, 1, g.Next().ID)
+				must.Eq(t, 2, g.Next().ID)
+			},
 		},
+
 		{
 			// source: `g1 union (g2 where .duration > 10)
-			name: "binary expression nested on right",
+			name: "union nested on right",
 			ops: []Op{
 				encode(OpCodeLoadGoroutineDump, 0), // 00 load g1
 				encode(OpCodeLoadGoroutineDump, 1), // 01 load g2
@@ -137,10 +144,17 @@ func TestVM_BinaryExpression(t *testing.T) {
 				g2.Add(&Goroutine{ID: 99, Duration: 0, State: "running"})
 				return g2
 			},
+			expectFn: func(t *testing.T, g *GoroutineDump) {
+				must.Eq(t, 3, g.Len())
+				must.Eq(t, 3, g.Next().ID)
+				must.Eq(t, 1, g.Next().ID)
+				must.Eq(t, 2, g.Next().ID)
+			},
 		},
+
 		{
 			// source: `(g1 where .duration > 10) union g2
-			name: "binary expression nested on left",
+			name: "union nested on left",
 			ops: []Op{
 				encode(OpCodeLoadGoroutineDump, 0), // 00 load g1
 				encode(OpCodeTempDump, 0),          // 01 setup scratch register
@@ -169,6 +183,39 @@ func TestVM_BinaryExpression(t *testing.T) {
 				g2.Add(&Goroutine{ID: 1, Duration: 0, State: "running"})
 				return g2
 			},
+			expectFn: func(t *testing.T, g *GoroutineDump) {
+				must.Eq(t, 3, g.Len())
+				must.Eq(t, 3, g.Next().ID)
+				must.Eq(t, 1, g.Next().ID)
+				must.Eq(t, 2, g.Next().ID)
+			},
+		},
+
+		{
+			// source: `g1 intersect g2`
+			name: "simple intersect",
+			ops: []Op{
+				encode(OpCodeLoadGoroutineDump, 0), // 00 load g1
+				encode(OpCodeLoadGoroutineDump, 1), // 01 load g2
+				encode(OpCodeFuncIntersect, 0),     // 02 union
+			},
+			constants: []any{"g1", "g2"},
+			g1Fn: func() *GoroutineDump {
+				g1 := NewGoroutineDump()
+				g1.Add(&Goroutine{ID: 1, Duration: 20, State: "select"})
+				g1.Add(&Goroutine{ID: 2, Duration: 0, State: "running"})
+				return g1
+			},
+			g2Fn: func() *GoroutineDump {
+				g2 := NewGoroutineDump()
+				g2.Add(&Goroutine{ID: 1, Duration: 20, State: "select"})
+				g2.Add(&Goroutine{ID: 3, Duration: 10, State: "IO wait"})
+				return g2
+			},
+			expectFn: func(t *testing.T, g *GoroutineDump) {
+				must.Eq(t, 1, g.Len())
+				must.Eq(t, 1, g.Next().ID)
+			},
 		},
 	}
 
@@ -193,12 +240,8 @@ func TestVM_BinaryExpression(t *testing.T) {
 			must.Eq(t, TagDump, result.Tag)
 			g3, ok := result.Data.(*GoroutineDump)
 			must.True(t, ok)
-			must.Eq(t, 3, g3.Len())
-
 			g3.StartIter()
-			must.Eq(t, 3, g3.Next().ID)
-			must.Eq(t, 1, g3.Next().ID)
-			must.Eq(t, 2, g3.Next().ID)
+			tc.expectFn(t, g3)
 		})
 	}
 }

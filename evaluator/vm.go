@@ -187,6 +187,8 @@ func (vm *VM) run() (Value, error) {
 			err = vm.handleDiff()
 
 		case OpCodeFuncIntersect:
+			err = vm.handleIntersect()
+
 		case OpCodeFuncShowDump:
 		case OpCodeFuncLoad:
 		case OpCodeFuncSave:
@@ -400,6 +402,28 @@ func (vm *VM) handleUnion() error {
 	}
 	for _, rg := range right.goroutines {
 		g.Add(rg)
+	}
+
+	vm.pushDump(g)
+	return nil
+}
+
+func (vm *VM) handleIntersect() error {
+
+	left, err := vm.popDump()
+	if err != nil {
+		return err
+	}
+	right, err := vm.popDump()
+	if err != nil {
+		return err
+	}
+
+	g := NewGoroutineDump()
+	for _, lg := range left.goroutines {
+		if right.Has(lg) {
+			g.Add(lg)
+		}
 	}
 
 	vm.pushDump(g)
