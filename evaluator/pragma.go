@@ -1,0 +1,47 @@
+package evaluator
+
+// Pragma represents all the VM's configuration values.
+type Pragma struct {
+	EmptyConfirm bool
+	ExitConfirm  bool
+	ListFormat   string
+	ShowColor    bool
+	ShowCount    int
+	ShowDedup    string
+	VarsDisplay  string
+	Gas          int
+	StackSize    int
+}
+
+func NewPragma() *Pragma {
+	return &Pragma{
+		EmptyConfirm: true,
+		ExitConfirm:  true,
+		ListFormat:   "",
+		ShowColor:    true,
+		ShowCount:    0,
+		ShowDedup:    PragmaDedupIDs,
+		VarsDisplay:  PragmaDisplayCount,
+		Gas:          defaultGas,
+		StackSize:    defaultInitialStackCap,
+	}
+}
+
+const defaultInitialStackCap = 1024
+const defaultGas = 1024 * 1024 * 1024
+
+type PragmaDisplay string
+
+const (
+	PragmaDisplayCount   = "count"
+	PragmaDisplaySummary = "summary"
+	PragmaDisplayNone    = "none"
+)
+
+type PragmaDedup string
+
+const (
+	PragmaDedupIDs    = "ids"
+	PragmaDedupNumber = "number"
+	PragmaDedupNone   = "none"
+)

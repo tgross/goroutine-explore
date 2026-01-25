@@ -2,7 +2,10 @@ package evaluator
 
 import (
 	"fmt"
+	"maps"
 	"slices"
+	"sort"
+	"strings"
 )
 
 /*
@@ -87,6 +90,30 @@ func (gd *GoroutineDump) Show(limit, offset int) string {
 		ids = append(ids, gd.goroutines[i].ID)
 	}
 	return fmt.Sprintf("%v", ids)
+}
+
+func (gd *GoroutineDump) Summary(name string) string {
+	var b strings.Builder
+	if name != "" {
+		b.WriteString(
+			fmt.Sprintf("# of goroutines in %q: %d\n", name, len(gd.goroutines)))
+	} else {
+		b.WriteString(
+			fmt.Sprintf("# of goroutines: %d\n", len(gd.goroutines)))
+	}
+
+	stats := map[string]int{}
+	for _, g := range gd.goroutines {
+		stats[g.State]++
+	}
+	if len(stats) > 0 {
+		states := slices.Collect(maps.Keys(stats))
+		sort.Strings(states)
+		for _, k := range states {
+			b.WriteString(fmt.Sprintf("%15s: %d\n", k, stats[k]))
+		}
+	}
+	return b.String()
 }
 
 type Goroutine struct {

@@ -317,6 +317,54 @@ func TestVM_Show(t *testing.T) {
 	must.Eq(t, `[2 3]`, string(recorder.Bytes()))
 }
 
+func TestVM_CommandVars(t *testing.T) {
+	// source: `vars`
+	chunk := &Chunk{
+		ops: []Op{encode(OpCodeCommandVars, 0)},
+	}
+	vm, _ := NewVM(&vmConfig{cwd: t.TempDir()})
+	recorder := new(bytes.Buffer) // TODO: probably want test helper for this
+	vm.wOut = recorder
+	vm.reset(chunk)
+
+	g1 := NewGoroutineDump()
+	g1.Add(&Goroutine{ID: 1, Duration: 20, State: "select"})
+	g1.Add(&Goroutine{ID: 2, Duration: 0, State: "running"})
+	g1.Add(&Goroutine{ID: 3, Duration: 10, State: "IO wait"})
+
+	g2 := NewGoroutineDump()
+	g2.Add(&Goroutine{ID: 1, Duration: 20, State: "select"})
+	g2.Add(&Goroutine{ID: 3, Duration: 10, State: "IO wait"})
+
+	vm.env = map[string]Value{
+		"g1": {Tag: TagDump, Data: g1},
+		"g2": {Tag: TagDump, Data: g2},
+	}
+
+	_, err := vm.run()
+	must.NoError(t, err)
+	must.Eq(t, `g1: 3
+g2: 2
+`, string(recorder.Bytes()))
+
+	vm.pragma.VarsDisplay = PragmaDisplaySummary
+	vm.reset(chunk)
+	recorder.Reset()
+	_, err = vm.run()
+	must.NoError(t, err)
+	must.Eq(t, `# of goroutines in "g1": 3
+        IO wait: 1
+        running: 1
+         select: 1
+
+# of goroutines in "g2": 2
+        IO wait: 1
+         select: 1
+
+`, string(recorder.Bytes()))
+
+}
+
 func expectDumpFromEnv(t *testing.T, env map[string]Value, name string) *GoroutineDump {
 	t.Helper()
 	val, ok := env[name]

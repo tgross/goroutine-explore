@@ -4,23 +4,13 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"os"
 	"reflect"
+	"slices"
+	"sort"
 	"strings"
 )
-
-const initialStackCap = 256
-const defaultGas = 1024 * 1024
-
-type Pragma struct {
-	EmptyConfirm bool
-	ExitConfirm  bool
-	ListFormat   string
-	ShowColor    bool
-	ShowCount    int
-	ShowDedup    string
-	VarsDisplay  string
-}
 
 type VM struct {
 	chunk *Chunk
@@ -54,9 +44,9 @@ func NewVM(cfg *vmConfig) (*VM, error) {
 	}
 
 	return &VM{
-		stack:  make([]Value, 0, initialStackCap),
+		stack:  make([]Value, 0, defaultInitialStackCap),
 		env:    make(map[string]Value),
-		pragma: &Pragma{},
+		pragma: NewPragma(),
 		cwd:    root,
 		gas:    defaultGas,
 	}, nil
@@ -65,7 +55,7 @@ func NewVM(cfg *vmConfig) (*VM, error) {
 func (vm *VM) reset(chunk *Chunk) {
 	vm.ip = -1
 	vm.chunk = chunk
-	vm.stack = make([]Value, 0, initialStackCap)
+	vm.stack = make([]Value, 0, vm.pragma.StackSize)
 	vm.gas = defaultGas
 }
 
@@ -191,6 +181,8 @@ func (vm *VM) run() (Value, error) {
 
 		case OpCodeCommandListDir:
 		case OpCodeCommandVars:
+			return NoValue, vm.commandVars()
+
 		case OpCodeCommandPragma:
 			// TODO: probably just need a function for each one?
 			//err = vm.loadAndExecCommand()
@@ -231,6 +223,7 @@ var (
 	ErrUnexpectedRegisterState   = errors.New("unexpected register state")
 	ErrOutOfStackBounds          = errors.New("jump outside of stack bounds")
 	ErrInvalidType               = errors.New("invalid type for operation")
+	ErrInvalidArg                = errors.New("invalid argument for operation")
 	ErrArgumentUnset             = errors.New("expected argument is unset")
 	ErrNoSuchOpCode              = errors.New("no such op code")
 	ErrExpectedConstantValueByte = errors.New("expected value after constant load byte")
@@ -742,6 +735,45 @@ func (vm *VM) commandHelp(index uint) (Value, error) {
 		// TODO: lookup help for topic here?
 		Data: fmt.Sprintf("help for topic: %s", topic),
 	}, nil
+}
+
+func (vm *VM) commandVars() error {
+	vars := slices.Collect(maps.Keys(vm.env))
+	sort.Strings(vars)
+
+	mode := vm.pragma.VarsDisplay
+	switch mode {
+	case PragmaDisplayCount:
+		for _, name := range vars {
+			v := vm.env[name]
+			if v.Tag == TagDump {
+				if dump, ok := v.Data.(*GoroutineDump); ok {
+					out := fmt.Sprintf("%s: %d\n", name, dump.Len())
+					vm.wOut.Write([]byte(out))
+				}
+			}
+		}
+	case PragmaDisplaySummary:
+		for _, name := range vars {
+			v := vm.env[name]
+			if v.Tag == TagDump {
+				if dump, ok := v.Data.(*GoroutineDump); ok {
+					summary := dump.Summary(name)
+					vm.wOut.Write([]byte(summary))
+					vm.wOut.Write([]byte("\n"))
+				}
+			}
+		}
+	case PragmaDisplayNone:
+		out := strings.Join(vars, "\t")
+		vm.wOut.Write([]byte(out))
+	default:
+		return fmt.Errorf(
+			"%w %q: expected \"count\", \"summary\", or \"none\"",
+			ErrInvalidArg, mode)
+	}
+
+	return nil
 }
 
 func (vm *VM) popArgNumeric() (int, error) {
