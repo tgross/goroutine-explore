@@ -180,12 +180,14 @@ func (vm *VM) run() (Value, error) {
 			return vm.commandHelp(operand)
 
 		case OpCodeCommandListDir:
+			// TODO: implement me
+
 		case OpCodeCommandVars:
 			return NoValue, vm.commandVars()
 
 		case OpCodeCommandPragma:
-			// TODO: probably just need a function for each one?
-			//err = vm.loadAndExecCommand()
+			return NoValue, vm.commandPragma()
+			// TODO: implement me
 
 		case OpCodeFuncUnion:
 			err = vm.handleUnion()
@@ -200,7 +202,10 @@ func (vm *VM) run() (Value, error) {
 			err = vm.handleShow()
 
 		case OpCodeFuncLoad:
+			// TODO: implement me
+
 		case OpCodeFuncSave:
+			// TODO: implement me
 
 		default:
 			return NoValue, fmt.Errorf("%w %s", ErrNoSuchOpCode, instruction)
@@ -737,6 +742,45 @@ func (vm *VM) commandHelp(index uint) (Value, error) {
 	}, nil
 }
 
+func (vm *VM) commandPragma() error {
+	setting, err := vm.popString()
+	if err != nil {
+		return err
+	}
+
+	switch setting {
+	case "empty.confirm":
+		return popAndSet(vm, &vm.pragma.EmptyConfirm)
+	case "exit.confirm":
+		return popAndSet(vm, &vm.pragma.ExitConfirm)
+	case "show.color":
+		return popAndSet(vm, &vm.pragma.ShowColor)
+	case "show.count":
+		return popAndSet(vm, &vm.pragma.ShowCount)
+	case "ls.format":
+		return popAndSet(vm, &vm.pragma.ListFormat)
+	case "show.dedup":
+		return popAndSet(vm, &vm.pragma.ShowDedup)
+	case "vars.display":
+		return popAndSet(vm, &vm.pragma.VarsDisplay)
+	}
+
+	return nil
+}
+
+func popAndSet[T any](vm *VM, setting *T) error {
+	raw, err := vm.Pop()
+	if err != nil {
+		return err
+	}
+	val, ok := raw.Data.(T)
+	if !ok {
+		return ErrInvalidType
+	}
+	*setting = val
+	return nil
+}
+
 func (vm *VM) commandVars() error {
 	vars := slices.Collect(maps.Keys(vm.env))
 	sort.Strings(vars)
@@ -776,7 +820,39 @@ func (vm *VM) commandVars() error {
 	return nil
 }
 
-func (vm *VM) popArgNumeric() (int, error) {
+func (vm *VM) popString() (string, error) {
+	val, err := vm.Pop()
+	if err != nil {
+		return "", err
+	}
+	if val.Tag != TagString {
+		return "", ErrInvalidType
+	}
+	arg, ok := val.Data.(string)
+	if !ok {
+		return "", fmt.Errorf(
+			"%w: expected string", ErrInvalidType)
+	}
+	return arg, nil
+}
+
+func (vm *VM) popBool() (bool, error) {
+	val, err := vm.Pop()
+	if err != nil {
+		return false, err
+	}
+	if val.Tag != TagBool {
+		return false, ErrInvalidType
+	}
+	arg, ok := val.Data.(bool)
+	if !ok {
+		return false, fmt.Errorf(
+			"%w: expected bool", ErrInvalidType)
+	}
+	return arg, nil
+}
+
+func (vm *VM) popNumber() (int, error) {
 	val, err := vm.Pop()
 	if err != nil {
 		return -1, err
@@ -787,20 +863,20 @@ func (vm *VM) popArgNumeric() (int, error) {
 	arg, ok := val.Data.(int)
 	if !ok {
 		return -1, fmt.Errorf(
-			"%w: expected an index for a constant", ErrInvalidType)
+			"%w: expected number", ErrInvalidType)
 	}
 	return arg, nil
 }
 
 func (vm *VM) handleShow() error {
-	limit, err := vm.popArgNumeric()
+	limit, err := vm.popNumber()
 	if err != nil {
 		return err
 	}
 	if limit < 1 {
 		limit = vm.pragma.ShowCount
 	}
-	offset, err := vm.popArgNumeric()
+	offset, err := vm.popNumber()
 	if err != nil {
 		return err
 	}

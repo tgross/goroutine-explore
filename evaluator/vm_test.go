@@ -365,6 +365,68 @@ g2: 2
 
 }
 
+func TestVM_CommandPragma(t *testing.T) {
+	testCases := []struct {
+		name      string
+		ops       []Op
+		constants []any
+		expectFn  func(*testing.T, *Pragma)
+	}{
+		{
+			name: "boolean",
+			ops: []Op{ // src: `pragma empty.confirm true`
+				encode(OpCodePushBool, 0),
+				encode(OpCodeLoadString, 0),
+				encode(OpCodeCommandPragma, 0),
+			},
+			constants: []any{"empty.confirm"},
+			expectFn: func(t *testing.T, p *Pragma) {
+				must.False(t, p.EmptyConfirm)
+			},
+		},
+		{
+			name: "numeric",
+			ops: []Op{ // src: `pragma show.count 100`
+				encode(OpCodeLoadNumber, 0),
+				encode(OpCodeLoadString, 1),
+				encode(OpCodeCommandPragma, 0),
+			},
+			constants: []any{100, "show.count"},
+			expectFn: func(t *testing.T, p *Pragma) {
+				must.Eq(t, 100, p.ShowCount)
+			},
+		},
+		{
+			name: "enum",
+			ops: []Op{ // src: `pragma vars.display summary`
+				encode(OpCodeLoadString, 0),
+				encode(OpCodeLoadString, 1),
+				encode(OpCodeCommandPragma, 0),
+			},
+			constants: []any{"summary", "vars.display"},
+			expectFn: func(t *testing.T, p *Pragma) {
+				must.Eq(t, PragmaDisplaySummary, p.VarsDisplay)
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			chunk := &Chunk{
+				ops:       tc.ops,
+				constants: tc.constants,
+			}
+			vm, _ := NewVM(&vmConfig{cwd: t.TempDir()})
+			vm.reset(chunk)
+			_, err := vm.run()
+			vm.debug()
+			must.NoError(t, err)
+			tc.expectFn(t, vm.pragma)
+		})
+	}
+
+}
+
 func expectDumpFromEnv(t *testing.T, env map[string]Value, name string) *GoroutineDump {
 	t.Helper()
 	val, ok := env[name]

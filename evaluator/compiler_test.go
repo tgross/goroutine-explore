@@ -443,3 +443,49 @@ func TestCompiler_Show(t *testing.T) {
 	}
 
 }
+
+func TestCompiler_Pragma(t *testing.T) {
+	testCases := []struct {
+		name          string
+		src           string
+		expectSetting string
+		expectValue   Op
+	}{
+		{
+			name:          "boolean",
+			src:           `pragma empty.confirm true`,
+			expectSetting: "empty.confirm",
+			expectValue:   encode(OpCodePushBool, 1),
+		},
+		{
+			name:          "numeric",
+			src:           `pragma show.count 100`,
+			expectSetting: "show.count",
+			expectValue:   encode(OpCodeLoadNumber, 0),
+		},
+		{
+			name:          "enum",
+			src:           `pragma vars.display summary`,
+			expectSetting: "vars.display",
+			expectValue:   encode(OpCodeLoadString, 0),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			body := strings.NewReader(tc.src)
+			tokenizer := NewTokenizer(body)
+			compiler := newCompiler()
+			chunk, err := compiler.Compile(tokenizer)
+			must.NoError(t, err)
+
+			fmt.Println(chunk.disassemble(0))
+			must.Len(t, 3, chunk.ops)
+
+			_, operand := chunk.ops[1].decode()
+			must.Eq(t, tc.expectSetting, chunk.constants[operand].(string))
+			must.Eq(t, tc.expectValue, chunk.ops[0])
+		})
+	}
+
+}

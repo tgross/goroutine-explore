@@ -224,6 +224,20 @@ func (p *Compiler) parseNumber(tok Token) error {
 	return nil
 }
 
+func (p *Compiler) parseBool(tok Token) error {
+	val, err := strconv.ParseBool(tok.Lexeme)
+	if err != nil {
+		return err
+	}
+	if val {
+		p.emitBytes(OpCodePushBool, 1)
+	} else {
+		p.emitBytes(OpCodePushBool, 0)
+	}
+
+	return nil
+}
+
 func (p *Compiler) parseBinaryLogicExpr(tok Token) error {
 
 	var addrShort int
@@ -424,11 +438,7 @@ func (p *Compiler) parseCommand(tok Token) error {
 		}
 		p.emitByte(OpCodeCommandChangeDir)
 	case "pragma":
-		err := p.parsePragma()
-		if err != nil {
-			return err
-		}
-		p.emitByte(OpCodeCommandPragma)
+		return p.parsePragma()
 	default:
 		panic("unknown command") // TODO
 	}
@@ -464,7 +474,49 @@ func (p *Compiler) parsePath() error {
 }
 
 func (p *Compiler) parsePragma() error {
-	return nil // TODO
+	topicTok, err := p.tokenizer.Next()
+	if err != nil {
+		return err
+	}
+	keyTok, err := p.consume(TokenFieldAccessor)
+	if err != nil {
+		return err
+	}
+	valTok, err := p.tokenizer.Next()
+	if err != nil {
+		return err
+	}
+
+	setting := fmt.Sprintf("%s%s", topicTok.Lexeme, keyTok.Lexeme)
+
+	switch setting {
+	case "empty.confirm", "exit.confirm", "show.color":
+		p.parseBool(valTok)
+	case "show.count":
+		p.parseNumber(valTok)
+	case "ls.format":
+		p.parseString(valTok)
+	case "show.dedup":
+		switch valTok.Lexeme {
+		case PragmaDedupIDs, PragmaDedupNone, PragmaDedupNumber:
+			p.parseString(valTok)
+		default:
+			return fmt.Errorf(
+				"%w: expected one of ids, number, none", ErrInvalidArg)
+		}
+	case "vars.display":
+		switch valTok.Lexeme {
+		case PragmaDisplayCount, PragmaDisplayNone, PragmaDisplaySummary:
+			p.parseString(valTok)
+		default:
+			return fmt.Errorf(
+				"%w: expected one of count, summary, none", ErrInvalidArg)
+		}
+	}
+
+	p.emitLoadConst(OpCodeLoadString, setting)
+	p.emitByte(OpCodeCommandPragma)
+	return nil
 }
 
 func (p *Compiler) parseFunction(tok Token) error {
