@@ -23,11 +23,11 @@ func NewPragma() *Pragma {
 		ShowDedup:    PragmaDedupIDs,
 		VarsDisplay:  PragmaDisplayCount,
 		Gas:          defaultGas,
-		StackSize:    defaultInitialStackCap,
+		StackSize:    defaultStackLimit,
 	}
 }
 
-const defaultInitialStackCap = 1024
+const defaultStackLimit = 1024
 const defaultGas = 1024 * 1024 * 1024
 
 type PragmaDisplay string

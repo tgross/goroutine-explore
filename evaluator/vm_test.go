@@ -29,7 +29,7 @@ func TestVM_BasicStackOps(t *testing.T) {
 
 func TestVM_SimpleWhere(t *testing.T) {
 
-	// source: `g1 = g where duration > 10`
+	// source: `g1 = g.where(duration > 10)`
 	chunk := &Chunk{
 		ops: []Op{
 			encode(OpCodeLoadGoroutineDump, 1), // load g
@@ -87,7 +87,7 @@ func TestVM_BinaryExpression(t *testing.T) {
 		expectFn  func(*testing.T, *GoroutineDump)
 	}{
 		{
-			// source: `g1 union g2`
+			// source: `g1.union(g2)`
 			name: "simple union",
 			ops: []Op{
 				encode(OpCodeLoadGoroutineDump, 0), // 00 load g1
@@ -115,7 +115,7 @@ func TestVM_BinaryExpression(t *testing.T) {
 		},
 
 		{
-			// source: `g1 union (g2 where .duration > 10)
+			// source: `g1.union(g2.where(.duration > 10))`
 			name: "union nested on right",
 			ops: []Op{
 				encode(OpCodeLoadGoroutineDump, 0), // 00 load g1
@@ -154,7 +154,7 @@ func TestVM_BinaryExpression(t *testing.T) {
 		},
 
 		{
-			// source: `(g1 where .duration > 10) union g2
+			// source: `union(g1.where(.duration > 10), g2)`
 			name: "union nested on left",
 			ops: []Op{
 				encode(OpCodeLoadGoroutineDump, 0), // 00 load g1
@@ -193,7 +193,7 @@ func TestVM_BinaryExpression(t *testing.T) {
 		},
 
 		{
-			// source: `g1 intersect g2`
+			// source: `g1.intersect(g2)`
 			name: "simple intersect",
 			ops: []Op{
 				encode(OpCodeLoadGoroutineDump, 0), // 00 load g1
@@ -249,7 +249,7 @@ func TestVM_BinaryExpression(t *testing.T) {
 
 func TestVM_MultiAssignDiff(t *testing.T) {
 
-	// source: `g3, g4, g4 = g1 diff g2`
+	// source: `g3, g4, g4 = g1.diff(g2)`
 	chunk := &Chunk{
 		ops: []Op{
 			encode(OpCodeLoadGoroutineDump, 4), // load g1
@@ -291,7 +291,7 @@ func TestVM_MultiAssignDiff(t *testing.T) {
 }
 
 func TestVM_Show(t *testing.T) {
-	// source: `g1 | show 3 1`
+	// source: `g1 | show(3, 1)`
 	chunk := &Chunk{
 		ops: []Op{
 			encode(OpCodeLoadGoroutineDump, 0), // load g1
@@ -377,7 +377,7 @@ func TestVM_CommandPragma(t *testing.T) {
 			ops: []Op{ // src: `pragma empty.confirm true`
 				encode(OpCodePushBool, 0),
 				encode(OpCodeLoadString, 0),
-				encode(OpCodeCommandPragma, 0),
+				encode(OpCodeCommandSetPragma, 0),
 			},
 			constants: []any{"empty.confirm"},
 			expectFn: func(t *testing.T, p *Pragma) {
@@ -389,7 +389,7 @@ func TestVM_CommandPragma(t *testing.T) {
 			ops: []Op{ // src: `pragma show.count 100`
 				encode(OpCodeLoadNumber, 0),
 				encode(OpCodeLoadString, 1),
-				encode(OpCodeCommandPragma, 0),
+				encode(OpCodeCommandSetPragma, 0),
 			},
 			constants: []any{100, "show.count"},
 			expectFn: func(t *testing.T, p *Pragma) {
@@ -401,7 +401,7 @@ func TestVM_CommandPragma(t *testing.T) {
 			ops: []Op{ // src: `pragma vars.display summary`
 				encode(OpCodeLoadString, 0),
 				encode(OpCodeLoadString, 1),
-				encode(OpCodeCommandPragma, 0),
+				encode(OpCodeCommandSetPragma, 0),
 			},
 			constants: []any{"summary", "vars.display"},
 			expectFn: func(t *testing.T, p *Pragma) {

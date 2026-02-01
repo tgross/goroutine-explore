@@ -5,7 +5,14 @@ import (
 	"fmt"
 	"slices"
 	"strconv"
+	"strings"
 )
+
+var ErrTooManyArgs = errors.New("too many arguments")
+var ErrMissingArgs = errors.New("expected more arguments")
+var ErrExpectedPath = errors.New("expected a path argument")
+var ErrExpectedMaybeType = errors.New("expected optional")
+var ErrInvalidArg = errors.New("invalid argument")
 
 type Compiler struct {
 	// internal state which is reset for each Compile call
@@ -32,6 +39,7 @@ const (
 	BindingEq
 	BindingCompare
 	BindingUnary
+	BindingCall
 	BindingPrimary
 	BindingAtom
 )
@@ -57,15 +65,16 @@ func newCompiler() *Compiler {
 	}
 
 	setupPrefix(TokenLeftParen, BindingNone, p.parseParenExpr)
-	setupInfix(TokenRightParen, BindingNone, nil)
 	setupPrefix(TokenIdentifier, BindingAtom, p.parseDumpAccessor)
 	setupPrefix(TokenFieldAccessor, BindingAtom, p.parseFieldAccessor)
 	setupPrefix(TokenString, BindingAtom, p.parseString)
 	setupPrefix(TokenNumber, BindingAtom, p.parseNumber)
 	setupPrefix(TokenFunction, BindingFunc, p.parseFunction)
-	setupPrefix(TokenKeywordWhere, BindingFunc, p.parseWhere)
-	setupPrefix(TokenKeywordDelete, BindingFunc, p.parseDelete)
+	setupPrefix(TokenMethod, BindingFunc, p.parseMethod)
+	setupPrefix(TokenCommand, BindingFunc, p.parseCommand)
+	setupPrefix(TokenPragma, BindingFunc, p.parsePragma)
 
+	setupInfix(TokenRightParen, BindingNone, nil)
 	setupInfix(TokenKeywordAnd, BindingAnd, p.parseBinaryLogicExpr)
 	setupInfix(TokenKeywordOr, BindingOr, p.parseBinaryLogicExpr)
 	setupInfix(TokenEqual, BindingEq, p.parseCompareExpr)
@@ -75,9 +84,6 @@ func newCompiler() *Compiler {
 	setupInfix(TokenLessEqualThan, BindingCompare, p.parseCompareExpr)
 	setupInfix(TokenLessThan, BindingCompare, p.parseCompareExpr)
 	setupInfix(TokenKeywordContains, BindingCompare, p.parseCompareExpr)
-	setupInfix(TokenFunctionBinary, BindingFunc, p.parseBinaryFunction)
-	setupInfix(TokenKeywordWhere, BindingFunc, p.parseWhere)
-	setupInfix(TokenKeywordDelete, BindingFunc, p.parseDelete)
 	setupInfix(TokenPipe, BindingPipe, p.parsePipeExpr)
 
 	return p
@@ -86,15 +92,6 @@ func newCompiler() *Compiler {
 func (p *Compiler) Compile(tokenizer *Tokenizer) (*Chunk, error) {
 	p.chunk = NewChunk()
 	p.tokenizer = tokenizer
-
-	tok, err := p.maybeConsume(TokenCommand)
-	if err != nil {
-		return nil, err
-	}
-	if tok != EmptyToken {
-		return p.chunk, p.parseCommand(tok)
-	}
-
 	return p.chunk, p.parseExpr(0)
 }
 
@@ -198,6 +195,13 @@ func (p *Compiler) parseDumpAccessorImpl(m MultiAssignment, tok Token) error {
 			return err
 		}
 		return p.parseDumpAccessorImpl(m, tok)
+	case TokenMethod:
+		fun, err := p.consume(TokenMethod)
+		if err != nil {
+			return err
+		}
+		p.emitLoadConst(OpCodeLoadGoroutineDump, tok.Lexeme)
+		return p.parseMethod(fun)
 	default:
 		p.emitLoadConst(OpCodeLoadGoroutineDump, tok.Lexeme)
 		return nil
@@ -301,6 +305,322 @@ func (p *Compiler) parseParenExpr(tok Token) error {
 	return p.expect(TokenRightParen)
 }
 
+func (p *Compiler) parsePipeExpr(tok Token) error {
+	// note that a pipe must *always* be followed by method with the first
+	// argument being made implicit
+	fun, err := p.consume(TokenFunction)
+	if err != nil {
+		return err
+	}
+	return p.parseMethod(fun)
+}
+
+// parseMethod is a parser for functions where the receiver has already been
+// parsed so it'll be on the stack when the function is called in the VM; in the
+// case of a pipe this will actually be a free function. This parser emits
+// identical bytecode for `receiver | fun(arg2)` and `receiver.func(arg2)`, and
+// the parseFunction parser emits the same bytecode for `func(receiver, arg2)`
+func (p *Compiler) parseMethod(fun Token) error {
+	err := p.expect(TokenLeftParen)
+	if err != nil {
+		return err
+	}
+	return p.parseFunctionArgs(fun)
+}
+
+// parseFunction is a parser for functions where the receiver has not already
+// been parsed so it needs to be parsed from the arguments, such as
+// `func(receiver, arg2)`. This parser emits the same bytecode as parseMethod
+// does for expressions like `receiver | fun(arg2)` and `receiver.func(arg2)`
+func (p *Compiler) parseFunction(fun Token) error {
+	err := p.expect(TokenLeftParen)
+	if err != nil {
+		return err
+	}
+
+	// receiver expression
+	err = p.parseExpr(BindingCall)
+	if err != nil {
+		return err
+	}
+	return p.parseFunctionArgs(fun)
+}
+
+// parseCommand is a parser for commands, which may or may not have arguments
+func (p *Compiler) parseCommand(cmd Token) error {
+	_, err := p.consume(TokenLeftParen)
+	if err != nil {
+		if errors.Is(err, ErrEOF) {
+			sig, ok := signatures[cmd.Lexeme]
+			if !ok {
+				panic("got a command token for a non-command")
+			}
+			if len(sig.args) > 0 {
+				return fmt.Errorf("%w for %q command, got none",
+					ErrMissingArgs, cmd.Lexeme)
+			}
+			p.emitByte(sig.op)
+			return nil
+		}
+		return err
+	}
+
+	return p.parseFunctionArgs(cmd)
+}
+
+type argType byte
+
+const (
+	optional argType = 1 << iota
+	expr
+	numeric
+	predicate
+	str
+	identifier
+	field
+	pragma
+)
+
+// signatures are the type signature of every function, not including the
+// receiver, which is always an expression
+var signatures = map[string]struct {
+	op   OpCode
+	args []argType
+}{
+	"union":     {OpCodeFuncUnion, []argType{expr}},
+	"diff":      {OpCodeFuncDiff, []argType{expr}},
+	"intersect": {OpCodeFuncIntersect, []argType{expr}},
+	"load":      {OpCodeFuncLoad, []argType{str}},
+	"save":      {OpCodeFuncSave, []argType{str}},
+	"as":        {OpCodeAssignment, []argType{identifier}},
+	"show": {OpCodeFuncShowDump, []argType{
+		numeric | optional, numeric | optional}},
+
+	// these have more complex handling so we don't have a single OpCode
+	"where":  {OpCodeNoop, []argType{predicate}},
+	"delete": {OpCodeNoop, []argType{predicate}},
+
+	// commands
+	"cd":    {OpCodeCommandChangeDir, []argType{str}},
+	"ls":    {OpCodeCommandListDir, nil},
+	"empty": {OpCodeCommandEmpty, nil},
+	"exit":  {OpCodeCommandQuit, nil},
+	"quit":  {OpCodeCommandQuit, nil},
+	"help":  {OpCodeCommandHelp, nil},
+	"pwd":   {OpCodeCommandGetWorkingDir, nil},
+	"vars":  {OpCodeCommandVars, nil},
+}
+
+func (p *Compiler) parseFunctionArgs(fun Token) error {
+	sig, ok := signatures[fun.Lexeme]
+	if !ok {
+		return fmt.Errorf("no such function %q", fun.Lexeme)
+	}
+
+	for i, arg := range sig.args {
+		if arg&optional == optional {
+			next, err := p.tokenizer.Peek()
+			if err != nil {
+				return err
+			}
+			if next.Type == TokenRightParen {
+				// get default from pragma
+				p.emitLoadConst(OpCodeLoadNumber, 0)
+				continue
+			}
+		}
+		if i > 0 {
+			err := p.expect(TokenComma)
+			if err != nil {
+				return err
+			}
+		}
+		switch {
+		case arg&expr == expr:
+			err := p.parseExpr(BindingCall)
+			if err != nil {
+				return err
+			}
+		case arg&numeric == numeric:
+			tok, err := p.consume(TokenNumber)
+			if err != nil {
+				return fmt.Errorf("%w for %s: %w",
+					ErrInvalidArg, fun.Lexeme, err)
+			}
+			err = p.parseNumber(tok)
+			if err != nil {
+				return fmt.Errorf("%w for %s: %w",
+					ErrInvalidArg, fun.Lexeme, err)
+			}
+		case arg&str == str:
+			tok, err := p.consume(TokenString)
+			if err != nil {
+				return fmt.Errorf("%w for %s: %w",
+					ErrInvalidArg, fun.Lexeme, err)
+			}
+			err = p.parseString(tok)
+			if err != nil {
+				return fmt.Errorf("%w for %s: %w",
+					ErrInvalidArg, fun.Lexeme, err)
+			}
+		case arg&identifier == identifier:
+			tok, err := p.consume(TokenIdentifier)
+			if err != nil {
+				return fmt.Errorf("%w for %s: %w",
+					ErrInvalidArg, fun.Lexeme, err)
+			}
+			err = p.parseDumpAccessor(tok)
+			if err != nil {
+				return fmt.Errorf("%w for %s: %w",
+					ErrInvalidArg, fun.Lexeme, err)
+			}
+		case arg&predicate == predicate:
+			err := p.parseFilter(fun)
+			if err != nil {
+				return fmt.Errorf("%w for %s: %w",
+					ErrInvalidArg, fun.Lexeme, err)
+			}
+		}
+	}
+	if sig.op != OpCodeNoop {
+		p.emitByte(sig.op)
+	}
+
+	if fun.Type == TokenCommand {
+		_, err := p.maybeConsume(TokenRightParen)
+		if err != nil {
+			return err
+		}
+		return p.expectNoMoreArgs()
+	}
+
+	err := p.expect(TokenRightParen)
+	if err != nil {
+		return nil
+	}
+
+	return nil
+}
+
+// patchJump takes an address and patches the instruction at that address to
+// point to the last OpCode in the chunk + any offset (to allow patching past
+// the current chunk)
+func (p *Compiler) patchJump(addr, offset int) {
+	end := len(p.chunk.ops) - 1 + offset
+	if addr > len(p.chunk.ops) {
+		panic(fmt.Sprintf("trying to patch too far back: len(chunk)=%d target=%d",
+			len(p.chunk.ops), addr))
+	}
+	instruction := p.chunk.ops[addr]
+	op, _ := instruction.decode()
+	switch op {
+	case OpCodeJumpIfFalse, OpCodeJumpIfTrue, OpCodeJumpTo, OpCodeNextGoroutine:
+	default:
+		panic(fmt.Sprintf("trying to patch a non-jump instruction: len(chunk)=%d target=%d instruction=%v", len(p.chunk.ops), addr, op))
+	}
+
+	p.chunk.ops[addr] = encode(op, uint(end))
+}
+
+func (p *Compiler) parseFilter(tok Token) error {
+
+	p.emitByte(OpCodeTempDump)
+	addr := p.emitBytes(OpCodeNextGoroutine, OpCodePatchPlaceholder)
+
+	err := p.parseExpr(BindingFunc)
+	if err != nil && !errors.Is(err, ErrEOF) {
+		return err
+	}
+
+	switch tok.Lexeme {
+	case "where":
+		// reject, so continue to next goroutine
+		p.emitBytes(OpCodeJumpIfFalse, uint(addr))
+	case "delete":
+		p.emitBytes(OpCodeJumpIfTrue, uint(addr))
+	}
+
+	// keep this goroutine in temp dump
+	p.emitByte(OpCodeAddGoroutine)
+	p.emitBytes(OpCodeJumpTo, uint(addr))
+
+	// when we run out of goroutines we need to jump to the end of the loop
+	// where we push the temporary dump onto the stack
+	p.emitByte(OpCodePushDump)
+	p.patchJump(addr, 0)
+
+	return nil
+}
+
+func (p *Compiler) parsePragma(_ Token) error {
+	topicTok, err := p.tokenizer.Next()
+	if err != nil {
+		if errors.Is(err, ErrEOF) {
+			p.emitLoadConst(OpCodeLoadString, "*.*")
+			p.emitBytes(OpCodeCommandGetPragma, 0)
+			return nil
+		}
+		return err
+	}
+	topic := strings.TrimPrefix(topicTok.Lexeme, ".")
+	keyTok, err := p.tokenizer.Next()
+	if err != nil {
+		if errors.Is(err, ErrEOF) {
+			p.emitLoadConst(OpCodeLoadString, topic+".*")
+			p.emitBytes(OpCodeCommandGetPragma, 0)
+			return nil
+		}
+		return err
+	}
+	setting := fmt.Sprintf("%s%s", topic, keyTok.Lexeme)
+	tok, err := p.maybeConsume(TokenAssign)
+	if err != nil {
+		return err
+	}
+	if tok == EmptyToken {
+		p.emitLoadConst(OpCodeLoadString, setting)
+		p.emitBytes(OpCodeCommandGetPragma, 0)
+		return nil
+	}
+
+	valTok, err := p.tokenizer.Next()
+	if err != nil {
+		return err
+	}
+
+	switch setting {
+	case "empty.confirm", "exit.confirm", "show.color":
+		err = p.parseBool(valTok)
+	case "show.count", "limits.stack", "limits.steps":
+		err = p.parseNumber(valTok)
+	case "ls.format":
+		err = p.parseString(valTok)
+	case "show.dedup":
+		switch valTok.Lexeme {
+		case PragmaDedupIDs, PragmaDedupNone, PragmaDedupNumber:
+			err = p.parseString(valTok)
+		default:
+			return fmt.Errorf(
+				"%w: expected one of ids, number, none", ErrInvalidOpArg)
+		}
+	case "vars.display":
+		switch valTok.Lexeme {
+		case PragmaDisplayCount, PragmaDisplayNone, PragmaDisplaySummary:
+			err = p.parseString(valTok)
+		default:
+			return fmt.Errorf(
+				"%w: expected one of count, summary, none", ErrInvalidOpArg)
+		}
+	}
+	if err != nil {
+		return err
+	}
+
+	p.emitLoadConst(OpCodeLoadString, setting)
+	p.emitByte(OpCodeCommandSetPragma)
+	return nil
+}
+
 func (p *Compiler) expectNoMoreArgs() error {
 	_, err := p.tokenizer.Peek()
 	if err == nil {
@@ -326,13 +646,19 @@ func (p *Compiler) consume(want TokenType) (Token, error) {
 	return tok, err
 }
 
+// maybeConsume returns the wanted token if there are any more tokens at
+// all. Returns EmptyToken but no error if there's no more tokens at all,
+// otherwise returns an error
 func (p *Compiler) maybeConsume(want TokenType) (Token, error) {
 	tok, err := p.tokenizer.Peek()
 	if err != nil {
-		return EmptyToken, nil
+		if errors.Is(err, ErrEOF) {
+			return EmptyToken, nil
+		}
+		return EmptyToken, err
 	}
 	if tok.Type != want {
-		return EmptyToken, nil
+		return EmptyToken, fmt.Errorf("%w %v", ErrExpectedMaybeType, want)
 	}
 	tok, err = p.tokenizer.Next()
 	return tok, err
@@ -350,253 +676,6 @@ func (p *Compiler) expect(want TokenType) error {
 	}
 	_, err = p.tokenizer.Next()
 	return err
-}
-
-// TODO: there's currently no optimization of pipeline expressions, so we'll end
-// up shallow-copying the goroutine dump frequently on long pipelines. Maybe do
-// some peephole optimization on the chunk when we're done?
-func (p *Compiler) parsePipeExpr(tok Token) error {
-	return p.parseExpr(0)
-}
-
-// patchJump takes an address and patches the instruction at that address to
-// point to the last OpCode in the chunk + any offset (to allow patching past
-// the current chunk)
-func (p *Compiler) patchJump(addr, offset int) {
-	end := len(p.chunk.ops) - 1 + offset
-	if addr > len(p.chunk.ops) {
-		panic(fmt.Sprintf("trying to patch too far back: len(chunk)=%d target=%d",
-			len(p.chunk.ops), addr))
-	}
-	instruction := p.chunk.ops[addr]
-	op, _ := instruction.decode()
-	switch op {
-	case OpCodeJumpIfFalse, OpCodeJumpIfTrue, OpCodeJumpTo, OpCodeNextGoroutine:
-	default:
-		panic(fmt.Sprintf("trying to patch a non-jump instruction: len(chunk)=%d target=%d instruction=%v", len(p.chunk.ops), addr, op))
-	}
-
-	p.chunk.ops[addr] = encode(op, uint(end))
-}
-
-func (p *Compiler) parseWhere(tok Token) error {
-	return p.parseFilter(tok, true)
-}
-
-func (p *Compiler) parseDelete(tok Token) error {
-	return p.parseFilter(tok, false)
-}
-
-func (p *Compiler) parseFilter(tok Token, keepOnMatch bool) error {
-
-	p.emitByte(OpCodeTempDump)
-	addr := p.emitBytes(OpCodeNextGoroutine, OpCodePatchPlaceholder)
-
-	err := p.parseExpr(BindingFunc)
-	if err != nil && !errors.Is(err, ErrEOF) {
-		return err
-	}
-
-	if keepOnMatch {
-		// reject, so continue to next goroutine
-		p.emitBytes(OpCodeJumpIfFalse, uint(addr))
-	} else {
-		p.emitBytes(OpCodeJumpIfTrue, uint(addr))
-	}
-
-	// keep this goroutine in temp dump
-	p.emitByte(OpCodeAddGoroutine)
-	p.emitBytes(OpCodeJumpTo, uint(addr))
-
-	// when we run out of goroutines we need to jump to the end of the loop
-	// where we push the temporary dump onto the stack
-	p.emitByte(OpCodePushDump)
-	p.patchJump(addr, 0)
-
-	return nil
-}
-
-func (p *Compiler) parseCommand(tok Token) error {
-	name := tok.Lexeme
-	switch name {
-	case "empty":
-		p.emitByte(OpCodeCommandEmpty)
-	case "exit", "quit":
-		p.emitByte(OpCodeCommandQuit)
-	case "help":
-		p.emitByte(OpCodeCommandHelp)
-	case "ls":
-		p.emitByte(OpCodeCommandListDir)
-	case "pwd":
-		p.emitByte(OpCodeCommandGetWorkingDir)
-	case "vars":
-		p.emitByte(OpCodeCommandVars)
-	case "cd":
-		err := p.parsePath()
-		if err != nil {
-			return fmt.Errorf("invalid arguments for cd: %w", err)
-		}
-		p.emitByte(OpCodeCommandChangeDir)
-	case "pragma":
-		return p.parsePragma()
-	default:
-		panic("unknown command") // TODO
-	}
-
-	return p.expectNoMoreArgs()
-}
-
-var ErrTooManyArgs = errors.New("too many arguments")
-var ErrExpectedPath = errors.New("expected a path argument")
-
-func (p *Compiler) parsePath() error {
-	var ok bool
-	path := ""
-
-	for {
-		tok, err := p.tokenizer.Peek()
-		if tok.Type == TokenPipe || errors.Is(err, ErrEOF) {
-			break
-		}
-		tok, err = p.tokenizer.Next()
-		if err != nil {
-			return err
-		}
-		ok = true
-		path += tok.Lexeme
-	}
-	if !ok { // empty!
-		return ErrExpectedPath
-	}
-
-	_ = p.parseString(Token{Type: TokenString, Lexeme: path})
-	return nil
-}
-
-func (p *Compiler) parsePragma() error {
-	topicTok, err := p.tokenizer.Next()
-	if err != nil {
-		return err
-	}
-	keyTok, err := p.consume(TokenFieldAccessor)
-	if err != nil {
-		return err
-	}
-	valTok, err := p.tokenizer.Next()
-	if err != nil {
-		return err
-	}
-
-	setting := fmt.Sprintf("%s%s", topicTok.Lexeme, keyTok.Lexeme)
-
-	switch setting {
-	case "empty.confirm", "exit.confirm", "show.color":
-		p.parseBool(valTok)
-	case "show.count":
-		p.parseNumber(valTok)
-	case "ls.format":
-		p.parseString(valTok)
-	case "show.dedup":
-		switch valTok.Lexeme {
-		case PragmaDedupIDs, PragmaDedupNone, PragmaDedupNumber:
-			p.parseString(valTok)
-		default:
-			return fmt.Errorf(
-				"%w: expected one of ids, number, none", ErrInvalidArg)
-		}
-	case "vars.display":
-		switch valTok.Lexeme {
-		case PragmaDisplayCount, PragmaDisplayNone, PragmaDisplaySummary:
-			p.parseString(valTok)
-		default:
-			return fmt.Errorf(
-				"%w: expected one of count, summary, none", ErrInvalidArg)
-		}
-	}
-
-	p.emitLoadConst(OpCodeLoadString, setting)
-	p.emitByte(OpCodeCommandPragma)
-	return nil
-}
-
-func (p *Compiler) parseFunction(tok Token) error {
-	switch tok.Lexeme {
-	case "load":
-		err := p.parsePath()
-		if err != nil {
-			return err
-		}
-		p.emitByte(OpCodeFuncLoad)
-		return nil
-	case "save":
-		err := p.parsePath()
-		if err != nil {
-			return err
-		}
-		p.emitByte(OpCodeFuncSave)
-		return nil
-	case "as":
-		tok, err := p.consume(TokenIdentifier)
-		if err != nil {
-			return err
-		}
-		nameIdx := p.createConst(tok.Lexeme)
-		p.emitBytes(OpCodeAssignment, uint(nameIdx))
-		return nil
-	case "show":
-		// limit argument
-		tokLimit, err := p.maybeConsume(TokenNumber)
-		if err != nil {
-			return err
-		}
-		if tokLimit == EmptyToken {
-			p.emitLoadConst(OpCodeLoadNumber, 0) // get default from pragma
-			p.emitLoadConst(OpCodeLoadNumber, 0) // get default from pragma
-			p.emitByte(OpCodeFuncShowDump)
-			return nil
-		}
-
-		// offset argument
-		tokOffset, err := p.maybeConsume(TokenNumber)
-		if err != nil {
-			return err
-		}
-		if tokOffset == EmptyToken {
-			p.emitLoadConst(OpCodeLoadNumber, 0) // get default from pragma
-		} else {
-			_ = p.parseNumber(tokOffset)
-		}
-		_ = p.parseNumber(tokLimit)
-
-		p.emitByte(OpCodeFuncShowDump)
-		return nil
-	default:
-		return fmt.Errorf("no such function %q", tok.Lexeme)
-	}
-}
-
-func (p *Compiler) parseBinaryFunction(tok Token) error {
-	name := tok.Lexeme
-
-	err := p.parseExpr(BindingFunc)
-	if err != nil && !errors.Is(err, ErrEOF) {
-		return err
-	}
-
-	switch name {
-	case "union":
-		p.emitByte(OpCodeFuncUnion)
-	case "intersect":
-		p.emitByte(OpCodeFuncIntersect)
-	case "diff":
-		p.emitByte(OpCodeFuncDiff)
-
-	default:
-		// TODO: this is always a programmer error?
-		panic("no such binary function")
-	}
-
-	return nil
 }
 
 func (p *Compiler) emitByte(op OpCode) int {

@@ -12,7 +12,7 @@ Run `goroutine-explore` in your terminal to start a shell, and load a goroutine
 dump from a file.
 
 ```sh
->>> g1 = load "goroutine-dump.txt"
+>>> g1 = load("goroutine-dump.txt")
 # of goroutines: 2217
 
         running: 1
@@ -28,9 +28,9 @@ dump from a file.
 Filter the goroutine dump by an expression.
 
 ```
->>> g2 = g1 where .state == "select" \
+>>> g2 = g1.where(.state == "select" \
               and .duration > 10 \
-              and .trace contains "keepAlive"
+              and .trace contains "keepAlive")
 # of goroutines: 5
 
          select: 5
@@ -39,14 +39,14 @@ Filter the goroutine dump by an expression.
 Print the details of the result and save them to a file.
 
 ```
->>> g2 show
+>>> g2.show()
 goroutine 72 [select, 25 minutes]: 5 times: [72, 54755, 76757, 299, 201]
 google.golang.org/grpc/transport.(*http2Server).keepalive(0xc4202f0420)
         google.golang.org/grpc/transport/http2_server.go:919 +0x488
 created by google.golang.org/grpc/transport.newHTTP2Server
         google.golang.org/grpc/transport/http2_server.go:226 +0x97c
 
->>> save g2 "goroutines-filtered.txt"
+>>> g2.save("goroutines-filtered.txt")
 ```
 
 ### Install or Build
@@ -90,7 +90,6 @@ pipeline or filter expression.
 | help    | Show available commands and expression functions.               |
 | ls      | Show files in the working directory.                            |
 | pwd     | Show the path to the working directory.                         |
-| pragma  | Change the behavior of the shell.                               |
 | quit    | Exit the shell (aliased to exit).                               |
 | vars    | Show all variables in the workspace.                            |
 
@@ -110,40 +109,6 @@ pipeline or filter expression.
 * `ls`: List all files in the working directory.
 
 * `pwd`: Print the path to the working directory.
-
-* `pragma`: Sets a `goroutine-explore` behavior from its defaults, or prints its
-  current value. Using `pragma` without any arguments prints a summary of the
-  available configurations and their current values.
-
-  * `empty.confirm` (default value: `true`): If set to `false`, disable the
-    confirmation prompt on the `empty` command.
-
-  * `exit.confirm` (default value: `true`): If set to `false`, disable the
-    confirmation prompt on the `exit` command.
-
-  * `ls.format` (default value: `none`): Format flags to pass to the `ls`
-    command. If set, the `ls` command will invoke the parent shell's `ls`
-    command with these flags instead of listing the directory itself.
-
-  * `show.color` (default value: `true`): Controls whether the `show` command
-    adds color to the output. If you have the `NOCOLOR` environment variable
-    set, this pragma defaults to `false` instead.
-
-  * `show.count` (default value: `0`): Controls the default value of the `show`
-    command's `count` argument. The default value of `0` shows all goroutines in
-    the dump.
-
-  * `show.dedup` (default value: `ids`): Controls how the `show` command
-    deduplicates goroutines. The default behavior lists the IDs of duplicates
-    with each goroutine stack. You can set this to `number` to show only the
-    number of duplicates without the IDs. Or you can set this to `none` to stop
-    deduplication entirely.
-
-  * `vars.display` (default value: `count`): Controls the output of the `vars`
-    command. By default, `vars` shows the total number of goroutines in each
-    dump. If set to `summary`, the `vars` command will print a summary
-    instead. If set to `none`, the `vars` command will only print the names of
-    the dumps.
 
 * `quit`: Exits the shell. Alias for `exit`.
 
@@ -171,10 +136,77 @@ The `goroutine-explore` shell understands the following types:
 * boolean: True or false as the literal `true` or `false` in the shell.
 * field accessor: The name of a goroutine field, prefixed with a period. Ex. `.duration`.
 
-## Variables
+### Variables
 
 Variables can be any valid Go identifier. A variable can only store a goroutine
-dump and not any other value (such as a number or individual goroutine).
+dump and not any other value (such as a number or individual goroutine). The
+value a variable points to is immutable but the variable can be rebound by
+assignment.
+
+### Pragma
+
+You can change the behavior of `goroutine-explore` from its defaults by setting
+pragmas. Setting a pragma has similar syntax to setting a variable:
+
+```
+>>> pragma.show.color = false
+```
+
+You can get the current values by using `pragma` or any subset of dot-separated
+keys For example, to show all the pragmas under `pragma.show`:
+
+```
+>>> pragma.show
+show.color = true
+show.count = 0
+show.dedup = "ids"
+```
+
+The available pragmas are as follows:
+
+* `pragma.empty.confirm` (default value: `true`): If set to `false`, disable the
+  confirmation prompt on the `empty` command.
+
+* `pragma.exit.confirm` (default value: `true`): If set to `false`, disable the
+  confirmation prompt on the `exit` command.
+
+* `pragma.limits.steps` (default value: `1073741824`): Maximum number of virtual
+  machine steps (op codes retired) per invocation. This limit is designed to
+  prevent accidental infinite loops in case of a bug. Iterating over a goroutine
+  dump with a simple filter query takes roughly 5 steps per goroutine plus a
+  little overhead for the query, so you should be able to iterate many millions
+  of goroutines in a single expression without hitting this limit. The limit is
+  reset each time the `goroutine-explore` REPL returns for more input.
+
+* `pragma.limits.stack` (default value: `1024`): Maximum size of the virtual
+  machine stack. `goroutine-explore` uses the stack for intermediate results of
+  nested calls an single expression. Each time the `goroutine-explore` REPL
+  returns for more input, the stack is cleared, so you should only need to
+  adjust this if you are creating unusually large expressions.
+
+* `pragma.ls.format` (default value: `none`): Format flags to pass to the `ls`
+  command. If set, the `ls` command will invoke the parent shell's `ls` command
+  with these flags instead of listing the directory itself.
+
+* `pragma.show.color` (default value: `true`): Controls whether the `show`
+  command adds color to the output. If you have the `NOCOLOR` environment
+  variable set, this pragma defaults to `false` instead.
+
+* `pragma.show.count` (default value: `0`): Controls the default value of the
+  `show` command's `count` argument. The default value of `0` shows all
+  goroutines in the dump.
+
+* `pragma.show.dedup` (default value: `ids`): Controls how the `show` command
+  deduplicates goroutines. The default behavior lists the IDs of duplicates with
+  each goroutine stack. You can set this to `number` to show only the number of
+  duplicates without the IDs. Or you can set this to `none` to stop
+  deduplication entirely.
+
+* `pragma.vars.display` (default value: `count`): Controls the output of the
+  `vars` command. By default, `vars` shows the total number of goroutines in
+  each dump. If set to `summary`, the `vars` command will print a summary
+  instead. If set to `none`, the `vars` command will only print the names of the
+  dumps.
 
 ## Expressions
 
@@ -229,14 +261,14 @@ multiple variables separated by a `,`. For example, using the `diff` function
 (described below):
 
 ```
->>> left, common, right = diff g1 g2
+>>> left, common, right = diff(g1, g2)
 ```
 
 When a function returns multiple goroutine dumps and you only want to assign one
 of them, you can use `_` to discard that dump, similar to assignment in Go.
 
 ```
->>> left, _, _ = diff g1 g2
+>>> left, _, _ = diff(g1, g2)
 ```
 
 ### Pipelines
@@ -246,53 +278,59 @@ over pipe operators. This means the value of `g3` at the end of these two
 expressions:
 
 ```
->>> g2 = g1 where .state == "select" \
-              and .duration > 10 \
-              and .trace contains "keepAlive"
->>> g3 = g2 delete .trace contains "gRPC"
+>>> g2 = g1.where(.state == "select"
+              and .duration > 10
+              and contains(.trace, "keepAlive"))
+>>> g3 = g2.delete(contains(.trace, "gRPC")
 ```
 
 Would be the same as the value of `g3` at the end of this expression, without
 having to define an intermediate variable.
 
 ```
->>> g3 = g1 where .state == "select" |
-            where .duration > 10 |
-            where .trace contains "keepAlive" |
-            delete .trace contains "gRPC"
+>>> g3 = g1.where(.state == "select") |
+            where(.duration > 10) |
+            where(contains(.trace, "keepAlive") |
+            delete(contains(.trace, "gRPC")
 ```
 
-## Functions
+### Functions
 
 Functions read in a goroutine dump and return one or more goroutine dumps. The
-general syntax for functions is:
+general syntax for functions is similar to calling a function in Go:
 
 ```
-<input> <function> [arguments]
+f(arg, arg)
 ```
 
-Where `input` is a previous expression or pipeline that returns a goroutine
-dump. (The `load` function is the sole exception; it will ignore any input.)
-Arguments may be variables, strings, or other expressions. For example, the
-following lines show equivalent `where` function calls:
+Most functions expect a goroutine dump as their first argument (the `load`
+function is the sole exception), or an expression that returns a goroutine
+dump. Additional arguments may be variables, strings, or other expressions.
+
+Functions can be called as though they were methods on the goroutine dump
+object, omitting their first argument. Or the function form can be used without
+the first argument if it immediately follows a pipe. For example, the following
+lines show equivalent `where` function calls that compile to identical bytecode:
 
 ```
->>> g2 = g1 where .state == "select"
+>>> g2 = where(g1, .state == "select")
 
->>> g2 = g1 | where .state == "select"
+>>> g2 = g1.where(.state == "select")
+
+>>> g2 = g1 | where(.state == "select")
 ```
 
-| Name        | Output  | Arguments                                       |
-|-------------|---------|-------------------------------------------------|
-| `as`        | dump    | new variable name                               |
-| `delete`    | dump    | filter expression                               |
-| `diff`      | 3 dumps | variable pointing to dump                       |
-| `intersect` | dump    | variable pointing to dump                       |
-| `load`      | dump    | string path (note: load ignores any input dump) |
-| `save`      | dump    | string path                                     |
-| `show`      | dump    | [offset, limit]                                 |
-| `union`     | dump    | variable pointing to dump                       |
-| `where`     | dump    | filter expression                               |
+| Name        | Arguments               | Output  |
+|-------------|-------------------------|---------|
+| `as`        | dump, new variable name | dump    |
+| `delete`    | dump, filter expression | dump    |
+| `diff`      | dump, dump              | 3 dumps |
+| `intersect` | dump, dump              | dump    |
+| `load`      | string path             | dump    |
+| `save`      | dump, string path       | dump    |
+| `show`      | dump [limit, offset]    | dump    |
+| `union`     | dump, dump              | dump    |
+| `where`     | dump, filter expression | dump    |
 
 ### Assign mid-pipeline
 
@@ -302,10 +340,10 @@ assigns the query result to `g2` before deleting the requested trace and
 assigning that to `g3`.
 
 ```
->>> g3 = g1 where .state == "select" |
-            where .duration > 10 |
-            as g2 |
-            delete .trace contains "gRPC"
+>>> g3 = g1.where(.state == "select") |
+            where(.duration > 10) |
+            as(g2) |
+            delete(contains(.trace, "gRPC")
 ```
 
 If an error occurs while evaluating the pipeline, the target variable will not
@@ -314,11 +352,12 @@ be defined or updated.
 ### Load a goroutine dump from file
 
 The `load` function returns a goroutine dump loaded from a file path. `load`
-accepts absolute paths or paths relative to the working directory. Typically
-you'll want to assign the result to a variable.
+accepts absolute paths or paths relative to the working directory. Loading a
+goroutine dump is the most costly operation in `goroutine-explore`, so typically
+you'll want to assign the result to a variable so it can be reused.
 
 ```
->>> g = load "goroutine-dump.txt"
+>>> g = load("goroutine-dump.txt")
 # of goroutines: 2217
 
         running: 1
@@ -339,7 +378,7 @@ format equivalent to that written by the Go runtime's [`pprof`][] with the
 working directory.
 
 ```
->>> g save "goroutine-dump.txt"
+>>> g.save("goroutine-dump.txt")
 ```
 
 The `save` function returns the dump that was saved. This allows you to save
@@ -347,12 +386,12 @@ intermediate results of a pipeline or assign a dump and save it in the same
 command.
 
 ```
->>> g2 = g1 where .state == "select" |
-            where .duration > 10 |
-            where .trace contains "keepAlive" |
-            save "./including-gRPC.txt"
-            delete .trace contains "gRPC" |
-            save "./without-gRPC.txt"
+>>> g2 = g1.where(.state == "select") |
+            where(.duration > 10) |
+            where(contains(.trace, "keepAlive") |
+            save("./including-gRPC.txt")
+            delete(.trace contains "gRPC")) |
+            save("./without-gRPC.txt")
 ```
 
 ### Show the goroutines of a dump
@@ -375,7 +414,7 @@ or missing, it is ignored and show starts from the beginning of the dump.
 
 ```
 # show 10 goroutines starting at offset 100
->>> g1 show 10 100
+>>> g1.show(10, 100)
 ```
 
 Paging via `offset` and `limit` respects the `show.dedup` pragma such that only
@@ -392,8 +431,8 @@ to filter a dump down to goroutines that have been in `select` for more than 10
 minutes:
 
 ```
->>> g2 = g1 where .state == "select" and .duration > 10
->>> g2 show
+>>> g2 = g1.where(.state == "select" and .duration > 10)
+>>> g2.show()
 
 goroutine 72 [select, 25 minutes]: 10 times: [72, 54755, 76757, 299, 201, 286, 283, 296, 204, 302]
 google.golang.org/grpc/transport.(*http2Server).keepalive(0xc4202f0420)
@@ -418,6 +457,9 @@ expressions can contain any of the following:
   string field like `.trace` and the right side is the literal pattern.
 * `contains`: is a binary operator. The left side is a string field like
   `.trace` or `state` and the right side of the literal to match.
+* `in`: is a binary operator and the opposite of `contains`. The left side is a
+  literal to match and the right side is a string field like `.trace` or
+  `.state`.
 
 Filter expressions can also use the following helper functions.
 
@@ -429,10 +471,7 @@ Filter expressions can also use the following helper functions.
 Example:
 
 ```
->>> g2 = g1 where lower .trace contains "handleStream"
-
-
->>> g2 = g1 where lower .trace contains "handleStream"
+>>> g2 = g1.where(lower(.trace) contains "handlestream")
 ```
 
 #### Properties of a Goroutine Dump Item
@@ -448,13 +487,15 @@ Each dump item has 5 properties which can be used in conditionals:
 | `.state`    | string | The running state of the goroutine.                 |
 | `.trace`    | string | The concatenated text of the goroutine stack trace. |
 
-
 ### Diff
 
-The `diff` expression takes two goroutine dumps and returns three goroutine dumps: a dump containing goroutines that only appear in the left side, a dump containing goroutines that appear in both the left and right side, and a dump containing goroutines that only appear in the right side.
+The `diff` function takes two goroutine dumps and returns three goroutine dumps:
+a dump containing goroutines that only appear in the left side, a dump
+containing goroutines that appear in both the left and right side, and a dump
+containing goroutines that only appear in the right side.
 
 ```bash
->> l, c, r = g1 diff g2
+>> l, c, r = diff(g1, g2)
 >> l
 # of goroutines: 574
 
@@ -487,10 +528,13 @@ The `diff` expression takes two goroutine dumps and returns three goroutine dump
 
 ### Union
 
-The `union` expression takes two goroutine dumps and returns a goroutine dump that combines them. Goroutines with the same ID in both dumps will be de-duplicated if they are identical. If they are not identical, this expression will return an error.
+The `union` function takes two goroutine dumps and returns a goroutine dump that
+combines them. Goroutines with the same ID in both dumps will be de-duplicated
+if they are identical. If they are not identical, this expression will return an
+error.
 
 ```
->> g3 = g1 union g2
+>> g3 = union(g1, g2)
 # of goroutines: 574
 
         IO wait: 147
@@ -502,10 +546,12 @@ The `union` expression takes two goroutine dumps and returns a goroutine dump th
 
 ### Intersect
 
-The `intersect` expression takes two goroutine dumps and returns a goroutine dump that includes only goroutines that are identical between them. Goroutines with the same ID in both dumps will not be included if they are not identical.
+The `intersect` function takes two goroutine dumps and returns a goroutine dump
+that includes only goroutines that are identical between them. Goroutines with
+the same ID in both dumps will not be included if they are not identical.
 
 ```
->> g3 = g1 intersect g2
+>> g3 = intersect(g1, g2)
 # of goroutines: 14
 
         IO wait: 7
@@ -513,55 +559,6 @@ The `intersect` expression takes two goroutine dumps and returns a goroutine dum
        runnable: 3
          select: 1
         syscall: 2
-```
-
-## Grammar
-
-Grammar in Wirth syntax notation.
-
-```
-REQUEST = COMMAND | EXPR .
-
-COMMAND = "cd" STRING
-        | "help" TOPIC
-        | ( "empty" | "exit" | "quit" | "pwd" | "vars" | "ls" )
-        | "pragma" PRAGMA ( IDENTIFIER | DIGITS ) .
-
-VAR    = IDENTIFIER .
-FIELD  = "." IDENTIFIER .
-PRAGMA = IDENTIFIER "." IDENTIFIER .
-TOPIC  = IDENTIFIER .
-
-DIGITS = { 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 }
-IDENTIFIER = (\w)
-STRING = \" (\w) \"
-COMPARE_OPERATOR = > | >= | == | <= | <
-
-EXPR = VAR
-     | PREFIX_FUN
-     | BINARY_FUN
-     | EXPR "|" EXPR
-     | [ASSIGN] EXPR .
-
-INNER_EXPR = VAR | "(" EXPR ")" .
-
-ASSIGN = VAR [{ "," VAR }]  "="
-
-PREFIX_FUN = "where" [INNER_EXPR] PREDICATE
-           | "delete" [INNER_EXPR] PREDICATE
-           | "load" STRING
-           | "save" [INNER_EXPR] STRING
-           | "show" [INNER_EXPR] [{DIGITS}] .
-
-BINARY_FUN = [INNER_EXPR] "union" [INNER_EXPR]
-           | [INNER_EXPR] "intersect" [INNER_EXPR]
-           | [INNER_EXPR] "diff" [INNER_EXPR]
-           | [INNER_EXPR] "as" VAR .
-
-PREDICATE = ["not"] "(" PREDICATE ")"
-          | PREDICATE ("and" | "or") PREDICATE
-          | (DIGITS | STRING ) COMPARE_OPERATOR FIELD .
-          | FIELD COMPARE_OPERATOR (DIGITS | STRING) .
 ```
 
 

@@ -37,34 +37,33 @@ const (
 	TokenStar                        // 6
 	TokenSlash                       // 7
 	TokenBang                        // 8
-	TokenComma
+	TokenComma                       // 9
+	TokenAssign                      // 10
 
-	// 1-or-2 char tokens
-	TokenAssign           // 9
-	TokenEqual            // 10
-	TokenNotEqual         // 11
-	TokenLessThan         // 12
+	// comparisons
+	TokenEqual            // 11
+	TokenNotEqual         // 12
+	TokenLessThan         // 13
 	TokenLessEqualThan    // 14
 	TokenGreaterThan      // 15
 	TokenGreaterEqualThan // 16
+	TokenKeywordContains  // 17
 
 	// literals
-	TokenIdentifier // 17
-	TokenString     // 18
-	TokenNumber     // 19
+	TokenIdentifier    // 18
+	TokenString        // 19
+	TokenNumber        // 20
+	TokenFieldAccessor // 21
 
-	TokenKeywordAnd // 20
-	TokenKeywordOr  // 21
+	// logic
+	TokenKeywordAnd // 22
+	TokenKeywordOr  // 23
 
-	TokenCommand        // 22
-	TokenFunction       // 23
-	TokenKeywordWhere   // 24
-	TokenKeywordDelete  // 25
-	TokenKeywordFrom    // 26
-	TokenFunctionBinary // 27
-	TokenFieldAccessor  // 28
-
-	TokenKeywordContains // 29
+	//
+	TokenCommand  // 24
+	TokenFunction // 25
+	TokenMethod   // 26
+	TokenPragma   // 27
 )
 
 type Tokenizer struct {
@@ -163,23 +162,24 @@ func (s *Tokenizer) next() (Token, error) {
 			token.Type = TokenKeywordAnd
 		case "or":
 			token.Type = TokenKeywordOr
-		case "where":
-			token.Type = TokenKeywordWhere
-		case "delete":
-			token.Type = TokenKeywordDelete
-		case "from":
-			token.Type = TokenKeywordFrom
-		case "as", "load", "save", "show":
+		case "where", "delete", "as", "save",
+			"show", "diff", "intersect", "union":
 			token.Type = TokenFunction
-		case "diff", "intersect", "union":
-			token.Type = TokenFunctionBinary
+		case "load":
+			// load takes no expression argument, so treat it like a method
+			token.Type = TokenMethod
+		case ".where", ".delete", ".as", ".load", ".save",
+			".show", ".diff", ".intersect", ".union":
+			token.Type = TokenMethod
+			token.Lexeme = strings.TrimPrefix(token.Lexeme, ".")
+
 		case "contains":
 			// TODO: need other string operators
 			token.Type = TokenKeywordContains
-		case "cd", "empty", "exit", "help", "ls", "pwd", "pragma", "quit", "vars":
-			// TODO: if we encounter a command, should we just bail out of the
-			// compiler entirely?
+		case "cd", "empty", "exit", "help", "ls", "pwd", "quit", "vars":
 			token.Type = TokenCommand
+		case "pragma":
+			token.Type = TokenPragma
 		}
 		// TODO: can't we just hard-code the accessors?
 		if strings.HasPrefix(token.Lexeme, ".") {

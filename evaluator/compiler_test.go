@@ -9,12 +9,7 @@ import (
 )
 
 func TestCompiler_SimplePipeline(t *testing.T) {
-	/*
-	   parenthesized to show binding power:
-	   g2 = ((g1 where .state == "select") | (where .duration > 10))
-	*/
-	src := `g2 = (g1 where .state == "select" |
-                    where .duration > 10)`
+	src := `g2 = g.where(.state == "select") | where(.duration > 10)`
 
 	body := strings.NewReader(src)
 
@@ -52,9 +47,9 @@ func TestCompiler_SimplePipeline(t *testing.T) {
 
 func TestCompiler_MultiPipeline(t *testing.T) {
 
-	src := `g3 = (g1 where .state == "select" |
-                    where .duration > 10 and .trace contains "keepAlive" |
-                    delete .trace contains "gRPC")`
+	src := `g3 = g1.where(.state == "select") |
+                    where(.duration > 10 and .trace contains "keepAlive") |
+                    delete(.trace contains "gRPC")`
 
 	body := strings.NewReader(src)
 
@@ -111,7 +106,7 @@ func TestCompiler_MultiPipeline(t *testing.T) {
 }
 
 func TestCompiler_SimpleWhere(t *testing.T) {
-	src := `g1 = g where .duration > 10`
+	src := `g1 = g.where(.duration > 10)`
 	body := strings.NewReader(src)
 
 	tokenizer := NewTokenizer(body)
@@ -177,7 +172,7 @@ func TestCompiler_PipelineEquivalence(t *testing.T) {
 }
 
 func TestCompiler_CompoundWhere(t *testing.T) {
-	src := `g where .duration > 10 and .state == "select"`
+	src := `g.where(.duration > 10 and .state == "select")`
 	body := strings.NewReader(src)
 
 	tokenizer := NewTokenizer(body)
@@ -209,8 +204,8 @@ func TestCompiler_CompoundWhere(t *testing.T) {
 }
 
 func TestCompiler_ParentheticalWhere(t *testing.T) {
-	src := `g where (.duration > 10 and .state == "select")
-                    or .state == "running"`
+	src := `g.where((.duration > 10 and .state == "select")
+                    or .state == "running")`
 	body := strings.NewReader(src)
 
 	tokenizer := NewTokenizer(body)
@@ -252,7 +247,7 @@ func TestCompiler_ParentheticalWhere(t *testing.T) {
 }
 
 func TestCompiler_NestedExpressions(t *testing.T) {
-	src := `g1 union (g2 where .duration > 10) | show`
+	src := `g1.union(g2.where(.duration > 10)) | show()`
 	body := strings.NewReader(src)
 
 	tokenizer := NewTokenizer(body)
@@ -288,20 +283,21 @@ func TestCompiler_Paths(t *testing.T) {
 		src        string
 		expect     []Op
 		expectPath string
+		expectErr  string
 	}{
 		{
-			name: "unquoted with spaces",
-			src:  `cd /path to directory`,
-			expect: []Op{
-				encode(OpCodeLoadString, 0),
-				encode(OpCodeCommandChangeDir, 0), // cd
-			},
-			// TODO: having this parse rather than error kinda sucks
-			expectPath: `/pathtodirectory`,
+			name:      "unquoted with spaces",
+			src:       `cd(/path to directory)`,
+			expectErr: `invalid argument for cd`,
+		},
+		{
+			name:      "unquoted without spaces",
+			src:       `cd(/path/to/direct.ory)`,
+			expectErr: `invalid argument for cd`,
 		},
 		{
 			name: "quoted with spaces",
-			src:  `cd "/path to directory"`,
+			src:  `cd("/path to directory")`,
 			expect: []Op{
 				encode(OpCodeLoadString, 0),
 				encode(OpCodeCommandChangeDir, 0), // cd
@@ -309,17 +305,8 @@ func TestCompiler_Paths(t *testing.T) {
 			expectPath: `/path to directory`,
 		},
 		{
-			name: "unquoted without spaces",
-			src:  `cd /path/to/direct.ory`,
-			expect: []Op{
-				encode(OpCodeLoadString, 0),
-				encode(OpCodeCommandChangeDir, 0), // cd
-			},
-			expectPath: `/path/to/direct.ory`,
-		},
-		{
-			name: "unquoted piped",
-			src:  `load /path/to/dump.txt | show 100 10`,
+			name: "quoted piped",
+			src:  `load("/path/to/dump.txt") | show(100, 10)`,
 			expect: []Op{
 				encode(OpCodeLoadString, 0),
 				encode(OpCodeFuncLoad, 0),     // load
@@ -337,6 +324,11 @@ func TestCompiler_Paths(t *testing.T) {
 			tokenizer := NewTokenizer(body)
 			compiler := newCompiler()
 			chunk, err := compiler.Compile(tokenizer)
+			if tc.expectErr != "" {
+				must.ErrorContains(t, err, tc.expectErr)
+				return
+			}
+
 			must.NoError(t, err)
 
 			fmt.Println(chunk.disassemble(0))
@@ -348,7 +340,7 @@ func TestCompiler_Paths(t *testing.T) {
 
 func TestCompiler_DiffMultiAssign(t *testing.T) {
 
-	src := `g3, g4, g5 = g1 diff g2` //`| l, r, c = diff g2`
+	src := `g3, g4, g5 = g1.diff(g2)` //`| l, r, c = diff g2`
 	body := strings.NewReader(src)
 
 	tokenizer := NewTokenizer(body)
@@ -399,25 +391,25 @@ func TestCompiler_Show(t *testing.T) {
 	}{
 		{
 			name:         "no args",
-			src:          `g1 | show`,
+			src:          `g1.show()`,
 			expectLimit:  0,
 			expectOffset: 0,
 		},
 		{
 			name:         "offset only",
-			src:          `g1 | show 0 3`,
+			src:          `g1 | show(0, 3)`,
 			expectLimit:  0,
 			expectOffset: 3,
 		},
 		{
 			name:         "limit only",
-			src:          `g1 | show 3`,
+			src:          `g1.show(3)`,
 			expectLimit:  3,
 			expectOffset: 0,
 		},
 		{
 			name:         "limit and offset",
-			src:          `g1 | show 10 3`,
+			src:          `g1 | show(10, 3)`,
 			expectLimit:  10,
 			expectOffset: 3,
 		},
@@ -434,10 +426,10 @@ func TestCompiler_Show(t *testing.T) {
 			fmt.Println(chunk.disassemble(0))
 			must.Len(t, 4, chunk.ops)
 
-			_, operand := chunk.ops[2].decode()
+			_, operand := chunk.ops[1].decode()
 			must.Eq(t, tc.expectLimit, chunk.constants[operand].(int))
 
-			_, operand = chunk.ops[1].decode()
+			_, operand = chunk.ops[2].decode()
 			must.Eq(t, tc.expectOffset, chunk.constants[operand].(int))
 		})
 	}
@@ -453,21 +445,36 @@ func TestCompiler_Pragma(t *testing.T) {
 	}{
 		{
 			name:          "boolean",
-			src:           `pragma empty.confirm true`,
+			src:           `pragma.empty.confirm = true`,
 			expectSetting: "empty.confirm",
 			expectValue:   encode(OpCodePushBool, 1),
 		},
 		{
 			name:          "numeric",
-			src:           `pragma show.count 100`,
+			src:           `pragma.show.count = 100`,
 			expectSetting: "show.count",
 			expectValue:   encode(OpCodeLoadNumber, 0),
 		},
 		{
 			name:          "enum",
-			src:           `pragma vars.display summary`,
+			src:           `pragma.vars.display = summary`,
 			expectSetting: "vars.display",
 			expectValue:   encode(OpCodeLoadString, 0),
+		},
+		{
+			name:          "get all",
+			src:           `pragma`,
+			expectSetting: "*.*",
+		},
+		{
+			name:          "get some",
+			src:           `pragma.limits`,
+			expectSetting: "limits.*",
+		},
+		{
+			name:          "get specific",
+			src:           `pragma.limits.steps`,
+			expectSetting: "limits.steps",
 		},
 	}
 
@@ -480,11 +487,16 @@ func TestCompiler_Pragma(t *testing.T) {
 			must.NoError(t, err)
 
 			fmt.Println(chunk.disassemble(0))
-			must.Len(t, 3, chunk.ops)
 
 			_, operand := chunk.ops[1].decode()
 			must.Eq(t, tc.expectSetting, chunk.constants[operand].(string))
-			must.Eq(t, tc.expectValue, chunk.ops[0])
+
+			if tc.expectValue == Op(OpCodeNoop) {
+				must.Len(t, 2, chunk.ops)
+			} else {
+				must.Len(t, 3, chunk.ops)
+				must.Eq(t, tc.expectValue, chunk.ops[0])
+			}
 		})
 	}
 

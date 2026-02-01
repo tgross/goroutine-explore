@@ -43,7 +43,7 @@ func NewVM(cfg *vmConfig) (*VM, error) {
 	}
 
 	return &VM{
-		stack:  make([]Value, 0, defaultInitialStackCap),
+		stack:  make([]Value, 0, defaultStackLimit),
 		env:    make(map[string]Value),
 		pragma: NewPragma(),
 		cwd:    root,
@@ -79,6 +79,9 @@ func (vm *VM) peekN(i int) (Value, error) {
 }
 
 func (vm *VM) Push(val Value) {
+	if len(vm.stack) >= vm.pragma.StackSize {
+		panic(ErrOutOfStackBounds)
+	}
 	vm.stack = append(vm.stack, val)
 }
 
@@ -184,8 +187,8 @@ func (vm *VM) run() (Value, error) {
 		case OpCodeCommandVars:
 			return NoValue, vm.commandVars()
 
-		case OpCodeCommandPragma:
-			return NoValue, vm.commandPragma()
+		case OpCodeCommandSetPragma:
+			return NoValue, vm.commandSetPragma()
 			// TODO: implement me
 
 		case OpCodeFuncUnion:
@@ -227,7 +230,7 @@ var (
 	ErrUnexpectedRegisterState   = errors.New("unexpected register state")
 	ErrOutOfStackBounds          = errors.New("jump outside of stack bounds")
 	ErrInvalidType               = errors.New("invalid type for operation")
-	ErrInvalidArg                = errors.New("invalid argument for operation")
+	ErrInvalidOpArg              = errors.New("invalid argument for operation")
 	ErrArgumentUnset             = errors.New("expected argument is unset")
 	ErrNoSuchOpCode              = errors.New("no such op code")
 	ErrExpectedConstantValueByte = errors.New("expected value after constant load byte")
@@ -736,7 +739,7 @@ func (vm *VM) commandHelp(index uint) (Value, error) {
 	}, nil
 }
 
-func (vm *VM) commandPragma() error {
+func (vm *VM) commandSetPragma() error {
 	setting, err := vm.popString()
 	if err != nil {
 		return err
@@ -808,7 +811,7 @@ func (vm *VM) commandVars() error {
 	default:
 		return fmt.Errorf(
 			"%w %q: expected \"count\", \"summary\", or \"none\"",
-			ErrInvalidArg, mode)
+			ErrInvalidOpArg, mode)
 	}
 
 	return nil

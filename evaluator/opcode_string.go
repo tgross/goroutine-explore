@@ -41,14 +41,15 @@ func _() {
 	_ = x[OpCodeCommandGetWorkingDir-30]
 	_ = x[OpCodeCommandHelp-31]
 	_ = x[OpCodeCommandListDir-32]
-	_ = x[OpCodeCommandPragma-33]
-	_ = x[OpCodeCommandQuit-34]
-	_ = x[OpCodeCommandVars-35]
+	_ = x[OpCodeCommandQuit-33]
+	_ = x[OpCodeCommandVars-34]
+	_ = x[OpCodeCommandSetPragma-35]
+	_ = x[OpCodeCommandGetPragma-36]
 }
 
-const _OpCode_name = "OpCodeNoopOpCodeLoadGoroutineDumpOpCodeLoadFieldAccessorOpCodeLoadNumberOpCodeLoadStringOpCodeAssignmentOpCodePushBoolOpCodePushDumpOpCodeAddGoroutineOpCodeNextGoroutineOpCodeTempDumpOpCodeContainsOpCodeEqualOpCodeGreaterOpCodeGreaterEqualOpCodeLessOpCodeLessEqualOpCodeNotEqualOpCodeJumpIfFalseOpCodeJumpIfTrueOpCodeJumpToOpCodePipeOpCodeFuncDiffOpCodeFuncIntersectOpCodeFuncLoadOpCodeFuncSaveOpCodeFuncShowDumpOpCodeFuncUnionOpCodeCommandChangeDirOpCodeCommandEmptyOpCodeCommandGetWorkingDirOpCodeCommandHelpOpCodeCommandListDirOpCodeCommandPragmaOpCodeCommandQuitOpCodeCommandVars"
+const _OpCode_name = "OpCodeNoopOpCodeLoadGoroutineDumpOpCodeLoadFieldAccessorOpCodeLoadNumberOpCodeLoadStringOpCodeAssignmentOpCodePushBoolOpCodePushDumpOpCodeAddGoroutineOpCodeNextGoroutineOpCodeTempDumpOpCodeContainsOpCodeEqualOpCodeGreaterOpCodeGreaterEqualOpCodeLessOpCodeLessEqualOpCodeNotEqualOpCodeJumpIfFalseOpCodeJumpIfTrueOpCodeJumpToOpCodePipeOpCodeFuncDiffOpCodeFuncIntersectOpCodeFuncLoadOpCodeFuncSaveOpCodeFuncShowDumpOpCodeFuncUnionOpCodeCommandChangeDirOpCodeCommandEmptyOpCodeCommandGetWorkingDirOpCodeCommandHelpOpCodeCommandListDirOpCodeCommandQuitOpCodeCommandVarsOpCodeCommandSetPragmaOpCodeCommandGetPragma"
 
-var _OpCode_index = [...]uint16{0, 10, 33, 56, 72, 88, 104, 118, 132, 150, 169, 183, 197, 208, 221, 239, 249, 264, 278, 295, 311, 323, 333, 347, 366, 380, 394, 412, 427, 449, 467, 493, 510, 530, 549, 566, 583}
+var _OpCode_index = [...]uint16{0, 10, 33, 56, 72, 88, 104, 118, 132, 150, 169, 183, 197, 208, 221, 239, 249, 264, 278, 295, 311, 323, 333, 347, 366, 380, 394, 412, 427, 449, 467, 493, 510, 530, 547, 564, 586, 608}
 
 func (i OpCode) String() string {
 	idx := int(i) - 0

@@ -11,8 +11,8 @@ import (
 
 func TestTokenizer_SmokeTest(t *testing.T) {
 
-	src := `g where (.duration > 10 and .state == "select")
-              | union g1 | as g2 | show`
+	src := `g.where(.duration > 10 and .state == "select")
+              | union(g1) | as(g2) | show()`
 
 	body := strings.NewReader(src)
 	tokenizer := NewTokenizer(body)
@@ -20,25 +20,31 @@ func TestTokenizer_SmokeTest(t *testing.T) {
 	t.Cleanup(stop)
 
 	expectedTypes := []TokenType{
-		TokenIdentifier,     // g
-		TokenKeywordWhere,   // where
-		TokenLeftParen,      // (
-		TokenFieldAccessor,  // .duration
-		TokenGreaterThan,    // >
-		TokenNumber,         // 10
-		TokenKeywordAnd,     // and
-		TokenFieldAccessor,  // .state
-		TokenEqual,          // ==
-		TokenString,         // "select"
-		TokenRightParen,     // )
-		TokenPipe,           // |
-		TokenFunctionBinary, // union
-		TokenIdentifier,     // g1
-		TokenPipe,           // |
-		TokenFunction,       // as
-		TokenIdentifier,     // g2
-		TokenPipe,           // |
-		TokenFunction,       // show
+		TokenIdentifier,    // g
+		TokenMethod,        // .where
+		TokenLeftParen,     // (
+		TokenFieldAccessor, // .duration
+		TokenGreaterThan,   // >
+		TokenNumber,        // 10
+		TokenKeywordAnd,    // and
+		TokenFieldAccessor, // .state
+		TokenEqual,         // ==
+		TokenString,        // "select"
+		TokenRightParen,    // )
+		TokenPipe,          // |
+		TokenFunction,      // union
+		TokenLeftParen,     // (
+		TokenIdentifier,    // g1
+		TokenRightParen,    // )
+		TokenPipe,          // |
+		TokenFunction,      // as
+		TokenLeftParen,     // (
+		TokenIdentifier,    // g2
+		TokenRightParen,    // )
+		TokenPipe,          // |
+		TokenFunction,      // show
+		TokenLeftParen,     // (
+		TokenRightParen,    // )
 	}
 
 	got := testCollectTokens(t, next)
@@ -55,32 +61,40 @@ func TestTokenizer_CommandArgs(t *testing.T) {
 		expect []Token
 	}{
 		{
-			src: `pragma show.dedup number`,
+			src: `pragma.show.dedup = number`,
 			expect: []Token{
-				Token{TokenCommand, `pragma`, scanner.Position{
+				Token{TokenPragma, `pragma`, scanner.Position{
 					Filename: "", Offset: 0, Line: 1, Column: 1}},
-				Token{TokenFunction, `show`, scanner.Position{
-					Filename: "", Offset: 7, Line: 1, Column: 8}},
+				Token{TokenMethod, `show`, scanner.Position{
+					Filename: "", Offset: 6, Line: 1, Column: 7}},
 				Token{TokenFieldAccessor, `.dedup`, scanner.Position{
 					Filename: "", Offset: 11, Line: 1, Column: 12}},
-				Token{TokenIdentifier, `number`, scanner.Position{
+				Token{TokenAssign, `=`, scanner.Position{
 					Filename: "", Offset: 18, Line: 1, Column: 19}},
+				Token{TokenIdentifier, `number`, scanner.Position{
+					Filename: "", Offset: 20, Line: 1, Column: 21}},
 			},
 		},
 		{
-			src: `cd "/foo/bar"`,
+			src: `cd("/foo/bar")`,
 			expect: []Token{
 				Token{TokenCommand, `cd`, scanner.Position{
 					Filename: "", Offset: 0, Line: 1, Column: 1}},
+				Token{TokenLeftParen, `(`, scanner.Position{
+					Filename: "", Offset: 2, Line: 1, Column: 3}},
 				Token{TokenString, `/foo/bar`, scanner.Position{
 					Filename: "", Offset: 3, Line: 1, Column: 4}},
+				Token{TokenRightParen, `)`, scanner.Position{
+					Filename: "", Offset: 13, Line: 1, Column: 14}},
 			},
 		},
 		{
-			src: `cd /foo/bar`,
+			src: `cd(/foo/bar)`,
 			expect: []Token{
 				Token{TokenCommand, `cd`, scanner.Position{
 					Filename: "", Offset: 0, Line: 1, Column: 1}},
+				Token{TokenLeftParen, `(`, scanner.Position{
+					Filename: "", Offset: 2, Line: 1, Column: 3}},
 				Token{TokenSlash, `/`, scanner.Position{
 					Filename: "", Offset: 3, Line: 1, Column: 4}},
 				Token{TokenIdentifier, `foo`, scanner.Position{
@@ -89,6 +103,8 @@ func TestTokenizer_CommandArgs(t *testing.T) {
 					Filename: "", Offset: 7, Line: 1, Column: 8}},
 				Token{TokenIdentifier, `bar`, scanner.Position{
 					Filename: "", Offset: 8, Line: 1, Column: 9}},
+				Token{TokenRightParen, `)`, scanner.Position{
+					Filename: "", Offset: 11, Line: 1, Column: 12}},
 			},
 		},
 	}

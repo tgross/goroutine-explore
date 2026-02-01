@@ -120,9 +120,10 @@ const (
 	OpCodeCommandGetWorkingDir
 	OpCodeCommandHelp
 	OpCodeCommandListDir
-	OpCodeCommandPragma
 	OpCodeCommandQuit
 	OpCodeCommandVars
+	OpCodeCommandSetPragma
+	OpCodeCommandGetPragma
 
 	OpCodePatchPlaceholder = 0x000000000000ffff
 )

@@ -86,7 +86,7 @@ created by net/http.(*connReader).startBackgroundRead in goroutine 37
 		},
 		{
 			name: "simple where string comparison",
-			src:  `g1 where .state == "select"`,
+			src:  `g1.where(.state == "select")`,
 			expect: func(t *testing.T, dump *GoroutineDump) {
 				must.Eq(t, 1, dump.Len())
 				must.Eq(t, 3, dump.Next().ID)
@@ -94,8 +94,8 @@ created by net/http.(*connReader).startBackgroundRead in goroutine 37
 		},
 		{
 			name: "simple where broken across newline",
-			src: `g1 where
-				 .state == "select"`,
+			src: `g1.where(
+				 .state == "select")`,
 			expect: func(t *testing.T, dump *GoroutineDump) {
 				must.Eq(t, 1, dump.Len())
 				must.Eq(t, 3, dump.Next().ID)
@@ -103,7 +103,7 @@ created by net/http.(*connReader).startBackgroundRead in goroutine 37
 		},
 		{
 			name: "simple where numeric comparison",
-			src:  `g1 where .duration > 0`,
+			src:  `g1.where(.duration > 0)`,
 			expect: func(t *testing.T, dump *GoroutineDump) {
 				must.Eq(t, 2, dump.Len())
 				must.Eq(t, 1, dump.Next().ID)
@@ -112,7 +112,7 @@ created by net/http.(*connReader).startBackgroundRead in goroutine 37
 		},
 		{
 			name: "simple where with binding",
-			src:  `g3 = g1 where .state == "select"`,
+			src:  `g3 = g1.where(.state == "select")`,
 			expect: func(t *testing.T, dump *GoroutineDump) {
 				must.Eq(t, 1, dump.Len())
 				must.Eq(t, 3, dump.Next().ID)
@@ -120,7 +120,7 @@ created by net/http.(*connReader).startBackgroundRead in goroutine 37
 		},
 		{
 			name: "compound where",
-			src:  `g1 where .duration > 0 and .state == "select"`,
+			src:  `g1.where(.duration > 0 and .state == "select")`,
 			expect: func(t *testing.T, dump *GoroutineDump) {
 				must.Eq(t, 1, dump.Len())
 				must.Eq(t, 3, dump.Next().ID)
@@ -129,9 +129,9 @@ created by net/http.(*connReader).startBackgroundRead in goroutine 37
 		{
 			name:           "diffed expressions",
 			notImplemented: true, // TODO
-			src: `l, c, r = diff
-				(g1 where .duration > 0)
-				(g1 delete .state == "select")`,
+			src: `l, c, r = diff(
+				g1.where(.duration > 0),
+				g1.delete(.state == "select"))`,
 			expect: func(t *testing.T, dump *GoroutineDump) {
 				// TODO: this should accept multiple dumps
 				must.Eq(t, 1, dump.Len())
@@ -140,9 +140,9 @@ created by net/http.(*connReader).startBackgroundRead in goroutine 37
 		{
 			name:           "unioned expressions",
 			notImplemented: true, // TODO
-			src: `union
-				(g1 where .duration > 0 and .lines > 0)
-				(g2 where .state == "runnable")`,
+			src: `union(
+				g1.where(.duration > 0 and .lines > 0),
+				g2.where(.state == "runnable"))`,
 			expect: func(t *testing.T, dump *GoroutineDump) {
 				must.Eq(t, 3, dump.Len())
 				must.Eq(t, 1, dump.Next().ID)
@@ -151,11 +151,10 @@ created by net/http.(*connReader).startBackgroundRead in goroutine 37
 			},
 		},
 		{
-			name:           "intersecting expressions with binding",
-			notImplemented: true, // TODO
-			src: `g3 = intersect
-				(g1 where .duration > 0 and .lines > 0)
-				(g1 where .state == "runnable")`,
+			name: "intersecting expressions with binding",
+			src: `g3 = intersect(
+				g1.where(.duration > 0 and .lines > 0),
+				g1.where(.state == "chan receive"))`,
 			expect: func(t *testing.T, dump *GoroutineDump) {
 				must.Eq(t, 1, dump.Len())
 				must.Eq(t, 1, dump.Next().ID)
