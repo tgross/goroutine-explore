@@ -27,7 +27,6 @@ type VM struct {
 	pragma *Pragma
 	cwd    *os.Root
 	wOut   io.Writer // writer for output
-	wErr   io.Writer // writer for errors
 
 	regGoroutine *Goroutine
 	regDumpDst   *GoroutineDump
@@ -680,16 +679,11 @@ func (vm *VM) handleMultiAssignment(m MultiAssignment) error {
 }
 
 func (vm *VM) handleConditionalJump(index uint, expected bool) error {
-	val, err := vm.Pop()
+	val, err := vm.popBool()
 	if err != nil {
-		return err
+		return fmt.Errorf("%w conditional jump", err)
 	}
-	if val.Tag != TagBool {
-		return fmt.Errorf(
-			"%w conditional jump: %s (%#v) at address=%d",
-			ErrInvalidType, val.Tag, val.Data, index)
-	}
-	if val.Data.(bool) == expected {
+	if val == expected {
 		vm.ip = int(index) - 1
 	}
 	return nil
@@ -793,7 +787,7 @@ func (vm *VM) commandVars() error {
 			if v.Tag == TagDump {
 				if dump, ok := v.Data.(*GoroutineDump); ok {
 					out := fmt.Sprintf("%s: %d\n", name, dump.Len())
-					vm.wOut.Write([]byte(out))
+					vm.wOut.Write([]byte(out)) //nolint:errcheck
 				}
 			}
 		}
@@ -803,14 +797,14 @@ func (vm *VM) commandVars() error {
 			if v.Tag == TagDump {
 				if dump, ok := v.Data.(*GoroutineDump); ok {
 					summary := dump.Summary(name)
-					vm.wOut.Write([]byte(summary))
-					vm.wOut.Write([]byte("\n"))
+					vm.wOut.Write([]byte(summary)) //nolint:errcheck
+					vm.wOut.Write([]byte("\n"))    //nolint:errcheck
 				}
 			}
 		}
 	case PragmaDisplayNone:
 		out := strings.Join(vars, "\t")
-		vm.wOut.Write([]byte(out))
+		vm.wOut.Write([]byte(out)) //nolint:errcheck
 	default:
 		return fmt.Errorf(
 			"%w %q: expected \"count\", \"summary\", or \"none\"",
@@ -886,6 +880,6 @@ func (vm *VM) handleShow() error {
 	}
 
 	out := dump.Show(limit, offset)
-	vm.wOut.Write([]byte(out))
+	vm.wOut.Write([]byte(out)) //nolint:errcheck
 	return nil
 }

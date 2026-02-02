@@ -314,7 +314,7 @@ func TestVM_Show(t *testing.T) {
 
 	_, err := vm.run()
 	must.NoError(t, err)
-	must.Eq(t, `[2 3]`, string(recorder.Bytes()))
+	must.Eq(t, `[2 3]`, recorder.String())
 }
 
 func TestVM_CommandVars(t *testing.T) {
@@ -345,7 +345,7 @@ func TestVM_CommandVars(t *testing.T) {
 	must.NoError(t, err)
 	must.Eq(t, `g1: 3
 g2: 2
-`, string(recorder.Bytes()))
+`, recorder.String())
 
 	vm.pragma.VarsDisplay = PragmaDisplaySummary
 	vm.reset(chunk)
@@ -361,7 +361,7 @@ g2: 2
         IO wait: 1
          select: 1
 
-`, string(recorder.Bytes()))
+`, recorder.String())
 
 }
 
