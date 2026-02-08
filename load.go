@@ -1,6 +1,8 @@
-// Copyright (c) linuxerwang and goroutine-explore contributors
-// SPDX-License-Identifier: BSD-2-Clause
+// Copyright (c) 2021-2026 The goroutine-explore contributors
 // SPDX-License-Identifier: BlueOak-1.0.0
+
+// Copyright (c) 2017-2021 linuxerwang and goroutine-inspect contributors
+// SPDX-License-Identifier: BSD-2-Clause
 
 package main
 
