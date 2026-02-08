@@ -1,4 +1,4 @@
-package evaluator
+package internal
 
 import (
 	"strings"

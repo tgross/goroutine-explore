@@ -1,4 +1,4 @@
-package evaluator
+package internal
 
 // Pragma represents all the VM's configuration values.
 type Pragma struct {
