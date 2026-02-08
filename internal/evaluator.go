@@ -4,8 +4,16 @@
 package internal
 
 import (
+	"io"
 	"strings"
 )
+
+type Config struct {
+	WorkDir string
+	Stdout  io.Writer
+	Stderr  io.Writer
+	Color   bool
+}
 
 func Evaluate(compiler *Compiler, src string, env map[string]Value, cwd string) (Value, error) {
 	body := strings.NewReader(src)
