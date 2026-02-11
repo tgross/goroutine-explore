@@ -23,8 +23,8 @@ install:
 	go install -trimpath .
 
 .PHONY: dev
-dev: build/goroutine-inspect
-	ln -sf $(shell pwd)/build/goroutine-inspect $(GOBIN)/goroutine-inspect
+dev: build/goroutine-explore
+	ln -sf $(shell pwd)/build/goroutine-explore $(GOBIN)/goroutine-explore
 
 .PHONY: run
 run: build
