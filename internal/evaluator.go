@@ -84,8 +84,9 @@ func (e *Evaluator) Eval(ctx context.Context, src string) error {
 	err = e.vm.Run(ctx)
 	if err != nil {
 		switch {
-		case errors.Is(err, ErrQuit):
-		case errors.Is(err, context.Canceled):
+		case errors.Is(err, ErrCommandQuit):
+		case errors.Is(err, ErrCommandOk),
+			errors.Is(err, context.Canceled):
 			err = nil
 		default:
 			// TODO: we want this to include rich diagnostic feedback

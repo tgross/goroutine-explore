@@ -63,7 +63,7 @@ func evalOnce(e *internal.Evaluator, src string) int {
 	err := e.Eval(ctx, src)
 	if err != nil {
 		switch {
-		case errors.Is(err, internal.ErrQuit):
+		case errors.Is(err, internal.ErrCommandQuit):
 			return 0
 		default:
 			return 1
@@ -113,7 +113,7 @@ func repl(e *internal.Evaluator) int {
 		err = e.Eval(ctx, src)
 		if err != nil {
 			switch {
-			case errors.Is(err, internal.ErrQuit):
+			case errors.Is(err, internal.ErrCommandQuit):
 				return 0
 			case errors.Is(err, internal.ErrNoSuchOpCode):
 				return 129

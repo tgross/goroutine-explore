@@ -368,7 +368,7 @@ func TestVM_CommandVars(t *testing.T) {
 	}
 
 	err := vm.Run(context.TODO())
-	must.NoError(t, err)
+	must.EqError(t, err, ErrCommandOk.Error())
 	must.Eq(t, `g1: 3
 g2: 2
 `, recorder.String())
@@ -377,7 +377,7 @@ g2: 2
 	vm.Reset(chunk)
 	recorder.Reset()
 	err = vm.Run(context.TODO())
-	must.NoError(t, err)
+	must.EqError(t, err, ErrCommandOk.Error())
 	must.Eq(t, `# of goroutines in "g1": 3
         IO wait: 1
         running: 1
@@ -446,7 +446,7 @@ func TestVM_CommandPragma(t *testing.T) {
 			vm.Reset(chunk)
 			err := vm.Run(context.TODO())
 			vm.debug()
-			must.NoError(t, err)
+			must.EqError(t, err, ErrCommandOk.Error())
 			tc.expectFn(t, vm.pragma)
 		})
 	}
