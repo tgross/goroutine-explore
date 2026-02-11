@@ -147,7 +147,8 @@ func nextSrc(lines *liner.State) (string, error) {
 		}
 		src += srcLine
 		src = strings.TrimSpace(src)
-		if strings.HasSuffix(src, "\\") || strings.HasSuffix(src, "(") {
+		if strings.HasSuffix(src, "\\") || strings.HasSuffix(src, "(") ||
+			strings.HasSuffix(src, "|") {
 			prompt = ".. "
 			src = strings.TrimSuffix(src, "\\")
 			src += " " // gives us whitespace when we append the line
