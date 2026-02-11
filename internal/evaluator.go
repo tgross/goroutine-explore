@@ -5,7 +5,11 @@ package internal
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"io"
+	"maps"
+	"slices"
 	"strings"
 )
 
@@ -16,25 +20,80 @@ type Config struct {
 	Color   bool
 }
 
-func Evaluate(compiler *Compiler, src string, env map[string]Value, cwd string) (Value, error) {
-	body := strings.NewReader(src)
+type Evaluator struct {
+	compiler  *Compiler
+	tokenizer *Tokenizer
+	vm        *VM
+
+	stdout *Writer
+	stderr *Writer
+}
+
+func NewEvaluator(cfg *Config) *Evaluator {
+	compiler := NewCompiler()
 	tokenizer := NewTokenizer()
-	tokenizer.Reset(context.TODO(), body)
-	chunk, err := compiler.Compile(tokenizer)
+	vm := NewVM(cfg)
+	wOut, wErr := NewWritersFrom(cfg)
+
+	return &Evaluator{
+		compiler:  compiler,
+		tokenizer: tokenizer,
+		vm:        vm,
+		stdout:    wOut,
+		stderr:    wErr,
+	}
+}
+
+var baseCompletions = []string{
+	"where", "delete", "as", "save", "load",
+	".where", ".delete", ".as", ".load", ".save",
+	"show", "diff", "intersect", "union",
+	".show", ".diff", ".intersect", ".union",
+	"and", "or", "contains",
+	"cd", "empty", "exit", "help", "ls", "pwd", "quit", "vars", "pragma",
+}
+
+// Completions returns all the known functions, commands, and keywords, plus all
+// the tokens in the environment
+func (e *Evaluator) Completions() []string {
+	completions := slices.Clone(baseCompletions)
+	if e.vm != nil {
+		for k := range e.vm.env {
+			completions = append(completions, k)
+		}
+	}
+	return completions
+}
+
+func (e *Evaluator) Eval(ctx context.Context, src string) error {
+	body := strings.NewReader(src)
+	e.tokenizer.Reset(ctx, body)
+	chunk, err := e.compiler.Compile(e.tokenizer)
 	if err != nil {
-		return NoValue, err
+		if errors.Is(err, context.Canceled) {
+			return nil
+		}
+		// TODO: we want this to include location feedback, etc.
+		fmt.Fprint(e.stderr.red(), err.Error()) //nolint:errcheck
+		return err
 	}
 
-	cfg := &vmConfig{cwd: cwd}
-
-	vm, err := NewVM(cfg)
+	// capture the previous environment so we can roll it back
+	oldEnv := maps.Clone(e.vm.env)
+	e.vm.Reset(chunk)
+	err = e.vm.Run(ctx)
 	if err != nil {
-		return NoValue, err
+		switch {
+		case errors.Is(err, ErrQuit):
+		case errors.Is(err, context.Canceled):
+			err = nil
+		default:
+			// TODO: we want this to include rich diagnostic feedback
+			fmt.Fprintln(e.stderr.red(), err.Error()) //nolint:errcheck
+		}
+		e.vm.env = oldEnv
+		return err
 	}
-	vm.env = env
-	vm.reset(chunk)
-	val, err := vm.run()
-	// vm.debug()
 
-	return val, err
+	return nil
 }

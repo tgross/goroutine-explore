@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"github.com/peterh/liner"
+	"github.com/tgross/goroutine-explore/internal"
 )
 
 func getConfDir() string {
@@ -35,26 +36,41 @@ func getHistoryFile() string {
 	return filepath.Join(getConfDir(), "history")
 }
 
-func createLiner() (*liner.State, error) {
-	line := liner.NewLiner()
-	line.SetCompleter(func(line string) (c []string) {
-		for n := range commands {
-			if strings.HasPrefix(n, strings.ToLower(line)) {
-				c = append(c, n)
+func createLiner(e *internal.Evaluator) (*liner.State, error) {
+	lines := liner.NewLiner()
+	lines.SetCtrlCAborts(true)
+	lines.SetMultiLineMode(true)
+	lines.SetTabCompletionStyle(liner.TabPrints)
+	lines.SetCompleter(func(line string) []string {
+		tokens := strings.Split(line, " ")
+		if len(tokens) == 0 {
+			return []string{}
+		}
+		lastToken := tokens[len(tokens)-1]
+		prefix := strings.ToLower(lastToken)
+
+		completions := []string{}
+		options := e.Completions()
+		for _, option := range options {
+			if strings.HasPrefix(option, prefix) {
+				completion := strings.TrimSuffix(line, lastToken)
+				completion += option
+				completions = append(completions, completion)
 			}
 		}
-		return
+
+		return completions
 	})
 
 	if f, err := os.Open(getHistoryFile()); err == nil {
 		defer f.Close() //nolint:errcheck
-		_, err := line.ReadHistory(f)
+		_, err := lines.ReadHistory(f)
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	return line, nil
+	return lines, nil
 }
 
 func saveLiner(liner *liner.State) error {

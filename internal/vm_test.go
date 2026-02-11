@@ -5,13 +5,14 @@ package internal
 
 import (
 	"bytes"
+	"context"
 	"testing"
 
 	"github.com/shoenig/test/must"
 )
 
 func TestVM_BasicStackOps(t *testing.T) {
-	vm, _ := NewVM(&vmConfig{cwd: t.TempDir()})
+	vm := NewVM(&Config{WorkDir: t.TempDir()})
 
 	vm.Push(Value{Tag: TagNumber, Data: 1})
 	vm.Push(Value{Tag: TagNumber, Data: 2})
@@ -49,8 +50,8 @@ func TestVM_SimpleWhere(t *testing.T) {
 		},
 		constants: []any{"g1", "g", ".duration", 10},
 	}
-	vm, _ := NewVM(&vmConfig{cwd: t.TempDir()})
-	vm.reset(chunk)
+	vm := NewVM(&Config{WorkDir: t.TempDir()})
+	vm.Reset(chunk)
 
 	gd := &GoroutineDump{}
 	gd.Add(&Goroutine{ID: 1, Duration: 20, State: "select"})
@@ -60,13 +61,14 @@ func TestVM_SimpleWhere(t *testing.T) {
 		"g": {Tag: TagDump, Data: gd},
 	}
 
-	result, err := vm.run()
+	err := vm.Run(context.TODO())
 	vm.debug()
 	must.NoError(t, err)
 
 	g1, ok := vm.env["g1"]
 	must.True(t, ok, must.Sprint("g1 was not written to env"))
 
+	result, _ := vm.Pop()
 	must.Eq(t, g1, result)
 
 	must.Eq(t, TagDump, g1.Tag)
@@ -229,18 +231,19 @@ func TestVM_BinaryExpression(t *testing.T) {
 				ops:       tc.ops,
 				constants: tc.constants,
 			}
-			vm, _ := NewVM(&vmConfig{cwd: t.TempDir()})
-			vm.reset(chunk)
+			vm := NewVM(&Config{WorkDir: t.TempDir()})
+			vm.Reset(chunk)
 
 			vm.env = map[string]Value{
 				"g1": {Tag: TagDump, Data: tc.g1Fn()},
 				"g2": {Tag: TagDump, Data: tc.g2Fn()},
 			}
 
-			result, err := vm.run()
+			err := vm.Run(context.TODO())
 			vm.debug()
 			must.NoError(t, err)
 
+			result, _ := vm.Pop()
 			must.Eq(t, TagDump, result.Tag)
 			g3, ok := result.Data.(*GoroutineDump)
 			must.True(t, ok)
@@ -263,8 +266,8 @@ func TestVM_MultiAssignDiff(t *testing.T) {
 		constants: []any{
 			"g3", "g4", "g5", MultiAssignment{0, 1, 2}, "g1", "g2"},
 	}
-	vm, _ := NewVM(&vmConfig{cwd: t.TempDir()})
-	vm.reset(chunk)
+	vm := NewVM(&Config{WorkDir: t.TempDir()})
+	vm.Reset(chunk)
 
 	g1 := NewGoroutineDump()
 	g1.Add(&Goroutine{ID: 1, Duration: 20, State: "select"})
@@ -279,7 +282,7 @@ func TestVM_MultiAssignDiff(t *testing.T) {
 		"g2": {Tag: TagDump, Data: g2},
 	}
 
-	_, err := vm.run()
+	err := vm.Run(context.TODO())
 	vm.debug()
 	must.NoError(t, err)
 
@@ -304,20 +307,40 @@ func TestVM_Show(t *testing.T) {
 		},
 		constants: []any{"g1", 1, 3},
 	}
-	vm, _ := NewVM(&vmConfig{cwd: t.TempDir()})
-	recorder := new(bytes.Buffer) // TODO: probably want test helper for this
-	vm.wOut = recorder
-	vm.reset(chunk)
+	vm := NewVM(&Config{WorkDir: t.TempDir()})
+	recorder := new(bytes.Buffer)
+	vm.wOut = NewWriter(recorder)
+	vm.Reset(chunk)
 
 	g1 := NewGoroutineDump()
-	g1.Add(&Goroutine{ID: 1, Duration: 20, State: "select"})
-	g1.Add(&Goroutine{ID: 2, Duration: 0, State: "running"})
-	g1.Add(&Goroutine{ID: 3, Duration: 10, State: "IO wait"})
+	g1.Add(testGoroutine("goroutine 1 [select, 20 minutes]:"))
+	g1.Add(testGoroutine("goroutine 2 [running]:"))
+	g1.Add(testGoroutine("goroutine 3 [IO wait, 10 minutes]:"))
 	vm.env = map[string]Value{"g1": {Tag: TagDump, Data: g1}}
-
-	_, err := vm.run()
+	err := vm.Run(context.TODO())
 	must.NoError(t, err)
-	must.Eq(t, `[2 3]`, recorder.String())
+	must.Eq(t, `goroutine 2 [running]:
+
+goroutine 3 [IO wait, 10 minutes]:
+
+# of goroutines: 3
+        IO wait: 1
+        running: 1
+         select: 1
+
+`, recorder.String())
+}
+
+func testGoroutine(header string, lines ...string) *Goroutine {
+	g, err := NewGoroutine(header)
+	if err != nil {
+		panic(err)
+	}
+	for _, line := range lines {
+		g.AddLine(line)
+	}
+	g.Freeze()
+	return g
 }
 
 func TestVM_CommandVars(t *testing.T) {
@@ -325,10 +348,10 @@ func TestVM_CommandVars(t *testing.T) {
 	chunk := &Chunk{
 		ops: []Op{encode(OpCodeCommandVars, 0)},
 	}
-	vm, _ := NewVM(&vmConfig{cwd: t.TempDir()})
-	recorder := new(bytes.Buffer) // TODO: probably want test helper for this
-	vm.wOut = recorder
-	vm.reset(chunk)
+	vm := NewVM(&Config{WorkDir: t.TempDir()})
+	recorder := new(bytes.Buffer)
+	vm.wOut = NewWriter(recorder)
+	vm.Reset(chunk)
 
 	g1 := NewGoroutineDump()
 	g1.Add(&Goroutine{ID: 1, Duration: 20, State: "select"})
@@ -344,16 +367,16 @@ func TestVM_CommandVars(t *testing.T) {
 		"g2": {Tag: TagDump, Data: g2},
 	}
 
-	_, err := vm.run()
+	err := vm.Run(context.TODO())
 	must.NoError(t, err)
 	must.Eq(t, `g1: 3
 g2: 2
 `, recorder.String())
 
 	vm.pragma.VarsDisplay = PragmaDisplaySummary
-	vm.reset(chunk)
+	vm.Reset(chunk)
 	recorder.Reset()
-	_, err = vm.run()
+	err = vm.Run(context.TODO())
 	must.NoError(t, err)
 	must.Eq(t, `# of goroutines in "g1": 3
         IO wait: 1
@@ -419,9 +442,9 @@ func TestVM_CommandPragma(t *testing.T) {
 				ops:       tc.ops,
 				constants: tc.constants,
 			}
-			vm, _ := NewVM(&vmConfig{cwd: t.TempDir()})
-			vm.reset(chunk)
-			_, err := vm.run()
+			vm := NewVM(&Config{WorkDir: t.TempDir()})
+			vm.Reset(chunk)
+			err := vm.Run(context.TODO())
 			vm.debug()
 			must.NoError(t, err)
 			tc.expectFn(t, vm.pragma)

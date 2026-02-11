@@ -39,11 +39,6 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 The following components are included in this project:
 
-`Knetic/govaluate`
-https://github.com/Knetic/govaluate
-Copyright (c) 2014-2025 George Lester
-Licensed under the MIT License
-
 `golang.org/x/sys`
 https://pkg.go.dev/golang.org/x/sys
 Copyright (c) 2009 The Go Authors
@@ -53,11 +48,6 @@ Licensed under the BSD-3-Clause License
 https://github.com/google/go-cmp
 Copyright (c) 2017 The Go Authors
 Licensed under the BSD-3-Clause License
-
-`mattn/go-colorable`
-https://github.com/mattn/go-colorable
-Copyright (c) 2016 Yasuhiro Matsumoto
-Licensed under the MIT License
 
 `mattn/go-isatty`
 https://github.com/mattn/go-isatty

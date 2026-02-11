@@ -4,6 +4,9 @@
 package internal
 
 import (
+	"bytes"
+	"context"
+	"io"
 	"testing"
 
 	"github.com/shoenig/test"
@@ -14,6 +17,7 @@ import (
 // output given an environment
 func TestEvaluator(t *testing.T) {
 
+	tempDir := t.TempDir()
 	env := map[string]Value{}
 
 	// TODO: this would be nicer if we had testdata files we could read in
@@ -25,9 +29,9 @@ func TestEvaluator(t *testing.T) {
 main.main()
 	/home/tim/src/tgross/sdnotifying/main.go:62 +0x1e5
 `,
-		Lines:    3,
-		Duration: 5,
-		State:    "chan receive",
+		LineCount: 3,
+		Duration:  5,
+		State:     "chan receive",
 	})
 	g1.Add(&Goroutine{
 		ID:     2,
@@ -40,8 +44,8 @@ os/signal.loop()
 created by os/signal.Notify.func1.1 in goroutine 1
 	/usr/local/go/src/os/signal/signal.go:151 +0x1f
 `,
-		Lines: 7,
-		State: "syscall",
+		LineCount: 7,
+		State:     "syscall",
 	})
 	g1.Add(&Goroutine{
 		ID:     3,
@@ -49,9 +53,9 @@ created by os/signal.Notify.func1.1 in goroutine 1
 		Trace: `main.main()
 	/home/tim/src/tgross/sdnotifying/main.go:62 +0x1e5
 `,
-		Lines:    3,
-		Duration: 1,
-		State:    "select",
+		LineCount: 3,
+		Duration:  1,
+		State:     "select",
 	})
 
 	g2 := NewGoroutineDump()
@@ -66,9 +70,9 @@ runtime.goexit({})
 created by net/http.(*connReader).startBackgroundRead in goroutine 37
 	/usr/local/go/src/net/http/server.go:677 +0xba
 `,
-		Lines:    7,
-		Duration: 0,
-		State:    "runnable",
+		LineCount: 7,
+		Duration:  0,
+		State:     "runnable",
 	})
 
 	env["g1"] = Value{Tag: TagDump, Data: g1}
@@ -170,13 +174,20 @@ created by net/http.(*connReader).startBackgroundRead in goroutine 37
 			if tc.notImplemented {
 				t.Skip("TODO not yet implemented")
 			}
-			c := NewCompiler()
-			got, err := Evaluate(c, tc.src, env, t.TempDir())
+			errRecorder := new(bytes.Buffer)
+
+			e := NewEvaluator(&Config{
+				WorkDir: tempDir,
+				Stdout:  io.Discard, // TODO: snapshot tests would be cool
+				Stderr:  errRecorder,
+			})
+			e.vm.env = env // simulate earlier expressions
+			err := e.Eval(context.TODO(), tc.src)
 			if tc.expectErrMsg != "" {
-				test.Eq(t, NoValue, got)
 				test.EqError(t, err, tc.expectErrMsg)
 			} else {
 				must.NoError(t, err)
+				got, _ := e.vm.Pop()
 				must.NotNil(t, got)
 				dump, ok := got.Data.(*GoroutineDump)
 				must.True(t, ok, must.Sprintf("did not return dump: %v", dump))
@@ -199,9 +210,9 @@ func BenchmarkEvaluator(b *testing.B) {
 main.main()
 	/home/tim/src/tgross/sdnotifying/main.go:62 +0x1e5
 `,
-		Lines:    3,
-		Duration: 5,
-		State:    "chan receive",
+		LineCount: 3,
+		Duration:  5,
+		State:     "chan receive",
 	})
 	g1.Add(&Goroutine{
 		ID:     2,
@@ -214,8 +225,8 @@ os/signal.loop()
 created by os/signal.Notify.func1.1 in goroutine 1
 	/usr/local/go/src/os/signal/signal.go:151 +0x1f
 `,
-		Lines: 7,
-		State: "syscall",
+		LineCount: 7,
+		State:     "syscall",
 	})
 	g1.Add(&Goroutine{
 		ID:     3,
@@ -223,9 +234,9 @@ created by os/signal.Notify.func1.1 in goroutine 1
 		Trace: `main.main()
 	/home/tim/src/tgross/sdnotifying/main.go:62 +0x1e5
 `,
-		Lines:    3,
-		Duration: 1,
-		State:    "select",
+		LineCount: 3,
+		Duration:  1,
+		State:     "select",
 	})
 
 	env["g1"] = Value{Tag: TagDump, Data: g1}
@@ -233,10 +244,18 @@ created by os/signal.Notify.func1.1 in goroutine 1
 	src := `g1 where .duration > 0 and .state == "select"`
 
 	length := 0
-	c := NewCompiler()
-	cwd := b.TempDir()
+	e := NewEvaluator(&Config{
+		WorkDir: b.TempDir(),
+		Stdout:  io.Discard,
+		Stderr:  io.Discard,
+	})
+	e.vm.env = env // simulate earlier expressions
+	ctx := context.TODO()
+
 	for b.Loop() {
-		got, err := Evaluate(c, src, env, cwd)
+		err := e.Eval(ctx, src)
+		must.NoError(b, err)
+		got, err := e.vm.Pop()
 		must.NoError(b, err)
 		dump, ok := got.Data.(*GoroutineDump)
 		must.True(b, ok, must.Sprintf("did not return dump: %v", dump))

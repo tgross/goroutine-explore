@@ -1,0 +1,44 @@
+// Copyright (c) 2021-2026 The goroutine-explore contributors
+// SPDX-License-Identifier: BlueOak-1.0.0
+
+// Copyright (c) 2017-2021 linuxerwang and goroutine-inspect contributors
+// SPDX-License-Identifier: BSD-2-Clause
+
+package internal
+
+import (
+	"fmt"
+	"os"
+	"sort"
+)
+
+func listDir(w *Writer) error {
+	wd, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+
+	f, err := os.Open(wd)
+	if err != nil {
+		return err
+	}
+	defer f.Close() //nolint:errcheck
+
+	fis, err := f.Readdir(-1)
+	if err != nil {
+		return err
+	}
+
+	sort.Slice(fis, func(i, j int) bool {
+		return fis[i].Name() < fis[j].Name()
+	})
+
+	for _, fi := range fis {
+		if fi.IsDir() {
+			fmt.Fprintln(w.blue(), fi.Name()) //nolint:errcheck
+		} else {
+			fmt.Fprintln(w, fi.Name()) //nolint:errcheck
+		}
+	}
+	return nil
+}

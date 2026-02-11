@@ -4,9 +4,9 @@
 package internal
 
 import (
+	"context"
 	"errors"
 	"fmt"
-	"io"
 	"maps"
 	"os"
 	"reflect"
@@ -24,37 +24,31 @@ type VM struct {
 	// infinite loops)
 	gas int
 
-	// TODO: we should have a copy of the environment that we write to on each
-	// pass through run, which only gets flattened into the env when complete
+	// the Eval call copied this before each call to Run
 	env    map[string]Value
 	pragma *Pragma
-	cwd    *os.Root
-	wOut   io.Writer // writer for output
+	cwd    string
+	wOut   *Writer // writer for output
+	wErr   *Writer // writer for errors
 
 	regGoroutine *Goroutine
 	regDumpDst   *GoroutineDump
 }
 
-type vmConfig struct {
-	cwd string
-}
-
-func NewVM(cfg *vmConfig) (*VM, error) {
-	root, err := os.OpenRoot(cfg.cwd)
-	if err != nil {
-		return nil, err
-	}
-
+func NewVM(cfg *Config) *VM {
+	wOut, wErr := NewWritersFrom(cfg)
 	return &VM{
 		stack:  make([]Value, 0, defaultStackLimit),
 		env:    make(map[string]Value),
 		pragma: NewPragma(),
-		cwd:    root,
+		cwd:    cfg.WorkDir,
 		gas:    defaultGas,
-	}, nil
+		wOut:   wOut,
+		wErr:   wErr,
+	}
 }
 
-func (vm *VM) reset(chunk *Chunk) {
+func (vm *VM) Reset(chunk *Chunk) {
 	vm.ip = -1
 	vm.chunk = chunk
 	vm.stack = make([]Value, 0, vm.pragma.StackSize)
@@ -105,11 +99,17 @@ func (vm *VM) Env(key string) (Value, error) {
 	return val, nil
 }
 
-func (vm *VM) run() (Value, error) {
+func (vm *VM) Run(ctx context.Context) error {
 	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
+
 		vm.gas--
 		if vm.gas <= 0 {
-			return NoValue, fmt.Errorf("%w (%d)", ErrOutOfGas, defaultGas)
+			return fmt.Errorf("%w (%d)", ErrOutOfGas, vm.pragma.Gas)
 		}
 
 		op, err := vm.readByte()
@@ -155,7 +155,6 @@ func (vm *VM) run() (Value, error) {
 
 		case OpCodeLoadGoroutineDump:
 			err = vm.loadEnv(operand)
-			// TODO: would be nice to do a type assertion here
 
 		case OpCodeAddGoroutine:
 			vm.regDumpDst.Add(vm.regGoroutine)
@@ -168,31 +167,29 @@ func (vm *VM) run() (Value, error) {
 
 		case OpCodeCommandChangeDir:
 			err = vm.commandChangeDir(operand)
-			return NoValue, err
+			return err
 
 		case OpCodeCommandEmpty:
 			vm.env = map[string]Value{}
-			return NoValue, nil
+			return nil
 
 		case OpCodeCommandGetWorkingDir:
-			return vm.commandGetWorkDir(), nil
+			return vm.commandGetWorkDir()
 
 		case OpCodeCommandQuit:
-			// TODO: how do we expect caller to detect this and quit?
-			return NoValue, err
+			return ErrQuit
 
 		case OpCodeCommandHelp:
 			return vm.commandHelp(operand)
 
 		case OpCodeCommandListDir:
-			// TODO: implement me
+			return listDir(vm.wOut)
 
 		case OpCodeCommandVars:
-			return NoValue, vm.commandVars()
+			return vm.commandVars()
 
 		case OpCodeCommandSetPragma:
-			return NoValue, vm.commandSetPragma()
-			// TODO: implement me
+			return vm.commandSetPragma()
 
 		case OpCodeFuncUnion:
 			err = vm.handleUnion()
@@ -207,23 +204,41 @@ func (vm *VM) run() (Value, error) {
 			err = vm.handleShow()
 
 		case OpCodeFuncLoad:
-			// TODO: implement me
+			err = vm.handleLoad()
 
 		case OpCodeFuncSave:
-			// TODO: implement me
+			err = vm.handleSave()
 
 		default:
-			return NoValue, fmt.Errorf("%w %s", ErrNoSuchOpCode, instruction)
+			return fmt.Errorf("%w %s", ErrNoSuchOpCode, instruction)
 		}
 		if err != nil {
-			return NoValue, err
+			return err
 		}
 
 	}
 
-	// TODO: shouldn't we just pop everything off the stack so we can print it
-	// all?
-	return vm.Pop()
+	// TODO: would be nice to account for calls to show() so that summaries
+	// match the show() value, or just leave the summary off in that case
+	val, err := vm.Peek()
+	if err == nil {
+		switch val.Tag {
+		case TagDump:
+			val.Data.(*GoroutineDump).Summary(vm.wOut, "")
+		case TagDiff:
+			val.Data.(*Diff).Left.Summary(vm.wOut, "left")
+			val.Data.(*Diff).Right.Summary(vm.wOut, "right")
+			val.Data.(*Diff).Common.Summary(vm.wOut, "shared")
+		case TagString:
+			fmt.Fprintln(vm.wOut, val.Data.(string)) //nolint:errcheck
+		case TagBool:
+			fmt.Fprintf(vm.wOut, "%v\n", val.Data.(bool)) //nolint:errcheck
+		case TagNumber:
+			fmt.Fprintf(vm.wOut, "%d\n", val.Data.(int)) //nolint:errcheck
+		}
+	}
+
+	return nil
 }
 
 var (
@@ -240,7 +255,9 @@ var (
 	ErrExpectedJumpAddress       = errors.New("expected address for jump")
 	ErrExpectedCommand           = errors.New("expected valid command after command byte")
 	ErrNoSuchEnv                 = errors.New("no identifer with name")
+	ErrNoSuchPragma              = errors.New("no pragma with name")
 	ErrExpectedDiffAssign        = errors.New("assigning a diff must have 3 identifiers or \"_\"")
+	ErrQuit                      = errors.New("user quit")
 )
 
 func (vm *VM) comparison(instruction OpCode) error {
@@ -254,7 +271,7 @@ func (vm *VM) comparison(instruction OpCode) error {
 	}
 	if left.Tag != right.Tag {
 		return fmt.Errorf(
-			"expected matching types, got %+v and %+v", left.Data, right.Data)
+			"expected matching types, got %+v and %+v", left.Tag, right.Tag)
 	}
 
 	var val bool
@@ -387,7 +404,10 @@ func (vm *VM) loadEnv(index uint) error {
 		return fmt.Errorf("%w: expected name of a variable or constant", err)
 	}
 
-	val := vm.env[name] // TODO: what if env is empty?
+	val, ok := vm.env[name]
+	if !ok {
+		return fmt.Errorf("%w %q", ErrNoSuchEnv, name)
+	}
 	vm.Push(val)
 	return nil
 }
@@ -523,7 +543,7 @@ func (vm *VM) handleFieldAccessor(index uint) error {
 	case "trace", ".trace":
 		vm.Push(Value{Tag: TagString, Data: g.Trace})
 	case "lines", ".lines":
-		vm.Push(Value{Tag: TagNumber, Data: g.Lines})
+		vm.Push(Value{Tag: TagNumber, Data: g.LineCount})
 	case "duration", ".duration":
 		vm.Push(Value{Tag: TagNumber, Data: g.Duration})
 	case "state", ".state":
@@ -700,11 +720,9 @@ func (vm *VM) handleJumpTo(addr uint) error {
 	return nil
 }
 
-func (vm *VM) commandGetWorkDir() Value {
-	return Value{
-		Tag:  TagString,
-		Data: vm.cwd.Name(),
-	}
+func (vm *VM) commandGetWorkDir() error {
+	fmt.Fprint(vm.wOut, vm.cwd+"\n") //nolint:errcheck
+	return nil
 }
 
 func (vm *VM) commandChangeDir(index uint) error {
@@ -716,30 +734,35 @@ func (vm *VM) commandChangeDir(index uint) error {
 	if !ok {
 		return fmt.Errorf("cd requires a string argument")
 	}
-	root, err := os.OpenRoot(path)
+	fi, err := os.Stat(path)
 	if err != nil {
 		return err
 	}
-	vm.cwd = root
+	if !fi.IsDir() {
+		return fmt.Errorf("%s is not a directory", path)
+	}
+	err = os.Chdir(path)
+	if err != nil {
+		return fmt.Errorf("could not change working directory: %w", err)
+	}
+	vm.cwd = path
 	return nil
 }
 
-func (vm *VM) commandHelp(index uint) (Value, error) {
+func (vm *VM) commandHelp(index uint) error {
 	// TODO: what about when we have no topic?
 	con, err := vm.fetchConstant(index)
 	if err != nil {
-		return NoValue, err
+		return err
 	}
 	topic, ok := con.(string)
 	if !ok {
-		return NoValue, fmt.Errorf("help topics must be strings")
+		return fmt.Errorf("help topics must be strings")
 	}
 
-	return Value{
-		Tag: TagString,
-		// TODO: lookup help for topic here?
-		Data: fmt.Sprintf("help for topic: %s", topic),
-	}, nil
+	// TODO: lookup topic
+	fmt.Fprintf(vm.wOut, "help for topic: %s", topic) //nolint:errcheck
+	return nil
 }
 
 func (vm *VM) commandSetPragma() error {
@@ -763,9 +786,9 @@ func (vm *VM) commandSetPragma() error {
 		return popAndSet(vm, &vm.pragma.ShowDedup)
 	case "vars.display":
 		return popAndSet(vm, &vm.pragma.VarsDisplay)
+	default:
+		return fmt.Errorf("%w pragma.%s", ErrNoSuchPragma, setting)
 	}
-
-	return nil
 }
 
 func popAndSet[T any](vm *VM, setting *T) error {
@@ -792,8 +815,7 @@ func (vm *VM) commandVars() error {
 			v := vm.env[name]
 			if v.Tag == TagDump {
 				if dump, ok := v.Data.(*GoroutineDump); ok {
-					out := fmt.Sprintf("%s: %d\n", name, dump.Len())
-					vm.wOut.Write([]byte(out)) //nolint:errcheck
+					fmt.Fprintf(vm.wOut, "%s: %d\n", name, dump.Len()) //nolint:errcheck
 				}
 			}
 		}
@@ -802,15 +824,13 @@ func (vm *VM) commandVars() error {
 			v := vm.env[name]
 			if v.Tag == TagDump {
 				if dump, ok := v.Data.(*GoroutineDump); ok {
-					summary := dump.Summary(name)
-					vm.wOut.Write([]byte(summary)) //nolint:errcheck
-					vm.wOut.Write([]byte("\n"))    //nolint:errcheck
+					dump.Summary(vm.wOut, name)
 				}
 			}
 		}
 	case PragmaDisplayNone:
 		out := strings.Join(vars, "\t")
-		vm.wOut.Write([]byte(out)) //nolint:errcheck
+		fmt.Fprint(vm.wOut, out) //nolint:errcheck
 	default:
 		return fmt.Errorf(
 			"%w %q: expected \"count\", \"summary\", or \"none\"",
@@ -868,6 +888,32 @@ func (vm *VM) popNumber() (int, error) {
 	return arg, nil
 }
 
+func (vm *VM) handleLoad() error {
+	path, err := vm.popString()
+	if err != nil {
+		return err
+	}
+	dump, err := load(path)
+	if err != nil {
+		return err
+	}
+	vm.pushDump(dump)
+	return nil
+}
+
+func (vm *VM) handleSave() error {
+	path, err := vm.popString()
+	if err != nil {
+		return err
+	}
+	dump, err := vm.popDump()
+	if err != nil {
+		return err
+	}
+
+	return dump.Save(path)
+}
+
 func (vm *VM) handleShow() error {
 	limit, err := vm.popNumber()
 	if err != nil {
@@ -885,7 +931,6 @@ func (vm *VM) handleShow() error {
 		return err
 	}
 
-	out := dump.Show(limit, offset)
-	vm.wOut.Write([]byte(out)) //nolint:errcheck
+	dump.Show(vm.wOut, limit, offset)
 	return nil
 }

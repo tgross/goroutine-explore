@@ -4,7 +4,7 @@
 // Copyright (c) 2017-2021 linuxerwang and goroutine-inspect contributors
 // SPDX-License-Identifier: BSD-2-Clause
 
-package main
+package internal
 
 import (
 	"bufio"
@@ -13,8 +13,6 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
-
-	"github.com/mattn/go-colorable"
 )
 
 var (
@@ -39,7 +37,7 @@ func load(fn string) (*GoroutineDump, error) {
 }
 
 func loadFrom(r io.Reader) (*GoroutineDump, error) {
-	dump := NewGoroutineDump(colorable.NewColorableStdout())
+	dump := NewGoroutineDump()
 
 	var goroutine *Goroutine
 	var err error
