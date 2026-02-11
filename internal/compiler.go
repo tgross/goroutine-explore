@@ -49,7 +49,7 @@ const (
 
 type parseFn func(Token) error
 
-func newCompiler() *Compiler {
+func NewCompiler() *Compiler {
 	p := &Compiler{
 		prefixParseFns:      make(map[TokenType]parseFn),
 		prefixPrecedenceTab: make(map[TokenType]int),
@@ -101,7 +101,7 @@ func (p *Compiler) Compile(tokenizer *Tokenizer) (*Chunk, error) {
 func (p *Compiler) parseExpr(precedence int) error {
 	tok, err := p.tokenizer.Next()
 	if err != nil {
-		return ErrEOF
+		return err
 	}
 
 	// every expression will start with a prefix expression, even if it's

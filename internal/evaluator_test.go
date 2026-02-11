@@ -170,7 +170,7 @@ created by net/http.(*connReader).startBackgroundRead in goroutine 37
 			if tc.notImplemented {
 				t.Skip("TODO not yet implemented")
 			}
-			c := newCompiler()
+			c := NewCompiler()
 			got, err := Evaluate(c, tc.src, env, t.TempDir())
 			if tc.expectErrMsg != "" {
 				test.Eq(t, NoValue, got)
@@ -233,7 +233,7 @@ created by os/signal.Notify.func1.1 in goroutine 1
 	src := `g1 where .duration > 0 and .state == "select"`
 
 	length := 0
-	c := newCompiler()
+	c := NewCompiler()
 	cwd := b.TempDir()
 	for b.Loop() {
 		got, err := Evaluate(c, src, env, cwd)

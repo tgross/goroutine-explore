@@ -4,6 +4,7 @@
 package internal
 
 import (
+	"context"
 	"iter"
 	"strings"
 	"testing"
@@ -18,7 +19,8 @@ func TestTokenizer_SmokeTest(t *testing.T) {
               | union(g1) | as(g2) | show()`
 
 	body := strings.NewReader(src)
-	tokenizer := NewTokenizer(body)
+	tokenizer := NewTokenizer()
+	tokenizer.Reset(context.TODO(), body)
 	next, stop := iter.Pull2(tokenizer.Tokens())
 	t.Cleanup(stop)
 
@@ -115,7 +117,8 @@ func TestTokenizer_CommandArgs(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run("", func(t *testing.T) {
 			body := strings.NewReader(tc.src)
-			tokenizer := NewTokenizer(body)
+			tokenizer := NewTokenizer()
+			tokenizer.Reset(context.TODO(), body)
 			next, stop := iter.Pull2(tokenizer.Tokens())
 			t.Cleanup(stop)
 

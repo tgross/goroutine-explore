@@ -4,6 +4,7 @@
 package internal
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"testing"
@@ -16,8 +17,9 @@ func TestCompiler_SimplePipeline(t *testing.T) {
 
 	body := strings.NewReader(src)
 
-	tokenizer := NewTokenizer(body)
-	compiler := newCompiler()
+	tokenizer := NewTokenizer()
+	tokenizer.Reset(context.TODO(), body)
+	compiler := NewCompiler()
 	chunk, err := compiler.Compile(tokenizer)
 	must.NoError(t, err)
 
@@ -56,8 +58,9 @@ func TestCompiler_MultiPipeline(t *testing.T) {
 
 	body := strings.NewReader(src)
 
-	tokenizer := NewTokenizer(body)
-	compiler := newCompiler()
+	tokenizer := NewTokenizer()
+	tokenizer.Reset(context.TODO(), body)
+	compiler := NewCompiler()
 	chunk, err := compiler.Compile(tokenizer)
 	must.NoError(t, err)
 
@@ -112,8 +115,9 @@ func TestCompiler_SimpleWhere(t *testing.T) {
 	src := `g1 = g.where(.duration > 10)`
 	body := strings.NewReader(src)
 
-	tokenizer := NewTokenizer(body)
-	compiler := newCompiler()
+	tokenizer := NewTokenizer()
+	tokenizer.Reset(context.TODO(), body)
+	compiler := NewCompiler()
 	chunk, err := compiler.Compile(tokenizer)
 	must.NoError(t, err)
 
@@ -136,7 +140,7 @@ func TestCompiler_SimpleWhere(t *testing.T) {
 }
 
 func TestCompiler_JumpPatch(t *testing.T) {
-	compiler := newCompiler()
+	compiler := NewCompiler()
 	compiler.chunk = NewChunk()
 	addr := compiler.emitBytes(OpCodeJumpIfTrue, 0)
 	compiler.emitByte(OpCodeNoop)
@@ -156,10 +160,11 @@ func TestCompiler_PipelineEquivalence(t *testing.T) {
 	src1 := `g2 = g1 where .state == "select" where .duration > 1`
 	src2 := `g2 = g1 | where .state == "select" | where .duration > 1`
 
-	compiler := newCompiler()
+	compiler := NewCompiler()
 
 	body := strings.NewReader(src1)
-	tokenizer := NewTokenizer(body)
+	tokenizer := NewTokenizer()
+	tokenizer.Reset(context.TODO(), body)
 	chunk, err := compiler.Compile(tokenizer)
 	must.NoError(t, err)
 	fmt.Println(chunk.disassemble(0))
@@ -167,7 +172,7 @@ func TestCompiler_PipelineEquivalence(t *testing.T) {
 	expect := chunk.ops
 
 	body = strings.NewReader(src2)
-	tokenizer = NewTokenizer(body)
+	tokenizer.Reset(context.TODO(), body)
 	chunk, err = compiler.Compile(tokenizer)
 	must.NoError(t, err)
 	fmt.Println(chunk.disassemble(0))
@@ -178,8 +183,9 @@ func TestCompiler_CompoundWhere(t *testing.T) {
 	src := `g.where(.duration > 10 and .state == "select")`
 	body := strings.NewReader(src)
 
-	tokenizer := NewTokenizer(body)
-	compiler := newCompiler()
+	tokenizer := NewTokenizer()
+	tokenizer.Reset(context.TODO(), body)
+	compiler := NewCompiler()
 	chunk, err := compiler.Compile(tokenizer)
 	must.NoError(t, err)
 
@@ -211,8 +217,9 @@ func TestCompiler_ParentheticalWhere(t *testing.T) {
                     or .state == "running")`
 	body := strings.NewReader(src)
 
-	tokenizer := NewTokenizer(body)
-	compiler := newCompiler()
+	tokenizer := NewTokenizer()
+	tokenizer.Reset(context.TODO(), body)
+	compiler := NewCompiler()
 	chunk, err := compiler.Compile(tokenizer)
 	fmt.Println(chunk.disassemble(0))
 	must.NoError(t, err)
@@ -253,8 +260,9 @@ func TestCompiler_NestedExpressions(t *testing.T) {
 	src := `g1.union(g2.where(.duration > 10)) | show()`
 	body := strings.NewReader(src)
 
-	tokenizer := NewTokenizer(body)
-	compiler := newCompiler()
+	tokenizer := NewTokenizer()
+	tokenizer.Reset(context.TODO(), body)
+	compiler := NewCompiler()
 	chunk, err := compiler.Compile(tokenizer)
 	fmt.Println(chunk.disassemble(0))
 	must.NoError(t, err)
@@ -324,8 +332,9 @@ func TestCompiler_Paths(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			body := strings.NewReader(tc.src)
-			tokenizer := NewTokenizer(body)
-			compiler := newCompiler()
+			tokenizer := NewTokenizer()
+			tokenizer.Reset(context.TODO(), body)
+			compiler := NewCompiler()
 			chunk, err := compiler.Compile(tokenizer)
 			if tc.expectErr != "" {
 				must.ErrorContains(t, err, tc.expectErr)
@@ -346,8 +355,9 @@ func TestCompiler_DiffMultiAssign(t *testing.T) {
 	src := `g3, g4, g5 = g1.diff(g2)` //`| l, r, c = diff g2`
 	body := strings.NewReader(src)
 
-	tokenizer := NewTokenizer(body)
-	compiler := newCompiler()
+	tokenizer := NewTokenizer()
+	tokenizer.Reset(context.TODO(), body)
+	compiler := NewCompiler()
 	chunk, err := compiler.Compile(tokenizer)
 	must.NoError(t, err)
 
@@ -370,8 +380,9 @@ func TestCompiler_NoAssign(t *testing.T) {
 	src := `g1, g2`
 	body := strings.NewReader(src)
 
-	tokenizer := NewTokenizer(body)
-	compiler := newCompiler()
+	tokenizer := NewTokenizer()
+	tokenizer.Reset(context.TODO(), body)
+	compiler := NewCompiler()
 	chunk, err := compiler.Compile(tokenizer)
 	must.NoError(t, err)
 
@@ -421,8 +432,9 @@ func TestCompiler_Show(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			body := strings.NewReader(tc.src)
-			tokenizer := NewTokenizer(body)
-			compiler := newCompiler()
+			tokenizer := NewTokenizer()
+			tokenizer.Reset(context.TODO(), body)
+			compiler := NewCompiler()
 			chunk, err := compiler.Compile(tokenizer)
 			must.NoError(t, err)
 
@@ -484,8 +496,9 @@ func TestCompiler_Pragma(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			body := strings.NewReader(tc.src)
-			tokenizer := NewTokenizer(body)
-			compiler := newCompiler()
+			tokenizer := NewTokenizer()
+			tokenizer.Reset(context.TODO(), body)
+			compiler := NewCompiler()
 			chunk, err := compiler.Compile(tokenizer)
 			must.NoError(t, err)
 

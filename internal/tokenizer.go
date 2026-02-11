@@ -4,6 +4,7 @@
 package internal
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -72,11 +73,11 @@ const (
 type Tokenizer struct {
 	scanner scanner.Scanner
 	peeked  Token
+	ctx     context.Context
 }
 
-func NewTokenizer(body io.Reader) *Tokenizer {
+func NewTokenizer() *Tokenizer {
 	s := scanner.Scanner{}
-	s.Init(body)
 
 	s.Mode = scanner.ScanIdents | scanner.ScanChars |
 		scanner.ScanInts | scanner.ScanStrings | scanner.SkipComments
@@ -95,6 +96,12 @@ func NewTokenizer(body io.Reader) *Tokenizer {
 		scanner: s,
 		peeked:  EmptyToken,
 	}
+}
+
+func (s *Tokenizer) Reset(ctx context.Context, body io.Reader) {
+	s.scanner.Init(body)
+	s.peeked = EmptyToken
+	s.ctx = ctx
 }
 
 // Tokens returns an iterator over the source and yields an EOF error when out
@@ -135,6 +142,11 @@ func (s *Tokenizer) Next() (Token, error) {
 
 // next pulls the next token but without handling previous Peek calls
 func (s *Tokenizer) next() (Token, error) {
+	select {
+	case <-s.ctx.Done():
+		return EmptyToken, s.ctx.Err()
+	default:
+	}
 
 	tok := s.scanner.Scan()
 	if tok == scanner.EOF {

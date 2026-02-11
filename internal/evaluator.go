@@ -4,6 +4,7 @@
 package internal
 
 import (
+	"context"
 	"io"
 	"strings"
 )
@@ -17,7 +18,8 @@ type Config struct {
 
 func Evaluate(compiler *Compiler, src string, env map[string]Value, cwd string) (Value, error) {
 	body := strings.NewReader(src)
-	tokenizer := NewTokenizer(body)
+	tokenizer := NewTokenizer()
+	tokenizer.Reset(context.TODO(), body)
 	chunk, err := compiler.Compile(tokenizer)
 	if err != nil {
 		return NoValue, err
