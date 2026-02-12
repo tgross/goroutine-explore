@@ -12,7 +12,8 @@ import (
 	"sort"
 )
 
-func listDir(w *Writer) error {
+func opCommandListDir(vm *VM, _ OpCode, _ uint) error {
+	w := vm.wOut
 	wd, err := os.Getwd()
 	if err != nil {
 		return err

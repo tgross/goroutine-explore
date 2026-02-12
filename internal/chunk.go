@@ -78,7 +78,7 @@ func (code Op) String() string {
 const (
 	OpCodeNoop OpCode = iota
 
-	// loads (TODO: should we have a single untyped load op?)
+	// loads
 	OpCodeLoadGoroutineDump
 	OpCodeLoadFieldAccessor
 	OpCodeLoadNumber
@@ -96,18 +96,17 @@ const (
 
 	// comparisons
 	OpCodeContains
-	OpCodeEqual
-	OpCodeGreater
-	OpCodeGreaterEqual // TODO: split into multiple op codes?
-	OpCodeLess
-	OpCodeLessEqual // TODO: split into multiple op codes?
-	OpCodeNotEqual  // TODO: split into multiple op codes?
+	OpCodeEqual        // opComparison
+	OpCodeGreater      // opComparison
+	OpCodeGreaterEqual // opComparison
+	OpCodeLess         // opComparison
+	OpCodeLessEqual    // opComparison
+	OpCodeNotEqual     // opComparison
 
 	// control flow
-	OpCodeJumpIfFalse
-	OpCodeJumpIfTrue
+	OpCodeJumpIfFalse // opConditionalJump
+	OpCodeJumpIfTrue  // opConditionalJump
 	OpCodeJumpTo
-	OpCodePipe
 
 	// functions
 	OpCodeFuncDiff

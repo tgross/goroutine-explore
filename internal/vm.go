@@ -99,11 +99,8 @@ func (vm *VM) Env(key string) (Value, error) {
 	return val, nil
 }
 
-// type dispatchFn func(*VM, OpCode, uint) error
-
-// var jumpTable = [37]dispatchFn{
-// 	// TODO: one dispatchFn per OpCode
-// }
+//go:generate go run ../tools/jumptable chunk.go jumptable.go
+type dispatchFn func(*VM, OpCode, uint) error
 
 func (vm *VM) Run(ctx context.Context) error {
 	for {
@@ -122,100 +119,13 @@ func (vm *VM) Run(ctx context.Context) error {
 		if err != nil {
 			break // only error this returns is EOF
 		}
+
 		instruction, operand := op.decode()
-		switch instruction {
-		case OpCodeLoadNumber:
-			err = loadNumber(vm, instruction, operand)
-
-		case OpCodeLoadString:
-			err = loadString(vm, instruction, operand)
-
-		case OpCodeGreater, OpCodeGreaterEqual,
-			OpCodeLess, OpCodeLessEqual,
-			OpCodeEqual, OpCodeNotEqual:
-			err = comparison(vm, instruction, operand)
-
-		case OpCodeContains:
-			err = contains(vm, instruction, operand)
-
-		case OpCodeTempDump:
-			err = tempDump(vm, instruction, operand)
-
-		case OpCodePushDump:
-			err = loadDumpFromRegister(vm, instruction, operand)
-
-		case OpCodeNextGoroutine:
-			err = handleNextGoroutine(vm, instruction, operand)
-
-		case OpCodeJumpTo:
-			err = handleJumpTo(vm, instruction, operand)
-
-		case OpCodeJumpIfTrue:
-			err = handleConditionalJump(vm, instruction, operand)
-
-		case OpCodeJumpIfFalse:
-			err = handleConditionalJump(vm, instruction, operand)
-
-		case OpCodeAssignment:
-			err = handleAssignment(vm, instruction, operand)
-
-		case OpCodeLoadGoroutineDump:
-			err = loadDump(vm, instruction, operand)
-
-		case OpCodeAddGoroutine:
-			err = addGoroutine(vm, instruction, operand)
-
-		case OpCodeLoadFieldAccessor:
-			err = handleFieldAccessor(vm, instruction, operand)
-
-		case OpCodePushBool:
-			err = pushBool(vm, instruction, operand)
-
-		case OpCodeCommandChangeDir:
-			err = commandChangeDir(vm, instruction, operand)
-
-		case OpCodeCommandEmpty:
-			err = commandEmpty(vm, instruction, operand)
-
-		case OpCodeCommandGetWorkingDir:
-			err = commandGetWorkDir(vm, instruction, operand)
-
-		case OpCodeCommandQuit:
-			err = commandQuit(vm, instruction, operand)
-
-		case OpCodeCommandHelp:
-			err = commandHelp(vm, instruction, operand)
-
-		case OpCodeCommandListDir:
-			return listDir(vm.wOut)
-
-		case OpCodeCommandVars:
-			err = commandVars(vm, instruction, operand)
-
-		case OpCodeCommandSetPragma:
-			err = commandSetPragma(vm, instruction, operand)
-
-		case OpCodeFuncUnion:
-			err = handleUnion(vm, instruction, operand)
-
-		case OpCodeFuncDiff:
-			err = handleDiff(vm, instruction, operand)
-
-		case OpCodeFuncIntersect:
-			err = handleIntersect(vm, instruction, operand)
-
-		case OpCodeFuncShowDump:
-			err = handleShow(vm, instruction, operand)
-
-		case OpCodeFuncLoad:
-			err = handleLoad(vm, instruction, operand)
-
-		case OpCodeFuncSave:
-			err = handleSave(vm, instruction, operand)
-
-		default:
+		if int(instruction) > len(jumpTable) {
 			return fmt.Errorf("%w %s", ErrNoSuchOpCode, instruction)
 		}
+
+		err = jumpTable[instruction](vm, instruction, operand)
 		if err != nil {
 			return err
 		}
@@ -266,7 +176,9 @@ var (
 	ErrCommandOk   = errors.New("command ok")
 )
 
-func comparison(vm *VM, instruction OpCode, _ uint) error {
+func opNoop(_ *VM, _ OpCode, _ uint) error { return nil }
+
+func opComparison(vm *VM, instruction OpCode, _ uint) error {
 	right, err := vm.Pop()
 	if err != nil {
 		return err
@@ -313,7 +225,7 @@ func compare[T ordered](left, right T, instruction OpCode) bool {
 	return false
 }
 
-func contains(vm *VM, instruction OpCode, _ uint) error {
+func opContains(vm *VM, instruction OpCode, _ uint) error {
 	right, err := vm.Pop()
 	if err != nil {
 		return err
@@ -364,7 +276,7 @@ func (vm *VM) peekDump() (*GoroutineDump, error) {
 	}
 }
 
-func loadNumber(vm *VM, _ OpCode, index uint) error {
+func opLoadNumber(vm *VM, _ OpCode, index uint) error {
 	con, err := vm.fetchConstant(index)
 	if err != nil {
 		return err
@@ -374,7 +286,7 @@ func loadNumber(vm *VM, _ OpCode, index uint) error {
 	return nil
 }
 
-func loadString(vm *VM, _ OpCode, index uint) error {
+func opLoadString(vm *VM, _ OpCode, index uint) error {
 	con, err := vm.fetchConstant(index)
 	if err != nil {
 		return err
@@ -404,7 +316,7 @@ func (vm *VM) fetchString(index uint) (string, error) {
 	return val, nil
 }
 
-func loadDump(vm *VM, _ OpCode, index uint) error {
+func opLoadGoroutineDump(vm *VM, _ OpCode, index uint) error {
 	name, err := vm.fetchString(index)
 	if err != nil {
 		return fmt.Errorf("%w: expected name of a variable or constant", err)
@@ -445,7 +357,7 @@ func (vm *VM) newInvalidTypeErr(expected, got Tag) error {
 	return fmt.Errorf("%w: expected %s got %s", ErrInvalidType, expected, got)
 }
 
-func handleUnion(vm *VM, _ OpCode, _ uint) error {
+func opFuncUnion(vm *VM, _ OpCode, _ uint) error {
 
 	left, err := vm.popDump()
 	if err != nil {
@@ -470,7 +382,7 @@ func handleUnion(vm *VM, _ OpCode, _ uint) error {
 	return nil
 }
 
-func handleIntersect(vm *VM, _ OpCode, _ uint) error {
+func opFuncIntersect(vm *VM, _ OpCode, _ uint) error {
 	left, err := vm.popDump()
 	if err != nil {
 		return err
@@ -491,7 +403,7 @@ func handleIntersect(vm *VM, _ OpCode, _ uint) error {
 	return nil
 }
 
-func handleDiff(vm *VM, _ OpCode, _ uint) error {
+func opFuncDiff(vm *VM, _ OpCode, _ uint) error {
 	inRight, err := vm.popDump()
 	if err != nil {
 		return err
@@ -533,7 +445,7 @@ func handleDiff(vm *VM, _ OpCode, _ uint) error {
 	return nil
 }
 
-func handleFieldAccessor(vm *VM, _ OpCode, index uint) error {
+func opLoadFieldAccessor(vm *VM, _ OpCode, index uint) error {
 	name, err := vm.fetchString(index)
 	if err != nil {
 		return fmt.Errorf("%w: expected name field", err)
@@ -561,7 +473,7 @@ func handleFieldAccessor(vm *VM, _ OpCode, index uint) error {
 	return nil
 }
 
-func addGoroutine(vm *VM, _ OpCode, _ uint) error {
+func opAddGoroutine(vm *VM, _ OpCode, _ uint) error {
 	vm.regDumpDst.Add(vm.regGoroutine)
 	return nil
 }
@@ -573,7 +485,7 @@ func addGoroutine(vm *VM, _ OpCode, _ uint) error {
 // - goroutine
 // OR (when complete)
 // - dump
-func handleNextGoroutine(vm *VM, _ OpCode, addr uint) error {
+func opNextGoroutine(vm *VM, _ OpCode, addr uint) error {
 	var dump *GoroutineDump
 
 	val, err := vm.Peek()
@@ -625,12 +537,12 @@ func handleNextGoroutine(vm *VM, _ OpCode, addr uint) error {
 	return nil
 }
 
-func tempDump(vm *VM, _ OpCode, _ uint) error {
+func opTempDump(vm *VM, _ OpCode, _ uint) error {
 	vm.regDumpDst = NewGoroutineDump()
 	return nil
 }
 
-func loadDumpFromRegister(vm *VM, _ OpCode, _ uint) error {
+func opPushDump(vm *VM, _ OpCode, _ uint) error {
 	vm.pushDump(vm.regDumpDst)
 	return nil
 }
@@ -643,14 +555,14 @@ func (vm *VM) pushDump(dump *GoroutineDump) {
 	})
 }
 
-func pushBool(vm *VM, _ OpCode, operand uint) error {
+func opPushBool(vm *VM, _ OpCode, operand uint) error {
 	vm.Push(Value{Tag: TagBool, Data: operand == 1})
 	return nil
 }
 
-// handleAssignment writes the object at the top of the stack to the
+// opAssignment writes the object at the top of the stack to the
 // environment, but leaves it on the stack
-func handleAssignment(vm *VM, _ OpCode, index uint) error {
+func opAssignment(vm *VM, _ OpCode, index uint) error {
 	con, err := vm.fetchConstant(index)
 	if err != nil {
 		return err
@@ -732,7 +644,7 @@ func (vm *VM) handleMultiAssignment(m MultiAssignment) error {
 	return nil
 }
 
-func handleConditionalJump(vm *VM, instruction OpCode, addr uint) error {
+func opConditionalJump(vm *VM, instruction OpCode, addr uint) error {
 	val, err := vm.popBool()
 	if err != nil {
 		return fmt.Errorf("%w conditional jump", err)
@@ -743,17 +655,17 @@ func handleConditionalJump(vm *VM, instruction OpCode, addr uint) error {
 	return nil
 }
 
-func handleJumpTo(vm *VM, _ OpCode, addr uint) error {
+func opJumpTo(vm *VM, _ OpCode, addr uint) error {
 	vm.ip = int(addr) - 1
 	return nil
 }
 
-func commandGetWorkDir(vm *VM, _ OpCode, _ uint) error {
+func opCommandGetWorkingDir(vm *VM, _ OpCode, _ uint) error {
 	fmt.Fprint(vm.wOut, vm.cwd+"\n") //nolint:errcheck
 	return nil
 }
 
-func commandChangeDir(vm *VM, _ OpCode, index uint) error {
+func opCommandChangeDir(vm *VM, _ OpCode, index uint) error {
 	con, err := vm.fetchConstant(index)
 	if err != nil {
 		return err
@@ -777,16 +689,16 @@ func commandChangeDir(vm *VM, _ OpCode, index uint) error {
 	return ErrCommandOk
 }
 
-func commandEmpty(vm *VM, _ OpCode, _ uint) error {
+func opCommandEmpty(vm *VM, _ OpCode, _ uint) error {
 	vm.env = map[string]Value{}
 	return ErrCommandOk
 }
 
-func commandQuit(_ *VM, _ OpCode, _ uint) error {
+func opCommandQuit(_ *VM, _ OpCode, _ uint) error {
 	return ErrCommandQuit
 }
 
-func commandHelp(vm *VM, _ OpCode, index uint) error {
+func opCommandHelp(vm *VM, _ OpCode, index uint) error {
 	// TODO: what about when we have no topic?
 	con, err := vm.fetchConstant(index)
 	if err != nil {
@@ -802,7 +714,39 @@ func commandHelp(vm *VM, _ OpCode, index uint) error {
 	return ErrCommandOk
 }
 
-func commandSetPragma(vm *VM, _ OpCode, _ uint) error {
+func opCommandGetPragma(vm *VM, _ OpCode, _ uint) error {
+	setting, err := vm.popString()
+	if err != nil {
+		return err
+	}
+
+	switch setting {
+	case "empty.confirm":
+		fmt.Fprintf(vm.wOut, "%v\n", vm.pragma.EmptyConfirm)
+	case "exit.confirm":
+		fmt.Fprintf(vm.wOut, "%v\n", vm.pragma.ExitConfirm)
+	case "show.color":
+		fmt.Fprintf(vm.wOut, "%v\n", vm.pragma.ShowColor)
+	case "show.count":
+		fmt.Fprintf(vm.wOut, "%v\n", vm.pragma.ShowCount)
+	case "ls.format":
+		fmt.Fprintf(vm.wOut, "%s\n", vm.pragma.ListFormat)
+	case "show.dedup":
+		fmt.Fprintf(vm.wOut, "%s\n", vm.pragma.ShowDedup)
+	case "vars.display":
+		fmt.Fprintf(vm.wOut, "%s\n", vm.pragma.VarsDisplay)
+	default:
+		return fmt.Errorf("%w pragma.%s", ErrNoSuchPragma, setting)
+	}
+	if err != nil {
+		return err
+	}
+
+	return ErrCommandOk
+
+}
+
+func opCommandSetPragma(vm *VM, _ OpCode, _ uint) error {
 	setting, err := vm.popString()
 	if err != nil {
 		return err
@@ -846,7 +790,7 @@ func popAndSet[T any](vm *VM, setting *T) error {
 	return nil
 }
 
-func commandVars(vm *VM, _ OpCode, _ uint) error {
+func opCommandVars(vm *VM, _ OpCode, _ uint) error {
 	vars := slices.Collect(maps.Keys(vm.env))
 	sort.Strings(vars)
 
@@ -930,7 +874,7 @@ func (vm *VM) popNumber() (int, error) {
 	return arg, nil
 }
 
-func handleLoad(vm *VM, _ OpCode, _ uint) error {
+func opFuncLoad(vm *VM, _ OpCode, _ uint) error {
 	path, err := vm.popString()
 	if err != nil {
 		return err
@@ -943,7 +887,7 @@ func handleLoad(vm *VM, _ OpCode, _ uint) error {
 	return nil
 }
 
-func handleSave(vm *VM, _ OpCode, _ uint) error {
+func opFuncSave(vm *VM, _ OpCode, _ uint) error {
 	path, err := vm.popString()
 	if err != nil {
 		return err
@@ -956,7 +900,7 @@ func handleSave(vm *VM, _ OpCode, _ uint) error {
 	return dump.Save(path)
 }
 
-func handleShow(vm *VM, _ OpCode, _ uint) error {
+func opFuncShowDump(vm *VM, _ OpCode, _ uint) error {
 	limit, err := vm.popNumber()
 	if err != nil {
 		return err

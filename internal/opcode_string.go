@@ -29,27 +29,26 @@ func _() {
 	_ = x[OpCodeJumpIfFalse-18]
 	_ = x[OpCodeJumpIfTrue-19]
 	_ = x[OpCodeJumpTo-20]
-	_ = x[OpCodePipe-21]
-	_ = x[OpCodeFuncDiff-22]
-	_ = x[OpCodeFuncIntersect-23]
-	_ = x[OpCodeFuncLoad-24]
-	_ = x[OpCodeFuncSave-25]
-	_ = x[OpCodeFuncShowDump-26]
-	_ = x[OpCodeFuncUnion-27]
-	_ = x[OpCodeCommandChangeDir-28]
-	_ = x[OpCodeCommandEmpty-29]
-	_ = x[OpCodeCommandGetWorkingDir-30]
-	_ = x[OpCodeCommandHelp-31]
-	_ = x[OpCodeCommandListDir-32]
-	_ = x[OpCodeCommandQuit-33]
-	_ = x[OpCodeCommandVars-34]
-	_ = x[OpCodeCommandSetPragma-35]
-	_ = x[OpCodeCommandGetPragma-36]
+	_ = x[OpCodeFuncDiff-21]
+	_ = x[OpCodeFuncIntersect-22]
+	_ = x[OpCodeFuncLoad-23]
+	_ = x[OpCodeFuncSave-24]
+	_ = x[OpCodeFuncShowDump-25]
+	_ = x[OpCodeFuncUnion-26]
+	_ = x[OpCodeCommandChangeDir-27]
+	_ = x[OpCodeCommandEmpty-28]
+	_ = x[OpCodeCommandGetWorkingDir-29]
+	_ = x[OpCodeCommandHelp-30]
+	_ = x[OpCodeCommandListDir-31]
+	_ = x[OpCodeCommandQuit-32]
+	_ = x[OpCodeCommandVars-33]
+	_ = x[OpCodeCommandSetPragma-34]
+	_ = x[OpCodeCommandGetPragma-35]
 }
 
-const _OpCode_name = "OpCodeNoopOpCodeLoadGoroutineDumpOpCodeLoadFieldAccessorOpCodeLoadNumberOpCodeLoadStringOpCodeAssignmentOpCodePushBoolOpCodePushDumpOpCodeAddGoroutineOpCodeNextGoroutineOpCodeTempDumpOpCodeContainsOpCodeEqualOpCodeGreaterOpCodeGreaterEqualOpCodeLessOpCodeLessEqualOpCodeNotEqualOpCodeJumpIfFalseOpCodeJumpIfTrueOpCodeJumpToOpCodePipeOpCodeFuncDiffOpCodeFuncIntersectOpCodeFuncLoadOpCodeFuncSaveOpCodeFuncShowDumpOpCodeFuncUnionOpCodeCommandChangeDirOpCodeCommandEmptyOpCodeCommandGetWorkingDirOpCodeCommandHelpOpCodeCommandListDirOpCodeCommandQuitOpCodeCommandVarsOpCodeCommandSetPragmaOpCodeCommandGetPragma"
+const _OpCode_name = "OpCodeNoopOpCodeLoadGoroutineDumpOpCodeLoadFieldAccessorOpCodeLoadNumberOpCodeLoadStringOpCodeAssignmentOpCodePushBoolOpCodePushDumpOpCodeAddGoroutineOpCodeNextGoroutineOpCodeTempDumpOpCodeContainsOpCodeEqualOpCodeGreaterOpCodeGreaterEqualOpCodeLessOpCodeLessEqualOpCodeNotEqualOpCodeJumpIfFalseOpCodeJumpIfTrueOpCodeJumpToOpCodeFuncDiffOpCodeFuncIntersectOpCodeFuncLoadOpCodeFuncSaveOpCodeFuncShowDumpOpCodeFuncUnionOpCodeCommandChangeDirOpCodeCommandEmptyOpCodeCommandGetWorkingDirOpCodeCommandHelpOpCodeCommandListDirOpCodeCommandQuitOpCodeCommandVarsOpCodeCommandSetPragmaOpCodeCommandGetPragma"
 
-var _OpCode_index = [...]uint16{0, 10, 33, 56, 72, 88, 104, 118, 132, 150, 169, 183, 197, 208, 221, 239, 249, 264, 278, 295, 311, 323, 333, 347, 366, 380, 394, 412, 427, 449, 467, 493, 510, 530, 547, 564, 586, 608}
+var _OpCode_index = [...]uint16{0, 10, 33, 56, 72, 88, 104, 118, 132, 150, 169, 183, 197, 208, 221, 239, 249, 264, 278, 295, 311, 323, 337, 356, 370, 384, 402, 417, 439, 457, 483, 500, 520, 537, 554, 576, 598}
 
 func (i OpCode) String() string {
 	idx := int(i) - 0
