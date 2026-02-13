@@ -55,50 +55,6 @@ func (vm *VM) Reset(chunk *Chunk) {
 	vm.gas = defaultGas
 }
 
-func (vm *VM) readByte() (Op, error) {
-	vm.ip++
-	if vm.ip >= len(vm.chunk.ops) {
-		return 0, ErrEOF
-	}
-	op := vm.chunk.ops[vm.ip]
-	return op, nil
-}
-
-func (vm *VM) Peek() (Value, error) {
-	return vm.peekN(1)
-}
-
-func (vm *VM) peekN(i int) (Value, error) {
-	if len(vm.stack) == 0 {
-		return NoValue, ErrEmptyStack
-	}
-	return vm.stack[len(vm.stack)-i], nil
-}
-
-func (vm *VM) Push(val Value) {
-	if len(vm.stack) >= vm.pragma.StackSize {
-		panic(ErrOutOfStackBounds)
-	}
-	vm.stack = append(vm.stack, val)
-}
-
-func (vm *VM) Pop() (Value, error) {
-	if len(vm.stack) == 0 {
-		return NoValue, ErrEmptyStack
-	}
-	val := vm.stack[len(vm.stack)-1]
-	vm.stack = vm.stack[:len(vm.stack)-1]
-	return val, nil
-}
-
-func (vm *VM) Env(key string) (Value, error) {
-	val, ok := vm.env[key]
-	if !ok {
-		return NoValue, fmt.Errorf("%w %q", ErrNoSuchEnv, key)
-	}
-	return val, nil
-}
-
 //go:generate go run ../tools/jumptable chunk.go jumptable.go
 type dispatchFn func(*VM, OpCode, uint) error
 
@@ -115,7 +71,7 @@ func (vm *VM) Run(ctx context.Context) error {
 			return fmt.Errorf("%w (%d)", ErrOutOfGas, vm.pragma.Gas)
 		}
 
-		op, err := vm.readByte()
+		op, err := vm.nextOp()
 		if err != nil {
 			break // only error this returns is EOF
 		}
@@ -134,7 +90,7 @@ func (vm *VM) Run(ctx context.Context) error {
 
 	// TODO: would be nice to account for calls to show() so that summaries
 	// match the show() value, or just leave the summary off in that case
-	val, err := vm.Peek()
+	val, err := vm.peek()
 	if err == nil {
 		switch val.Tag {
 		case TagDump:
@@ -153,6 +109,61 @@ func (vm *VM) Run(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+func (vm *VM) nextOp() (Op, error) {
+	vm.ip++
+	if vm.ip >= len(vm.chunk.ops) {
+		return 0, ErrEOF
+	}
+	op := vm.chunk.ops[vm.ip]
+	return op, nil
+}
+
+func (vm *VM) peek() (Value, error) {
+	return vm.peekN(1)
+}
+
+func (vm *VM) peekN(i int) (Value, error) {
+	if len(vm.stack) == 0 {
+		return NoValue, ErrEmptyStack
+	}
+	return vm.stack[len(vm.stack)-i], nil
+}
+
+func (vm *VM) push(val Value) {
+	if len(vm.stack) >= vm.pragma.StackSize {
+		panic(ErrOutOfStackBounds)
+	}
+	vm.stack = append(vm.stack, val)
+}
+
+func (vm *VM) pop() (Value, error) {
+	if len(vm.stack) == 0 {
+		return NoValue, ErrEmptyStack
+	}
+	val := vm.stack[len(vm.stack)-1]
+	vm.stack = vm.stack[:len(vm.stack)-1]
+	return val, nil
+}
+
+func (vm *VM) debug() {
+	fmt.Printf("chunk (ip=%d)\n", vm.ip)
+	fmt.Println(vm.chunk.disassemble(vm.ip))
+
+	fmt.Printf("env\n")
+	for k, v := range vm.env {
+		fmt.Printf("  %s => %v\n", k, v)
+	}
+
+	fmt.Printf("stack\n")
+	for i := len(vm.stack) - 1; i >= 0; i-- {
+		fmt.Printf("  [%02d] %v\n", i, vm.stack[i])
+	}
+
+	fmt.Printf("registers\n")
+	fmt.Printf("  goroutine: %s\n", vm.regGoroutine.Debug())
+	fmt.Printf("  dstDump: %d\n", vm.regDumpDst.Len())
 }
 
 var (
@@ -179,11 +190,11 @@ var (
 func opNoop(_ *VM, _ OpCode, _ uint) error { return nil }
 
 func opComparison(vm *VM, instruction OpCode, _ uint) error {
-	right, err := vm.Pop()
+	right, err := vm.pop()
 	if err != nil {
 		return err
 	}
-	left, err := vm.Pop()
+	left, err := vm.pop()
 	if err != nil {
 		return err
 	}
@@ -199,7 +210,7 @@ func opComparison(vm *VM, instruction OpCode, _ uint) error {
 	case string:
 		val = compare(left.Data.(string), right.Data.(string), instruction)
 	}
-	vm.Push(Value{Tag: TagBool, Data: val})
+	vm.push(Value{Tag: TagBool, Data: val})
 	return nil
 }
 
@@ -226,11 +237,11 @@ func compare[T ordered](left, right T, instruction OpCode) bool {
 }
 
 func opContains(vm *VM, instruction OpCode, _ uint) error {
-	right, err := vm.Pop()
+	right, err := vm.pop()
 	if err != nil {
 		return err
 	}
-	left, err := vm.Pop()
+	left, err := vm.pop()
 	if err != nil {
 		return err
 	}
@@ -248,12 +259,12 @@ func opContains(vm *VM, instruction OpCode, _ uint) error {
 		// the other, I think?
 		return fmt.Errorf("%w: expected string for contains", ErrInvalidType)
 	}
-	vm.Push(Value{Tag: TagBool, Data: val})
+	vm.push(Value{Tag: TagBool, Data: val})
 	return nil
 }
 
 func (vm *VM) popDump() (*GoroutineDump, error) {
-	val, err := vm.Pop()
+	val, err := vm.pop()
 	if err != nil {
 		return nil, err
 	}
@@ -265,7 +276,7 @@ func (vm *VM) popDump() (*GoroutineDump, error) {
 }
 
 func (vm *VM) peekDump() (*GoroutineDump, error) {
-	val, err := vm.Peek()
+	val, err := vm.peek()
 	if err != nil {
 		return nil, err
 	}
@@ -282,7 +293,7 @@ func opLoadNumber(vm *VM, _ OpCode, index uint) error {
 		return err
 	}
 	num := con.(int)
-	vm.Push(Value{Tag: TagNumber, Data: num})
+	vm.push(Value{Tag: TagNumber, Data: num})
 	return nil
 }
 
@@ -292,7 +303,7 @@ func opLoadString(vm *VM, _ OpCode, index uint) error {
 		return err
 	}
 	str := con.(string)
-	vm.Push(Value{Tag: TagString, Data: str})
+	vm.push(Value{Tag: TagString, Data: str})
 	return nil
 }
 
@@ -329,27 +340,8 @@ func opLoadGoroutineDump(vm *VM, _ OpCode, index uint) error {
 	if val.Tag != TagDump {
 		return fmt.Errorf("%w: expected dump, got %s", ErrInvalidType, val.Tag)
 	}
-	vm.Push(val)
+	vm.push(val)
 	return nil
-}
-
-func (vm *VM) debug() {
-	fmt.Printf("chunk (ip=%d)\n", vm.ip)
-	fmt.Println(vm.chunk.disassemble(vm.ip))
-
-	fmt.Printf("env\n")
-	for k, v := range vm.env {
-		fmt.Printf("  %s => %v\n", k, v)
-	}
-
-	fmt.Printf("stack\n")
-	for i := len(vm.stack) - 1; i >= 0; i-- {
-		fmt.Printf("  [%02d] %v\n", i, vm.stack[i])
-	}
-
-	fmt.Printf("registers\n")
-	fmt.Printf("  goroutine: %s\n", vm.regGoroutine.Debug())
-	fmt.Printf("  dstDump: %d\n", vm.regDumpDst.Len())
 }
 
 func (vm *VM) newInvalidTypeErr(expected, got Tag) error {
@@ -434,7 +426,7 @@ func opFuncDiff(vm *VM, _ OpCode, _ uint) error {
 
 	// we push a Diff and not a stack of three values because we want to be able
 	// to return a single item off the stack when the VM exits
-	vm.Push(Value{
+	vm.push(Value{
 		Tag: TagDiff,
 		Data: &Diff{
 			Left:   left,
@@ -457,17 +449,17 @@ func opLoadFieldAccessor(vm *VM, _ OpCode, index uint) error {
 
 	switch name {
 	case "id", ".id":
-		vm.Push(Value{Tag: TagNumber, Data: g.ID})
+		vm.push(Value{Tag: TagNumber, Data: g.ID})
 	case "header", ".header":
-		vm.Push(Value{Tag: TagString, Data: g.Header})
+		vm.push(Value{Tag: TagString, Data: g.Header})
 	case "trace", ".trace":
-		vm.Push(Value{Tag: TagString, Data: g.Trace})
+		vm.push(Value{Tag: TagString, Data: g.Trace})
 	case "lines", ".lines":
-		vm.Push(Value{Tag: TagNumber, Data: g.LineCount})
+		vm.push(Value{Tag: TagNumber, Data: g.LineCount})
 	case "duration", ".duration":
-		vm.Push(Value{Tag: TagNumber, Data: g.Duration})
+		vm.push(Value{Tag: TagNumber, Data: g.Duration})
 	case "state", ".state":
-		vm.Push(Value{Tag: TagString, Data: g.State})
+		vm.push(Value{Tag: TagString, Data: g.State})
 	}
 
 	return nil
@@ -488,7 +480,7 @@ func opAddGoroutine(vm *VM, _ OpCode, _ uint) error {
 func opNextGoroutine(vm *VM, _ OpCode, addr uint) error {
 	var dump *GoroutineDump
 
-	val, err := vm.Peek()
+	val, err := vm.peek()
 	if err != nil {
 		return fmt.Errorf("%w: %v", ErrUnexpectedStackState, err)
 	}
@@ -501,11 +493,11 @@ func opNextGoroutine(vm *VM, _ OpCode, addr uint) error {
 	case TagGoroutine:
 		// subsequent calls: need to clean up the previous goroutine; this is
 		// how we track that we're in the middle of a loop
-		_, err = vm.Pop()
+		_, err = vm.pop()
 		if err != nil {
 			return fmt.Errorf("%w: %v", ErrUnexpectedStackState, err)
 		}
-		val, err = vm.Peek()
+		val, err = vm.peek()
 		if err != nil {
 			return fmt.Errorf("%w: %v", ErrUnexpectedStackState, err)
 		}
@@ -521,19 +513,19 @@ func opNextGoroutine(vm *VM, _ OpCode, addr uint) error {
 	if dump.Len() == 0 {
 		vm.ip = int(addr) - 1
 		vm.regGoroutine = nil
-		_, _ = vm.Pop() // we're done: pop the dump off the stack
+		_, _ = vm.pop() // we're done: pop the dump off the stack
 		return nil
 	}
 	g := dump.Next()
 	if g == nil {
 		vm.ip = int(addr) - 1
 		vm.regGoroutine = nil
-		_, _ = vm.Pop() // we're done: pop the dump off the stack
+		_, _ = vm.pop() // we're done: pop the dump off the stack
 		return nil
 	}
 
 	vm.regGoroutine = g
-	vm.Push(Value{Tag: TagGoroutine, Data: g})
+	vm.push(Value{Tag: TagGoroutine, Data: g})
 	return nil
 }
 
@@ -549,14 +541,14 @@ func opPushDump(vm *VM, _ OpCode, _ uint) error {
 
 func (vm *VM) pushDump(dump *GoroutineDump) {
 	dump.StartIter() // reset before we push it back onto the stack
-	vm.Push(Value{
+	vm.push(Value{
 		Tag:  TagDump,
 		Data: dump,
 	})
 }
 
 func opPushBool(vm *VM, _ OpCode, operand uint) error {
-	vm.Push(Value{Tag: TagBool, Data: operand == 1})
+	vm.push(Value{Tag: TagBool, Data: operand == 1})
 	return nil
 }
 
@@ -569,7 +561,7 @@ func opAssignment(vm *VM, _ OpCode, index uint) error {
 	}
 	switch target := con.(type) {
 	case string:
-		val, err := vm.Peek()
+		val, err := vm.peek()
 		if err != nil {
 			return err
 		}
@@ -601,7 +593,7 @@ func (vm *VM) assign(index int, val Value) error {
 
 func (vm *VM) handleMultiAssignment(m MultiAssignment) error {
 
-	top, err := vm.Peek()
+	top, err := vm.peek()
 	if err != nil {
 		return err
 	}
@@ -610,7 +602,7 @@ func (vm *VM) handleMultiAssignment(m MultiAssignment) error {
 		if len(m) != 3 {
 			return ErrExpectedDiffAssign
 		}
-		val, _ := vm.Peek()
+		val, _ := vm.peek()
 		diff, ok := val.Data.(*Diff)
 		if !ok {
 			t := reflect.TypeOf(val.Data)
@@ -778,7 +770,7 @@ func opCommandSetPragma(vm *VM, _ OpCode, _ uint) error {
 }
 
 func popAndSet[T any](vm *VM, setting *T) error {
-	raw, err := vm.Pop()
+	raw, err := vm.pop()
 	if err != nil {
 		return err
 	}
@@ -827,7 +819,7 @@ func opCommandVars(vm *VM, _ OpCode, _ uint) error {
 }
 
 func (vm *VM) popString() (string, error) {
-	val, err := vm.Pop()
+	val, err := vm.pop()
 	if err != nil {
 		return "", err
 	}
@@ -843,7 +835,7 @@ func (vm *VM) popString() (string, error) {
 }
 
 func (vm *VM) popBool() (bool, error) {
-	val, err := vm.Pop()
+	val, err := vm.pop()
 	if err != nil {
 		return false, err
 	}
@@ -859,7 +851,7 @@ func (vm *VM) popBool() (bool, error) {
 }
 
 func (vm *VM) popNumber() (int, error) {
-	val, err := vm.Pop()
+	val, err := vm.pop()
 	if err != nil {
 		return -1, err
 	}

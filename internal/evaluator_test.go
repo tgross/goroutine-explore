@@ -187,7 +187,7 @@ created by net/http.(*connReader).startBackgroundRead in goroutine 37
 				test.EqError(t, err, tc.expectErrMsg)
 			} else {
 				must.NoError(t, err)
-				got, _ := e.vm.Pop()
+				got, _ := e.vm.pop()
 				must.NotNil(t, got)
 				dump, ok := got.Data.(*GoroutineDump)
 				must.True(t, ok, must.Sprintf("did not return dump: %v", dump))
@@ -255,7 +255,7 @@ created by os/signal.Notify.func1.1 in goroutine 1
 	for b.Loop() {
 		err := e.Eval(ctx, src)
 		must.NoError(b, err)
-		got, err := e.vm.Pop()
+		got, err := e.vm.pop()
 		must.NoError(b, err)
 		dump, ok := got.Data.(*GoroutineDump)
 		must.True(b, ok, must.Sprintf("did not return dump: %v", dump))

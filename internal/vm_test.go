@@ -14,19 +14,19 @@ import (
 func TestVM_BasicStackOps(t *testing.T) {
 	vm := NewVM(&Config{WorkDir: t.TempDir()})
 
-	vm.Push(Value{Tag: TagNumber, Data: 1})
-	vm.Push(Value{Tag: TagNumber, Data: 2})
-	vm.Push(Value{Tag: TagNumber, Data: 3})
+	vm.push(Value{Tag: TagNumber, Data: 1})
+	vm.push(Value{Tag: TagNumber, Data: 2})
+	vm.push(Value{Tag: TagNumber, Data: 3})
 
-	val, err := vm.Peek()
+	val, err := vm.peek()
 	must.NoError(t, err)
 	must.Eq(t, 3, val.Data)
 
-	val, err = vm.Pop()
+	val, err = vm.pop()
 	must.NoError(t, err)
 	must.Eq(t, 3, val.Data)
 
-	val, err = vm.Peek()
+	val, err = vm.peek()
 	must.NoError(t, err)
 	must.Eq(t, 2, val.Data)
 }
@@ -68,7 +68,7 @@ func TestVM_SimpleWhere(t *testing.T) {
 	g1, ok := vm.env["g1"]
 	must.True(t, ok, must.Sprint("g1 was not written to env"))
 
-	result, _ := vm.Pop()
+	result, _ := vm.pop()
 	must.Eq(t, g1, result)
 
 	must.Eq(t, TagDump, g1.Tag)
@@ -243,7 +243,7 @@ func TestVM_BinaryExpression(t *testing.T) {
 			vm.debug()
 			must.NoError(t, err)
 
-			result, _ := vm.Pop()
+			result, _ := vm.pop()
 			must.Eq(t, TagDump, result.Tag)
 			g3, ok := result.Data.(*GoroutineDump)
 			must.True(t, ok)
