@@ -37,21 +37,21 @@ package internal
 // rebuild this table.
 var jumpTable = [%d]dispatchFn{
 	opNoop,
-`, len(matches)+1) //nolint:errcheck
+`, len(matches)+1)
 
 	for _, submatch := range matches {
 		if submatch[1] == "\tOpCodePatchPlaceholder" {
 			continue
 		}
 		if submatch[3] != "" {
-			fmt.Fprintf(dst, "\t%s,\n", submatch[3]) //nolint:errcheck
+			fmt.Fprintf(dst, "\t%s,\n", submatch[3])
 		} else {
 			suffix := strings.TrimPrefix(
 				strings.TrimSpace(submatch[1]), "OpCode")
-			fmt.Fprintf(dst, "\top%s,\n", suffix) //nolint:errcheck
+			fmt.Fprintf(dst, "\top%s,\n", suffix)
 		}
 	}
-	fmt.Fprintln(dst, "}") //nolint:errcheck
+	fmt.Fprintln(dst, "}")
 	return nil
 }
 

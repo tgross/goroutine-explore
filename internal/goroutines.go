@@ -104,9 +104,9 @@ func (gd *GoroutineDump) Show(w *Writer, limit, offset int) {
 
 func (gd *GoroutineDump) Summary(w *Writer, name string) {
 	if name != "" {
-		fmt.Fprintf(w, "# of goroutines in %q: %d\n", name, len(gd.goroutines)) //nolint:errcheck
+		fmt.Fprintf(w, "# of goroutines in %q: %d\n", name, len(gd.goroutines))
 	} else {
-		fmt.Fprintf(w, "# of goroutines: %d\n", len(gd.goroutines)) //nolint:errcheck
+		fmt.Fprintf(w, "# of goroutines: %d\n", len(gd.goroutines))
 	}
 
 	stats := map[string]int{}
@@ -117,10 +117,10 @@ func (gd *GoroutineDump) Summary(w *Writer, name string) {
 		states := slices.Collect(maps.Keys(stats))
 		sort.Strings(states)
 		for _, k := range states {
-			fmt.Fprintf(w, "%15s: %d\n", k, stats[k]) //nolint:errcheck
+			fmt.Fprintf(w, "%15s: %d\n", k, stats[k])
 		}
 	}
-	fmt.Fprintln(w, "") //nolint:errcheck
+	fmt.Fprintln(w, "")
 }
 
 // Save saves the goroutine dump to the given file.
@@ -218,10 +218,10 @@ func (g *Goroutine) AddLine(l string) {
 			fl := parts[0]
 
 			h := md5.New()
-			fmt.Fprint(h, fl) //nolint:errcheck
+			fmt.Fprint(h, fl)
 			g.lineMd5 = append(g.lineMd5, string(h.Sum(nil)))
 
-			fmt.Fprint(g.fullHasher, fl) //nolint:errcheck
+			fmt.Fprint(g.fullHasher, fl)
 		}
 	}
 }
@@ -238,8 +238,6 @@ func (g *Goroutine) Freeze() {
 }
 
 // PrintWithColor outputs the goroutine details to stdout with color.
-//
-//nolint:errcheck
 func (g Goroutine) Print(w *Writer) {
 	fmt.Fprint(w.blue(), g.Header)
 	if len(g.Duplicates) > 0 {

@@ -68,47 +68,47 @@ func TestTokenizer_CommandArgs(t *testing.T) {
 		{
 			src: `pragma.show.dedup = number`,
 			expect: []Token{
-				Token{TokenPragma, `pragma`, scanner.Position{
+				{TokenPragma, `pragma`, scanner.Position{
 					Filename: "", Offset: 0, Line: 1, Column: 1}},
-				Token{TokenMethod, `show`, scanner.Position{
+				{TokenMethod, `show`, scanner.Position{
 					Filename: "", Offset: 6, Line: 1, Column: 7}},
-				Token{TokenFieldAccessor, `.dedup`, scanner.Position{
+				{TokenFieldAccessor, `.dedup`, scanner.Position{
 					Filename: "", Offset: 11, Line: 1, Column: 12}},
-				Token{TokenAssign, `=`, scanner.Position{
+				{TokenAssign, `=`, scanner.Position{
 					Filename: "", Offset: 18, Line: 1, Column: 19}},
-				Token{TokenIdentifier, `number`, scanner.Position{
+				{TokenIdentifier, `number`, scanner.Position{
 					Filename: "", Offset: 20, Line: 1, Column: 21}},
 			},
 		},
 		{
 			src: `cd("/foo/bar")`,
 			expect: []Token{
-				Token{TokenCommand, `cd`, scanner.Position{
+				{TokenCommand, `cd`, scanner.Position{
 					Filename: "", Offset: 0, Line: 1, Column: 1}},
-				Token{TokenLeftParen, `(`, scanner.Position{
+				{TokenLeftParen, `(`, scanner.Position{
 					Filename: "", Offset: 2, Line: 1, Column: 3}},
-				Token{TokenString, `/foo/bar`, scanner.Position{
+				{TokenString, `/foo/bar`, scanner.Position{
 					Filename: "", Offset: 3, Line: 1, Column: 4}},
-				Token{TokenRightParen, `)`, scanner.Position{
+				{TokenRightParen, `)`, scanner.Position{
 					Filename: "", Offset: 13, Line: 1, Column: 14}},
 			},
 		},
 		{
 			src: `cd(/foo/bar)`,
 			expect: []Token{
-				Token{TokenCommand, `cd`, scanner.Position{
+				{TokenCommand, `cd`, scanner.Position{
 					Filename: "", Offset: 0, Line: 1, Column: 1}},
-				Token{TokenLeftParen, `(`, scanner.Position{
+				{TokenLeftParen, `(`, scanner.Position{
 					Filename: "", Offset: 2, Line: 1, Column: 3}},
-				Token{TokenSlash, `/`, scanner.Position{
+				{TokenSlash, `/`, scanner.Position{
 					Filename: "", Offset: 3, Line: 1, Column: 4}},
-				Token{TokenIdentifier, `foo`, scanner.Position{
+				{TokenIdentifier, `foo`, scanner.Position{
 					Filename: "", Offset: 4, Line: 1, Column: 5}},
-				Token{TokenSlash, `/`, scanner.Position{
+				{TokenSlash, `/`, scanner.Position{
 					Filename: "", Offset: 7, Line: 1, Column: 8}},
-				Token{TokenIdentifier, `bar`, scanner.Position{
+				{TokenIdentifier, `bar`, scanner.Position{
 					Filename: "", Offset: 8, Line: 1, Column: 9}},
-				Token{TokenRightParen, `)`, scanner.Position{
+				{TokenRightParen, `)`, scanner.Position{
 					Filename: "", Offset: 11, Line: 1, Column: 12}},
 			},
 		},

@@ -36,9 +36,9 @@ func opCommandListDir(vm *VM, _ OpCode, _ uint) error {
 
 	for _, fi := range fis {
 		if fi.IsDir() {
-			fmt.Fprintln(w.blue(), fi.Name()) //nolint:errcheck
+			fmt.Fprintln(w.blue(), fi.Name())
 		} else {
-			fmt.Fprintln(w, fi.Name()) //nolint:errcheck
+			fmt.Fprintln(w, fi.Name())
 		}
 	}
 	return nil

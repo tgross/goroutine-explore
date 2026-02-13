@@ -94,17 +94,42 @@ func (vm *VM) Run(ctx context.Context) error {
 	if err == nil {
 		switch val.Tag {
 		case TagDump:
-			val.Data.(*GoroutineDump).Summary(vm.wOut, "")
+			dump, ok := val.Data.(*GoroutineDump)
+			if !ok {
+				vm.debug()
+				return fmt.Errorf("%w: expected dump", ErrWrongTag)
+			}
+			dump.Summary(vm.wOut, "")
 		case TagDiff:
-			val.Data.(*Diff).Left.Summary(vm.wOut, "left")
-			val.Data.(*Diff).Right.Summary(vm.wOut, "right")
-			val.Data.(*Diff).Common.Summary(vm.wOut, "shared")
+			diff, ok := val.Data.(*Diff)
+			if !ok {
+				vm.debug()
+				return fmt.Errorf("%w: expected diff", ErrWrongTag)
+			}
+			diff.Left.Summary(vm.wOut, "left")
+			diff.Right.Summary(vm.wOut, "right")
+			diff.Common.Summary(vm.wOut, "shared")
 		case TagString:
-			fmt.Fprintln(vm.wOut, val.Data.(string)) //nolint:errcheck
+			s, ok := val.Data.(string)
+			if !ok {
+				vm.debug()
+				return fmt.Errorf("%w: expected string", ErrWrongTag)
+			}
+			fmt.Fprintln(vm.wOut, s)
 		case TagBool:
-			fmt.Fprintf(vm.wOut, "%v\n", val.Data.(bool)) //nolint:errcheck
+			b, ok := val.Data.(bool)
+			if !ok {
+				vm.debug()
+				return fmt.Errorf("%w: expected bool", ErrWrongTag)
+			}
+			fmt.Fprintf(vm.wOut, "%v\n", b)
 		case TagNumber:
-			fmt.Fprintf(vm.wOut, "%d\n", val.Data.(int)) //nolint:errcheck
+			num, ok := val.Data.(int)
+			if !ok {
+				vm.debug()
+				return fmt.Errorf("%w: expected number", ErrWrongTag)
+			}
+			fmt.Fprintf(vm.wOut, "%d\n", num)
 		}
 	}
 
@@ -173,6 +198,7 @@ var (
 	ErrUnexpectedRegisterState   = errors.New("unexpected register state")
 	ErrOutOfStackBounds          = errors.New("jump outside of stack bounds")
 	ErrInvalidType               = errors.New("invalid type for operation")
+	ErrWrongTag                  = errors.New("data had wrong tag for type")
 	ErrInvalidOpArg              = errors.New("invalid argument for operation")
 	ErrArgumentUnset             = errors.New("expected argument is unset")
 	ErrNoSuchOpCode              = errors.New("no such op code")
@@ -204,11 +230,19 @@ func opComparison(vm *VM, instruction OpCode, _ uint) error {
 	}
 
 	var val bool
-	switch left.Data.(type) {
+	switch left := left.Data.(type) {
 	case int:
-		val = compare(left.Data.(int), right.Data.(int), instruction)
+		if r, ok := right.Data.(int); ok {
+			val = compare(left, r, instruction)
+		} else {
+			return fmt.Errorf("%w: expected number", ErrWrongTag)
+		}
 	case string:
-		val = compare(left.Data.(string), right.Data.(string), instruction)
+		if r, ok := right.Data.(string); ok {
+			val = compare(left, r, instruction)
+		} else {
+			return fmt.Errorf("%w: expected number", ErrWrongTag)
+		}
 	}
 	vm.push(Value{Tag: TagBool, Data: val})
 	return nil
@@ -251,9 +285,13 @@ func opContains(vm *VM, instruction OpCode, _ uint) error {
 	}
 
 	var val bool
-	switch left.Data.(type) {
+	switch left := left.Data.(type) {
 	case string:
-		val = strings.Contains(left.Data.(string), right.Data.(string))
+		if r, ok := right.Data.(string); ok {
+			val = strings.Contains(left, r)
+		} else {
+			return fmt.Errorf("%w: expected string", ErrWrongTag)
+		}
 	default:
 		// TODO: actually needs to be a goroutine on one side and a string on
 		// the other, I think?
@@ -292,7 +330,11 @@ func opLoadNumber(vm *VM, _ OpCode, index uint) error {
 	if err != nil {
 		return err
 	}
-	num := con.(int)
+	num, ok := con.(int)
+	if !ok {
+		vm.debug()
+		return fmt.Errorf("%w: expected number", ErrInvalidType)
+	}
 	vm.push(Value{Tag: TagNumber, Data: num})
 	return nil
 }
@@ -302,7 +344,11 @@ func opLoadString(vm *VM, _ OpCode, index uint) error {
 	if err != nil {
 		return err
 	}
-	str := con.(string)
+	str, ok := con.(string)
+	if !ok {
+		vm.debug()
+		return fmt.Errorf("%w: expected string", ErrInvalidType)
+	}
 	vm.push(Value{Tag: TagString, Data: str})
 	return nil
 }
@@ -482,12 +528,16 @@ func opNextGoroutine(vm *VM, _ OpCode, addr uint) error {
 
 	val, err := vm.peek()
 	if err != nil {
-		return fmt.Errorf("%w: %v", ErrUnexpectedStackState, err)
+		return fmt.Errorf("%w: %w", ErrUnexpectedStackState, err)
 	}
 	switch val.Tag {
 	case TagDump:
 		// first call
-		dump = val.Data.(*GoroutineDump)
+		var ok bool
+		dump, ok = val.Data.(*GoroutineDump)
+		if !ok {
+			return fmt.Errorf("%w: expected dump", ErrWrongTag)
+		}
 		dump.StartIter()
 
 	case TagGoroutine:
@@ -495,16 +545,20 @@ func opNextGoroutine(vm *VM, _ OpCode, addr uint) error {
 		// how we track that we're in the middle of a loop
 		_, err = vm.pop()
 		if err != nil {
-			return fmt.Errorf("%w: %v", ErrUnexpectedStackState, err)
+			return fmt.Errorf("%w: %w", ErrUnexpectedStackState, err)
 		}
 		val, err = vm.peek()
 		if err != nil {
-			return fmt.Errorf("%w: %v", ErrUnexpectedStackState, err)
+			return fmt.Errorf("%w: %w", ErrUnexpectedStackState, err)
 		}
 		if val.Tag != TagDump {
 			return vm.newInvalidTypeErr(TagDump, val.Tag)
 		}
-		dump = val.Data.(*GoroutineDump)
+		var ok bool
+		dump, ok = val.Data.(*GoroutineDump)
+		if !ok {
+			return fmt.Errorf("%w: expected dump", ErrWrongTag)
+		}
 
 	default:
 		return fmt.Errorf("%w: expected either dump or previous goroutine on top of stack when iterating", ErrUnexpectedStackState)
@@ -606,7 +660,7 @@ func (vm *VM) handleMultiAssignment(m MultiAssignment) error {
 		diff, ok := val.Data.(*Diff)
 		if !ok {
 			t := reflect.TypeOf(val.Data)
-			return fmt.Errorf("%w: diff value was a %v", ErrInvalidType, t)
+			return fmt.Errorf("%w: diff value was a %v", ErrWrongTag, t)
 		}
 		err := vm.assign(m[0], Value{TagDump, diff.Left})
 		if err != nil {
@@ -653,7 +707,7 @@ func opJumpTo(vm *VM, _ OpCode, addr uint) error {
 }
 
 func opCommandGetWorkingDir(vm *VM, _ OpCode, _ uint) error {
-	fmt.Fprint(vm.wOut, vm.cwd+"\n") //nolint:errcheck
+	fmt.Fprint(vm.wOut, vm.cwd+"\n")
 	return nil
 }
 
@@ -702,7 +756,7 @@ func opCommandHelp(vm *VM, _ OpCode, index uint) error {
 	}
 
 	// TODO: lookup topic
-	fmt.Fprintf(vm.wOut, "help for topic: %s", topic) //nolint:errcheck
+	fmt.Fprintf(vm.wOut, "help for topic: %s", topic)
 	return ErrCommandOk
 }
 
@@ -793,7 +847,9 @@ func opCommandVars(vm *VM, _ OpCode, _ uint) error {
 			v := vm.env[name]
 			if v.Tag == TagDump {
 				if dump, ok := v.Data.(*GoroutineDump); ok {
-					fmt.Fprintf(vm.wOut, "%s: %d\n", name, dump.Len()) //nolint:errcheck
+					fmt.Fprintf(vm.wOut, "%s: %d\n", name, dump.Len())
+				} else {
+					return fmt.Errorf("%w: expected dump", ErrWrongTag)
 				}
 			}
 		}
@@ -803,12 +859,14 @@ func opCommandVars(vm *VM, _ OpCode, _ uint) error {
 			if v.Tag == TagDump {
 				if dump, ok := v.Data.(*GoroutineDump); ok {
 					dump.Summary(vm.wOut, name)
+				} else {
+					return fmt.Errorf("%w: expected dump", ErrWrongTag)
 				}
 			}
 		}
 	case PragmaDisplayNone:
 		out := strings.Join(vars, "\t")
-		fmt.Fprint(vm.wOut, out) //nolint:errcheck
+		fmt.Fprint(vm.wOut, out)
 	default:
 		return fmt.Errorf(
 			"%w %q: expected \"count\", \"summary\", or \"none\"",
@@ -828,8 +886,7 @@ func (vm *VM) popString() (string, error) {
 	}
 	arg, ok := val.Data.(string)
 	if !ok {
-		return "", fmt.Errorf(
-			"%w: expected string", ErrInvalidType)
+		return "", fmt.Errorf("%w: expected string", ErrWrongTag)
 	}
 	return arg, nil
 }
@@ -844,8 +901,7 @@ func (vm *VM) popBool() (bool, error) {
 	}
 	arg, ok := val.Data.(bool)
 	if !ok {
-		return false, fmt.Errorf(
-			"%w: expected bool", ErrInvalidType)
+		return false, fmt.Errorf("%w: expected bool", ErrWrongTag)
 	}
 	return arg, nil
 }
@@ -860,8 +916,7 @@ func (vm *VM) popNumber() (int, error) {
 	}
 	arg, ok := val.Data.(int)
 	if !ok {
-		return -1, fmt.Errorf(
-			"%w: expected number", ErrInvalidType)
+		return -1, fmt.Errorf("%w: expected number", ErrWrongTag)
 	}
 	return arg, nil
 }

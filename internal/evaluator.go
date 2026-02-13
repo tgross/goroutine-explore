@@ -74,7 +74,7 @@ func (e *Evaluator) Eval(ctx context.Context, src string) error {
 			return nil
 		}
 		// TODO: we want this to include location feedback, etc.
-		fmt.Fprint(e.stderr.red(), err.Error()) //nolint:errcheck
+		fmt.Fprint(e.stderr.red(), err.Error())
 		return err
 	}
 
@@ -90,7 +90,7 @@ func (e *Evaluator) Eval(ctx context.Context, src string) error {
 			err = nil
 		default:
 			// TODO: we want this to include rich diagnostic feedback
-			fmt.Fprintln(e.stderr.red(), err.Error()) //nolint:errcheck
+			fmt.Fprintln(e.stderr.red(), err.Error())
 		}
 		e.vm.env = oldEnv
 		return err

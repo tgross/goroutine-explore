@@ -1,0 +1,20 @@
+version: '2'
+linters:
+  enable:
+    - errorlint
+  settings:
+    errcheck:
+      check-type-assertions: true
+      disable-default-exclusions: false
+      verbose: true
+      exclude-functions:
+        - fmt.Fprint
+        - fmt.Fprintf
+        - fmt.Fprintln
+formatters:
+  enable:
+    - goimports
+    - gofmt
+  settings:
+    gofmt:
+      simple: true

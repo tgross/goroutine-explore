@@ -345,7 +345,8 @@ func TestCompiler_Paths(t *testing.T) {
 
 			fmt.Println(chunk.disassemble(0))
 			must.Eq(t, tc.expect, chunk.ops)
-			must.Eq(t, tc.expectPath, chunk.constants[0].(string))
+			must.Eq(t, tc.expectPath,
+				chunk.constants[0].(string)) //nolint:errcheck
 		})
 	}
 }
@@ -442,10 +443,12 @@ func TestCompiler_Show(t *testing.T) {
 			must.Len(t, 4, chunk.ops)
 
 			_, operand := chunk.ops[1].decode()
-			must.Eq(t, tc.expectLimit, chunk.constants[operand].(int))
+			must.Eq(t, tc.expectLimit,
+				chunk.constants[operand].(int)) //nolint:errcheck
 
 			_, operand = chunk.ops[2].decode()
-			must.Eq(t, tc.expectOffset, chunk.constants[operand].(int))
+			must.Eq(t, tc.expectOffset,
+				chunk.constants[operand].(int)) //nolint:errcheck
 		})
 	}
 
@@ -505,7 +508,8 @@ func TestCompiler_Pragma(t *testing.T) {
 			fmt.Println(chunk.disassemble(0))
 
 			_, operand := chunk.ops[1].decode()
-			must.Eq(t, tc.expectSetting, chunk.constants[operand].(string))
+			must.Eq(t, tc.expectSetting,
+				chunk.constants[operand].(string)) //nolint:errcheck
 
 			if tc.expectValue == Op(OpCodeNoop) {
 				must.Len(t, 2, chunk.ops)
