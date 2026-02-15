@@ -172,6 +172,40 @@ func (vm *VM) pop() (Value, error) {
 	return val, nil
 }
 
+func (vm *VM) popDump() (*GoroutineDump, error) {
+	return popExpect[*GoroutineDump](vm, TagDump)
+}
+
+func (vm *VM) popNumber() (int, error) {
+	return popExpect[int](vm, TagNumber)
+}
+
+func (vm *VM) popString() (string, error) {
+	return popExpect[string](vm, TagString)
+}
+
+func (vm *VM) popBool() (bool, error) {
+	return popExpect[bool](vm, TagBool)
+}
+
+func popExpect[T any](vm *VM, tag Tag) (T, error) {
+	var zero T
+	val, err := vm.pop()
+	if err != nil {
+		return zero, err
+	}
+	if val.Tag != tag {
+		return zero, fmt.Errorf("%w: expected %s", ErrInvalidType, tag)
+	}
+	data, ok := val.Data.(T)
+	if !ok {
+		// arguably this should panic because this state isn't really
+		// recoverable but let's wait until we've stabilized this first
+		return zero, fmt.Errorf("%w: expected %s", ErrWrongTag, tag)
+	}
+	return data, nil
+}
+
 func (vm *VM) debug() {
 	fmt.Printf("chunk (ip=%d)\n", vm.ip)
 	fmt.Println(vm.chunk.disassemble(vm.ip))
@@ -299,18 +333,6 @@ func opContains(vm *VM, instruction OpCode, _ uint) error {
 	}
 	vm.push(Value{Tag: TagBool, Data: val})
 	return nil
-}
-
-func (vm *VM) popDump() (*GoroutineDump, error) {
-	val, err := vm.pop()
-	if err != nil {
-		return nil, err
-	}
-	if b, ok := val.Data.(*GoroutineDump); !ok {
-		return nil, fmt.Errorf("%w: expected a goroutine dump", ErrInvalidType)
-	} else {
-		return b, nil
-	}
 }
 
 func (vm *VM) peekDump() (*GoroutineDump, error) {
@@ -874,51 +896,6 @@ func opCommandVars(vm *VM, _ OpCode, _ uint) error {
 	}
 
 	return ErrCommandOk
-}
-
-func (vm *VM) popString() (string, error) {
-	val, err := vm.pop()
-	if err != nil {
-		return "", err
-	}
-	if val.Tag != TagString {
-		return "", ErrInvalidType
-	}
-	arg, ok := val.Data.(string)
-	if !ok {
-		return "", fmt.Errorf("%w: expected string", ErrWrongTag)
-	}
-	return arg, nil
-}
-
-func (vm *VM) popBool() (bool, error) {
-	val, err := vm.pop()
-	if err != nil {
-		return false, err
-	}
-	if val.Tag != TagBool {
-		return false, ErrInvalidType
-	}
-	arg, ok := val.Data.(bool)
-	if !ok {
-		return false, fmt.Errorf("%w: expected bool", ErrWrongTag)
-	}
-	return arg, nil
-}
-
-func (vm *VM) popNumber() (int, error) {
-	val, err := vm.pop()
-	if err != nil {
-		return -1, err
-	}
-	if val.Tag != TagNumber {
-		return -1, ErrInvalidType
-	}
-	arg, ok := val.Data.(int)
-	if !ok {
-		return -1, fmt.Errorf("%w: expected number", ErrWrongTag)
-	}
-	return arg, nil
 }
 
 func opFuncLoad(vm *VM, _ OpCode, _ uint) error {
