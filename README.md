@@ -129,9 +129,9 @@ The `goroutine-explore` shell understands the following types:
 
 * goroutine: The stack trace of a single goroutine, along with its metadata such as ID and state.
 * goroutine dump: A collection of goroutines.
-* string: An UTF8 encoded string literal, wrapped in double quotes. Ex. `"running"`.
+* string: An UTF8 encoded string literal, wrapped in double quotes or backticks. Ex. `"running"`.
 * pattern: A [`regexp`](https://pkg.go.dev/regexp)-compatible regex expression,
-  wrapped in forward slashes. Ex. `/^foo.*bar$/`
+  wrapped in double quotes or backticks. Ex. `"^foo.*bar$"`
 * number: An unsigned integer between 0 and 2147483647.
 * boolean: True or false as the literal `true` or `false` in the shell.
 * field accessor: The name of a goroutine field, prefixed with a period. Ex. `.duration`.

@@ -207,6 +207,10 @@ func (s *Tokenizer) next() (Token, error) {
 		token.Type = TokenString
 		token.Lexeme, _ = strings.CutPrefix(token.Lexeme, `"`)
 		token.Lexeme, _ = strings.CutSuffix(token.Lexeme, `"`)
+	case scanner.RawString:
+		token.Type = TokenString
+		token.Lexeme, _ = strings.CutPrefix(token.Lexeme, "`")
+		token.Lexeme, _ = strings.CutSuffix(token.Lexeme, "`")
 
 	case '|':
 		token.Type = TokenPipe
