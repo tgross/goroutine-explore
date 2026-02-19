@@ -110,6 +110,10 @@ func repl(e *internal.Evaluator) int {
 		}
 		previousCtrlC = false
 
+		// append to history even if it won't compile so that users can up-arrow
+		// to edit their mistake
+		lines.AppendHistory(src)
+
 		err = e.Eval(ctx, src)
 		if err != nil {
 			switch {
@@ -122,7 +126,6 @@ func repl(e *internal.Evaluator) int {
 			// stderr
 			continue
 		}
-		lines.AppendHistory(src)
 
 		// note: there's a tiny race between here and the next loop iteration
 		// where Ctrl-C is unhandled
@@ -151,7 +154,7 @@ func nextSrc(lines *liner.State) (string, error) {
 			strings.HasSuffix(src, "|") {
 			prompt = ".. "
 			src = strings.TrimSuffix(src, "\\")
-			src += " " // gives us whitespace when we append the line
+			src += "\n" // gives us whitespace when we append the line
 			continue
 		}
 		return src, nil
