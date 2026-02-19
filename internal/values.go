@@ -5,19 +5,19 @@ package internal
 
 type Tag uint
 
-//go:generate stringer -type Tag
+//go:generate stringer -type Tag -linecomment
 const (
-	TagNone Tag = iota
-	TagBool
-	TagNumber
-	TagString
-	TagIdentifier
-	TagFieldAccessor
-	TagCommand
-	TagDump
-	TagGoroutine
-	TagAddress
-	TagDiff
+	TagNone          Tag = iota
+	TagBool              // bool
+	TagNumber            // number
+	TagString            // string
+	TagIdentifier        // identifier
+	TagFieldAccessor     // field accessor
+	TagCommand           //command
+	TagDump              // dump
+	TagGoroutine         // goroutine
+	TagAddress           // address
+	TagDiff              // diff
 )
 
 type Value struct {

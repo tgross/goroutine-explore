@@ -11,6 +11,24 @@ import (
 	"strings"
 )
 
+type CompilerError struct {
+	tok   Token
+	inner error
+}
+
+func compileErr(tok Token, msg string, args ...any) CompilerError {
+	inner := fmt.Errorf(msg, args...)
+	return CompilerError{tok, inner}
+}
+
+func (e CompilerError) Unwrap() error {
+	return e.inner
+}
+
+func (e CompilerError) Error() string {
+	return e.inner.Error()
+}
+
 var ErrTooManyArgs = errors.New("too many arguments")
 var ErrMissingArgs = errors.New("expected more arguments")
 var ErrExpectedPath = errors.New("expected a path argument")
@@ -101,16 +119,15 @@ func (p *Compiler) Compile(tokenizer *Tokenizer) (*Chunk, error) {
 func (p *Compiler) parseExpr(precedence int) error {
 	tok, err := p.tokenizer.Next()
 	if err != nil {
-		return err
+		return compileErr(tok, "%w", err)
 	}
 
 	// every expression will start with a prefix expression, even if it's
 	// actually an operand of a later infix expression
 	prefix, ok := p.prefixParseFns[tok.Type]
 	if !ok {
-		// TODO: this error message is terrible
-		return fmt.Errorf(
-			"expected an identifier or open paren: %+v", tok)
+		return compileErr(tok,
+			"expected expression to start with an identifier or open paren")
 	}
 
 	err = prefix(tok)
@@ -127,7 +144,7 @@ func (p *Compiler) parseExpr(precedence int) error {
 			if errors.Is(err, ErrEOF) {
 				break
 			}
-			return err
+			return compileErr(tok, "%w", err)
 		}
 
 		if infixPrec, ok := p.infixPrecedenceTab[tok.Type]; ok {
@@ -138,7 +155,7 @@ func (p *Compiler) parseExpr(precedence int) error {
 
 		tok, err := p.tokenizer.Next()
 		if err != nil {
-			return err
+			return compileErr(tok, "%w", err)
 		}
 
 		infix, ok := p.infixParseFns[tok.Type]
@@ -224,7 +241,7 @@ func (p *Compiler) parseString(tok Token) error {
 func (p *Compiler) parseNumber(tok Token) error {
 	val, err := strconv.Atoi(tok.Lexeme)
 	if err != nil {
-		return err
+		return compileErr(tok, "%w", err)
 	}
 
 	p.emitLoadConst(OpCodeLoadNumber, val)
@@ -234,7 +251,7 @@ func (p *Compiler) parseNumber(tok Token) error {
 func (p *Compiler) parseBool(tok Token) error {
 	val, err := strconv.ParseBool(tok.Lexeme)
 	if err != nil {
-		return err
+		return compileErr(tok, "%w", err)
 	}
 	if val {
 		p.emitBytes(OpCodePushBool, 1)
@@ -359,7 +376,7 @@ func (p *Compiler) parseCommand(cmd Token) error {
 				panic("got a command token for a non-command")
 			}
 			if len(sig.args) > 0 {
-				return fmt.Errorf("%w for %q command, got none",
+				return compileErr(cmd, "%w for %q command, got none",
 					ErrMissingArgs, cmd.Lexeme)
 			}
 			p.emitByte(sig.op)
@@ -417,14 +434,14 @@ var signatures = map[string]struct {
 func (p *Compiler) parseFunctionArgs(fun Token) error {
 	sig, ok := signatures[fun.Lexeme]
 	if !ok {
-		return fmt.Errorf("no such function %q", fun.Lexeme)
+		return compileErr(fun, "no such function %q", fun.Lexeme)
 	}
 
 	for i, arg := range sig.args {
 		if arg&optional == optional {
 			next, err := p.tokenizer.Peek()
 			if err != nil {
-				return err
+				return compileErr(next, "%w", err)
 			}
 			if next.Type == TokenRightParen {
 				// get default from pragma
@@ -447,41 +464,34 @@ func (p *Compiler) parseFunctionArgs(fun Token) error {
 		case arg&numeric == numeric:
 			tok, err := p.consume(TokenNumber)
 			if err != nil {
-				return fmt.Errorf("%w for %s: %w",
-					ErrInvalidArg, fun.Lexeme, err)
+				return fmt.Errorf("%w for %s: %w", ErrInvalidArg, fun.Lexeme, err)
 			}
 			err = p.parseNumber(tok)
 			if err != nil {
-				return fmt.Errorf("%w for %s: %w",
-					ErrInvalidArg, fun.Lexeme, err)
+				return fmt.Errorf("%w for %s: %w", ErrInvalidArg, fun.Lexeme, err)
 			}
 		case arg&str == str:
 			tok, err := p.consume(TokenString)
 			if err != nil {
-				return fmt.Errorf("%w for %s: %w",
-					ErrInvalidArg, fun.Lexeme, err)
+				return fmt.Errorf("%w for %s: %w", ErrInvalidArg, fun.Lexeme, err)
 			}
 			err = p.parseString(tok)
 			if err != nil {
-				return fmt.Errorf("%w for %s: %w",
-					ErrInvalidArg, fun.Lexeme, err)
+				return fmt.Errorf("%w for %s: %w", ErrInvalidArg, fun.Lexeme, err)
 			}
 		case arg&identifier == identifier:
 			tok, err := p.consume(TokenIdentifier)
 			if err != nil {
-				return fmt.Errorf("%w for %s: %w",
-					ErrInvalidArg, fun.Lexeme, err)
+				return fmt.Errorf("%w for %s: %w", ErrInvalidArg, fun.Lexeme, err)
 			}
 			err = p.parseDumpAccessor(tok)
 			if err != nil {
-				return fmt.Errorf("%w for %s: %w",
-					ErrInvalidArg, fun.Lexeme, err)
+				return fmt.Errorf("%w for %s: %w", ErrInvalidArg, fun.Lexeme, err)
 			}
 		case arg&predicate == predicate:
 			err := p.parseFilter(fun)
 			if err != nil {
-				return fmt.Errorf("%w for %s: %w",
-					ErrInvalidArg, fun.Lexeme, err)
+				return fmt.Errorf("%w for %s: %w", ErrInvalidArg, fun.Lexeme, err)
 			}
 		}
 	}
@@ -499,7 +509,7 @@ func (p *Compiler) parseFunctionArgs(fun Token) error {
 
 	err := p.expect(TokenRightParen)
 	if err != nil {
-		return nil
+		return err
 	}
 
 	return nil
@@ -563,7 +573,7 @@ func (p *Compiler) parsePragma(_ Token) error {
 			p.emitBytes(OpCodeCommandGetPragma, 0)
 			return nil
 		}
-		return err
+		return compileErr(topicTok, "%w", err)
 	}
 	topic := strings.TrimPrefix(topicTok.Lexeme, ".")
 	keyTok, err := p.tokenizer.Next()
@@ -573,7 +583,7 @@ func (p *Compiler) parsePragma(_ Token) error {
 			p.emitBytes(OpCodeCommandGetPragma, 0)
 			return nil
 		}
-		return err
+		return compileErr(keyTok, "%w", err)
 	}
 	setting := fmt.Sprintf("%s%s", topic, keyTok.Lexeme)
 	tok, err := p.maybeConsume(TokenAssign)
@@ -588,7 +598,7 @@ func (p *Compiler) parsePragma(_ Token) error {
 
 	valTok, err := p.tokenizer.Next()
 	if err != nil {
-		return err
+		return compileErr(valTok, "%w", err)
 	}
 
 	switch setting {
@@ -603,20 +613,20 @@ func (p *Compiler) parsePragma(_ Token) error {
 		case PragmaDedupIDs, PragmaDedupNone, PragmaDedupNumber:
 			err = p.parseString(valTok)
 		default:
-			return fmt.Errorf(
-				"%w: expected one of ids, number, none", ErrInvalidOpArg)
+			return compileErr(valTok,
+				`invalid pragma value: expected one of "ids", "number", or "none"`)
 		}
 	case "vars.display":
 		switch valTok.Lexeme {
 		case PragmaDisplayCount, PragmaDisplayNone, PragmaDisplaySummary:
 			err = p.parseString(valTok)
 		default:
-			return fmt.Errorf(
-				"%w: expected one of count, summary, none", ErrInvalidOpArg)
+			return compileErr(valTok,
+				`invalid pragma value: expected one of "count", "summary", or "none"`)
 		}
 	}
 	if err != nil {
-		return err
+		return compileErr(valTok, "%w", err)
 	}
 
 	p.emitLoadConst(OpCodeLoadString, setting)
@@ -625,9 +635,9 @@ func (p *Compiler) parsePragma(_ Token) error {
 }
 
 func (p *Compiler) expectNoMoreArgs() error {
-	_, err := p.tokenizer.Peek()
+	tok, err := p.tokenizer.Peek()
 	if err == nil {
-		return ErrTooManyArgs
+		return compileErr(tok, "%w", ErrTooManyArgs)
 	}
 	if errors.Is(err, ErrEOF) {
 		return nil
@@ -638,15 +648,18 @@ func (p *Compiler) expectNoMoreArgs() error {
 func (p *Compiler) consume(want TokenType) (Token, error) {
 	tok, err := p.tokenizer.Peek()
 	if err != nil {
-		return EmptyToken, err
+		return EmptyToken, compileErr(tok, "%w", err)
 	}
 	if tok.Type != want {
 		// TODO: we didn't implement stringer for Token but if we're going to
 		// return it in errors we probably should
-		return EmptyToken, fmt.Errorf("expected %v, got %s", want, tok)
+		return EmptyToken, compileErr(tok, "expected %v got %v", want, tok.Type)
 	}
 	tok, err = p.tokenizer.Next()
-	return tok, err
+	if err != nil {
+		return tok, compileErr(tok, "%w", err)
+	}
+	return tok, nil
 }
 
 // maybeConsume returns the wanted token if there are any more tokens at
@@ -658,26 +671,32 @@ func (p *Compiler) maybeConsume(want TokenType) (Token, error) {
 		if errors.Is(err, ErrEOF) {
 			return EmptyToken, nil
 		}
-		return EmptyToken, err
+		return EmptyToken, compileErr(tok, "%w", err)
 	}
 	if tok.Type != want {
-		return EmptyToken, fmt.Errorf("%w %v", ErrExpectedMaybeType, want)
+		return EmptyToken, compileErr(tok, "%w %v", ErrExpectedMaybeType, want)
 	}
 	tok, err = p.tokenizer.Next()
-	return tok, err
+	if err != nil {
+		return tok, compileErr(tok, "%w", err)
+	}
+	return tok, nil
 }
 
 func (p *Compiler) expect(want TokenType) error {
 	tok, err := p.tokenizer.Peek()
 	if err != nil {
-		return err
+		return compileErr(tok, "expected %v, got error %v", want, err)
 	}
 	if tok.Type != want {
 		// TODO: we didn't implement stringer for Token but if we're going to
 		// return it in errors we probably should
-		return fmt.Errorf("expected %v, got %s", want, tok)
+		return compileErr(tok, "expected %v, got %v", want, tok.Type)
 	}
 	_, err = p.tokenizer.Next()
+	if err != nil {
+		return compileErr(tok, "%w", err)
+	}
 	return err
 }
 

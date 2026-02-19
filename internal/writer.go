@@ -9,10 +9,11 @@ import (
 )
 
 const (
-	fgRed   = "\x1b[38;05;1m"
-	fgGreen = "\x1b[38;05;2m"
-	fgBlue  = "\x1b[38;05;4m"
-	reset   = "\x1b[0m"
+	fgRed    = "\x1b[38;05;1m"
+	fgGreen  = "\x1b[38;05;2m"
+	fgYellow = "\x1b[38;05;3m"
+	fgBlue   = "\x1b[38;05;4m"
+	reset    = "\x1b[0m"
 )
 
 // Writer wraps a io.Writer and lets us add color to output
@@ -65,6 +66,15 @@ func (w *Writer) red() *Writer {
 		inner:    w.inner,
 		useColor: w.useColor,
 		color:    fgRed,
+	}
+}
+
+// yellow returns a shallow copy of the Writer with the color set
+func (w *Writer) yellow() *Writer {
+	return &Writer{
+		inner:    w.inner,
+		useColor: w.useColor,
+		color:    fgYellow,
 	}
 }
 

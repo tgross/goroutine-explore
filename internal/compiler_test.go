@@ -5,6 +5,7 @@ package internal
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"testing"
@@ -520,4 +521,51 @@ func TestCompiler_Pragma(t *testing.T) {
 		})
 	}
 
+}
+
+func TestCompiler_Errors(t *testing.T) {
+
+	tokenizer := NewTokenizer()
+	compiler := NewCompiler()
+
+	testCases := []struct {
+		src          string
+		expectLexeme string
+		expectPos    int
+		expectErr    string
+	}{
+		{
+			`!`, `!`, 1,
+			`expected expression to start with an identifier or open paren`,
+		},
+		{
+			`g = load(1)`, `1`, 10,
+			`expected string got number`,
+		},
+		{
+			`g = load`, ``, 9,
+			`expected left paren, got error EOF`,
+		},
+		{
+			`g.where(.)`, `.`, 9,
+			`invalid identifier`,
+		},
+		{
+			"pragma.show.dedup = `foo`", `foo`, 21,
+			`invalid pragma value: expected one of "ids", "number", or "none"`,
+		},
+	}
+
+	for _, tc := range testCases {
+		body := strings.NewReader(tc.src)
+		tokenizer.Reset(context.TODO(), body)
+		_, err := compiler.Compile(tokenizer)
+		must.NotNil(t, err)
+
+		var cerr CompilerError
+		must.True(t, errors.As(err, &cerr))
+		must.EqError(t, cerr, tc.expectErr)
+		must.Eq(t, tc.expectLexeme, cerr.tok.Lexeme)
+		must.Eq(t, tc.expectPos, cerr.tok.Pos.Column)
+	}
 }

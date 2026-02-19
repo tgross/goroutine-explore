@@ -73,8 +73,34 @@ func (e *Evaluator) Eval(ctx context.Context, src string) error {
 		if errors.Is(err, context.Canceled) {
 			return nil
 		}
-		// TODO: we want this to include location feedback, etc.
-		fmt.Fprint(e.stderr.red(), err.Error())
+		var cerr CompilerError
+		if errors.As(err, &cerr) {
+			fmt.Fprintln(e.stderr.red(), err.Error())
+
+			errLine := cerr.tok.Pos.Line
+			errCol := max(1, cerr.tok.Pos.Column-1)
+
+			lines := strings.Split(src, "\n")
+			for i, line := range lines {
+				fmt.Fprintln(e.stderr.yellow(), ""+line)
+				if i == errLine-1 {
+					fmt.Fprintf(e.stderr.red(),
+						"%s▲\n",
+						strings.Repeat(" ", errCol),
+					)
+					fmt.Fprintf(e.stderr.red(),
+						"%s╰%s\n",
+						strings.Repeat(" ", errCol),
+						strings.Repeat("─", max(0, len(line)-errCol-1)),
+					)
+
+				}
+			}
+			return err
+		}
+
+		// if it's not a compiler error we don't have a token position to print
+		fmt.Fprintln(e.stderr.red(), err.Error())
 		return err
 	}
 
@@ -90,7 +116,7 @@ func (e *Evaluator) Eval(ctx context.Context, src string) error {
 			err = nil
 		default:
 			// TODO: we want this to include rich diagnostic feedback
-			fmt.Fprintln(e.stderr.red(), err.Error())
+			fmt.Fprintln(e.stderr.red(), err.Error()+"\n")
 		}
 		e.vm.env = oldEnv
 		return err

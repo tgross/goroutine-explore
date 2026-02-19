@@ -29,45 +29,46 @@ func (t Token) String() string {
 		t.Type, t.Pos.Line, t.Pos.Column, t.Lexeme)
 }
 
-type TokenType = uint8
+//go:generate stringer -type TokenType -linecomment
+type TokenType uint8
 
 const (
-	TokenInvalid    TokenType = iota // 0
-	TokenPipe                        // 1
-	TokenLeftParen                   // 2
-	TokenRightParen                  // 3
-	TokenPlus                        // 4
-	TokenMinus                       // 5
-	TokenStar                        // 6
-	TokenSlash                       // 7
-	TokenBang                        // 8
-	TokenComma                       // 9
-	TokenAssign                      // 10
+	TokenInvalid    TokenType = iota // invalid
+	TokenPipe                        // pipe
+	TokenLeftParen                   // left paren
+	TokenRightParen                  // right paren
+	TokenPlus                        // +
+	TokenMinus                       // -
+	TokenStar                        // *
+	TokenSlash                       // /
+	TokenBang                        // !
+	TokenComma                       // ,
+	TokenAssign                      // =
 
 	// comparisons
-	TokenEqual            // 11
-	TokenNotEqual         // 12
-	TokenLessThan         // 13
-	TokenLessEqualThan    // 14
-	TokenGreaterThan      // 15
-	TokenGreaterEqualThan // 16
-	TokenKeywordContains  // 17
+	TokenEqual            // ==
+	TokenNotEqual         // !=
+	TokenLessThan         // <
+	TokenLessEqualThan    // <=
+	TokenGreaterThan      // >
+	TokenGreaterEqualThan // >=
+	TokenKeywordContains  // contains
 
 	// literals
-	TokenIdentifier    // 18
-	TokenString        // 19
-	TokenNumber        // 20
-	TokenFieldAccessor // 21
+	TokenIdentifier    // identifier
+	TokenString        // string
+	TokenNumber        // number
+	TokenFieldAccessor // field accessor
 
 	// logic
-	TokenKeywordAnd // 22
-	TokenKeywordOr  // 23
+	TokenKeywordAnd // and
+	TokenKeywordOr  // or
 
 	//
-	TokenCommand  // 24
-	TokenFunction // 25
-	TokenMethod   // 26
-	TokenPragma   // 27
+	TokenCommand  // command
+	TokenFunction // function
+	TokenMethod   // method
+	TokenPragma   // pragma
 )
 
 type Tokenizer struct {
