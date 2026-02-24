@@ -280,8 +280,8 @@ expressions:
 ```
 >> g2 = g1.where(.state == "select"
               and .duration > 10
-              and contains(.trace, "keepAlive"))
->> g3 = g2.delete(contains(.trace, "gRPC")
+              and .trace contains "keepAlive"))
+>> g3 = g2.delete(.trace contains "gRPC")
 ```
 
 Would be the same as the value of `g3` at the end of this expression, without
@@ -290,8 +290,8 @@ having to define an intermediate variable.
 ```
 >> g3 = g1.where(.state == "select") |
             where(.duration > 10) |
-            where(contains(.trace, "keepAlive") |
-            delete(contains(.trace, "gRPC")
+            where(.trace contains "keepAlive") |
+            delete(.trace contains "gRPC")
 ```
 
 ### Functions
@@ -343,7 +343,7 @@ assigning that to `g3`.
 >> g3 = g1.where(.state == "select") |
             where(.duration > 10) |
             as(g2) |
-            delete(contains(.trace, "gRPC")
+            delete(.trace contains "gRPC")
 ```
 
 If an error occurs while evaluating the pipeline, the target variable will not
@@ -388,7 +388,7 @@ command.
 ```
 >> g2 = g1.where(.state == "select") |
             where(.duration > 10) |
-            where(contains(.trace, "keepAlive") |
+            where(.trace contains "keepAlive") |
             save("./including-gRPC.txt")
             delete(.trace contains "gRPC")) |
             save("./without-gRPC.txt")

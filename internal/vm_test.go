@@ -33,55 +33,130 @@ func TestVM_BasicStackOps(t *testing.T) {
 
 func TestVM_SimpleWhere(t *testing.T) {
 
-	// source: `g1 = g.where(duration > 10)`
-	chunk := &Chunk{
-		ops: []Op{
-			encode(OpCodeLoadGoroutineDump, 1), // load g
-			encode(OpCodeTempDump, 0),          // start
-			encode(OpCodeNextGoroutine, 9),     // addr when done
-			encode(OpCodeLoadFieldAccessor, 2), // load .duration
-			encode(OpCodeLoadNumber, 3),        // load 10
-			encode(OpCodeGreater, 0),           // compare
-			encode(OpCodeJumpIfFalse, 2),       // addr if false
-			encode(OpCodeAddGoroutine, 0),      // keep
-			encode(OpCodeJumpTo, 2),            // unconditional jump to addr
-			encode(OpCodePushDump, 0),          // push temp dump to stack
-			encode(OpCodeAssignment, 0),
+	testCases := []struct {
+		name      string
+		ops       []Op
+		constants []any
+		g1Fn      func(*GoroutineDump)
+		expectFn  func(*testing.T, *GoroutineDump)
+	}{
+		{
+			name: "numeric comparison",
+			ops: []Op{ // source: `g2 = g1.where(duration > 10)`
+				encode(OpCodeLoadGoroutineDump, 1), // load g1
+				encode(OpCodeTempDump, 0),          // start
+				encode(OpCodeNextGoroutine, 9),     // addr when done
+				encode(OpCodeLoadFieldAccessor, 2), // load .duration
+				encode(OpCodeLoadNumber, 3),        // load 10
+				encode(OpCodeGreater, 0),           // compare
+				encode(OpCodeJumpIfFalse, 2),       // addr if false
+				encode(OpCodeAddGoroutine, 0),      // keep
+				encode(OpCodeJumpTo, 2),            // unconditional jump to addr
+				encode(OpCodePushDump, 0),          // push temp dump to stack
+				encode(OpCodeAssignment, 0),        // assign g2
+			},
+			constants: []any{"g2", "g1", ".duration", 10},
+			g1Fn: func(g1 *GoroutineDump) {
+				g1.Add(testGoroutine(`goroutine 1 [running]:`))
+				g1.Add(testGoroutine(`goroutine 2 [select, 20 minutes]:`))
+				g1.Add(testGoroutine(`goroutine 3 [IO wait, 5 minutes]:`))
+			},
+			expectFn: func(t *testing.T, g2 *GoroutineDump) {
+				must.Eq(t, 1, g2.Len())
+				must.Eq(t, 2, g2.Next().ID)
+			},
 		},
-		constants: []any{"g1", "g", ".duration", 10},
+		{
+			name: "not-equal comparison",
+			ops: []Op{ // source: `g2 = g1.where(.state != "running")`
+				encode(OpCodeLoadGoroutineDump, 1), // load g1
+				encode(OpCodeTempDump, 0),          // start
+				encode(OpCodeNextGoroutine, 9),     // addr when done
+				encode(OpCodeLoadFieldAccessor, 2), // load .state
+				encode(OpCodeLoadString, 3),        // load "running"
+				encode(OpCodeNotEqual, 0),          // compare
+				encode(OpCodeJumpIfFalse, 2),       // addr if false
+				encode(OpCodeAddGoroutine, 0),      // keep
+				encode(OpCodeJumpTo, 2),            // unconditional jump to addr
+				encode(OpCodePushDump, 0),          // push temp dump to stack
+				encode(OpCodeAssignment, 0),        // assign g2
+			},
+			constants: []any{"g2", "g1", ".state", "running"},
+			g1Fn: func(g1 *GoroutineDump) {
+				g1.Add(testGoroutine(`goroutine 1 [select, 20 minutes]:`))
+				g1.Add(testGoroutine(`goroutine 2 [running]:`))
+				g1.Add(testGoroutine(`goroutine 3 [IO wait, 5 minutes]:`))
+			},
+			expectFn: func(t *testing.T, g2 *GoroutineDump) {
+				must.Eq(t, 2, g2.Len())
+				must.Eq(t, 1, g2.Next().ID)
+				must.Eq(t, 3, g2.Next().ID)
+			},
+		},
+		{
+			name: "contains comparison",
+			ops: []Op{ // source: `g2 = g1.where(.trace contains "sdnotifying")`
+				encode(OpCodeLoadGoroutineDump, 1), // load g1
+				encode(OpCodeTempDump, 0),          // start
+				encode(OpCodeNextGoroutine, 9),     // addr when done
+				encode(OpCodeLoadFieldAccessor, 2), // load .trace
+				encode(OpCodeLoadString, 3),        // load "running"
+				encode(OpCodeContains, 0),          // compare
+				encode(OpCodeJumpIfFalse, 2),       // addr if false
+				encode(OpCodeAddGoroutine, 0),      // keep
+				encode(OpCodeJumpTo, 2),            // unconditional jump to addr
+				encode(OpCodePushDump, 0),          // push temp dump to stack
+				encode(OpCodeAssignment, 0),        // assign g2
+			},
+			constants: []any{"g2", "g1", ".trace", "sdnotifying"},
+			g1Fn: func(g1 *GoroutineDump) {
+				g1.Add(testGoroutine(`goroutine 1 [running]:`))
+				g1.Add(testGoroutineFromStack(`goroutine 2 [select, 1 minutes]:
+main.main()
+	/home/tim/src/tgross/sdnotifying/main.go:62 +0x1e5
+`))
+				g1.Add(testGoroutine(`goroutine 3 [syscall]:
+os/signal.signal_recv()
+	/usr/local/go/src/runtime/sigqueue.go:152 +0x29
+				`))
+			},
+			expectFn: func(t *testing.T, g2 *GoroutineDump) {
+				must.Eq(t, 1, g2.Len())
+				must.Eq(t, 2, g2.Next().ID)
+			},
+		},
 	}
-	vm := NewVM(&Config{WorkDir: t.TempDir()})
-	vm.Reset(chunk)
 
-	gd := &GoroutineDump{}
-	gd.Add(testGoroutine(`goroutine 1 [select, 20 minutes]:`))
-	gd.Add(testGoroutine(`goroutine 2 [running]:`))
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			chunk := &Chunk{
+				ops:       tc.ops,
+				constants: tc.constants,
+			}
+			vm := NewVM(&Config{WorkDir: t.TempDir()})
+			vm.Reset(chunk)
 
-	vm.env = map[string]Value{
-		"g": {Tag: TagDump, Data: gd},
+			g1 := NewGoroutineDump()
+			tc.g1Fn(g1)
+			vm.env = map[string]Value{
+				"g1": {Tag: TagDump, Data: g1},
+			}
+
+			err := vm.Run(context.TODO())
+			vm.debug()
+			must.NoError(t, err)
+
+			result, _ := vm.pop()
+			must.Eq(t, TagDump, result.Tag)
+			got, ok := result.Data.(*GoroutineDump)
+			must.True(t, ok)
+			got.StartIter()
+			tc.expectFn(t, got)
+		})
 	}
-
-	err := vm.Run(context.TODO())
-	vm.debug()
-	must.NoError(t, err)
-
-	g1, ok := vm.env["g1"]
-	must.True(t, ok, must.Sprint("g1 was not written to env"))
-
-	result, _ := vm.pop()
-	must.Eq(t, g1, result)
-
-	must.Eq(t, TagDump, g1.Tag)
-	gd1, ok := g1.Data.(*GoroutineDump)
-	must.True(t, ok)
-	must.Eq(t, 1, gd1.Len())
-	g := gd1.Next()
-	must.NotNil(t, g)
-	must.Eq(t, 1, g.ID)
-	must.Eq(t, "select", g.State)
 }
 
-func TestVM_BinaryExpression(t *testing.T) {
+func TestVM_SetFunctions(t *testing.T) {
 
 	testCases := []struct {
 		name      string

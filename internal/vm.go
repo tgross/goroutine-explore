@@ -305,32 +305,16 @@ func compare[T ordered](left, right T, instruction OpCode) bool {
 }
 
 func opContains(vm *VM, instruction OpCode, _ uint) error {
-	right, err := vm.pop()
+	right, err := vm.popString()
 	if err != nil {
 		return err
 	}
-	left, err := vm.pop()
+	left, err := vm.popString()
 	if err != nil {
 		return err
-	}
-	if left.Tag != right.Tag {
-		return fmt.Errorf(
-			"expected matching types, got %+v and %+v", left.Data, right.Data)
 	}
 
-	var val bool
-	switch left := left.Data.(type) {
-	case string:
-		if r, ok := right.Data.(string); ok {
-			val = strings.Contains(left, r)
-		} else {
-			return fmt.Errorf("%w: expected string", ErrWrongTag)
-		}
-	default:
-		// TODO: actually needs to be a goroutine on one side and a string on
-		// the other, I think?
-		return fmt.Errorf("%w: expected string for contains", ErrInvalidType)
-	}
+	val := strings.Contains(left, right)
 	vm.push(Value{Tag: TagBool, Data: val})
 	return nil
 }
