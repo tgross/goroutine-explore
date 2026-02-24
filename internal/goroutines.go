@@ -5,7 +5,7 @@ package internal
 
 import (
 	"bytes"
-	"crypto/md5"
+	"crypto/sha256"
 	"fmt"
 	"hash"
 	"maps"
@@ -41,6 +41,11 @@ func NewGoroutineDump() *GoroutineDump {
 }
 
 func (gd *GoroutineDump) Add(g *Goroutine) {
+	for _, ex := range gd.goroutines {
+		if g.hash == ex.hash {
+			return
+		}
+	}
 	gd.goroutines = append(gd.goroutines, g)
 }
 
@@ -63,8 +68,8 @@ func (gd *GoroutineDump) Copy() *GoroutineDump {
 
 func (gd *GoroutineDump) Has(p *Goroutine) bool {
 	for _, g := range gd.goroutines {
-		if g.ID == p.ID {
-			return true // TODO: want an equality hash here
+		if g.ID == p.ID && g.hash == p.hash {
+			return true
 		}
 	}
 	return false
@@ -140,23 +145,23 @@ func (gd GoroutineDump) Save(fn string) error {
 }
 
 type Goroutine struct {
-	ID        int
-	Header    string
-	Trace     string
-	LineCount int
-	Duration  int    // In minutes, from meta in header
-	State     string // From meta in header
-
-	lineMd5    []string
-	fullMd5    string
-	fullHasher hash.Hash
+	ID         int
+	Header     string
+	Trace      string
+	LineCount  int
+	Duration   int    // In minutes, from meta in header
+	State      string // From meta in header
+	CreatedBy  int
 	Duplicates []int
 
-	isFrozen bool
-	buf      *bytes.Buffer
+	buf      *bytes.Buffer // a copy of the original text from the dump
+	isFrozen bool          // once a goroutine is frozen, we never add to it again
+	hash     string        // set from location specs of all lines in the stack
+	hasher   hash.Hash
 }
 
 var durationPattern = regexp.MustCompile(`^\d+ minutes$`)
+var createdByPattern = regexp.MustCompile(`^created by .* in goroutine (\d+)`)
 
 // NewGoroutine creates and returns a new Goroutine.
 func NewGoroutine(header string) (*Goroutine, error) {
@@ -190,7 +195,7 @@ func NewGoroutine(header string) (*Goroutine, error) {
 		buf:        &bytes.Buffer{},
 		Duration:   duration,
 		State:      state,
-		fullHasher: md5.New(),
+		hasher:     sha256.New(),
 		Duplicates: []int{},
 	}, nil
 }
@@ -209,19 +214,17 @@ func (g *Goroutine) AddLine(l string) {
 		g.buf.WriteString(l)
 		g.buf.WriteString("\n")
 
-		if strings.HasPrefix(l, "\t") || strings.HasPrefix(l, " ") {
-
+		createdByMatches := createdByPattern.FindStringSubmatch(l)
+		if len(createdByMatches) == 2 {
+			createdBy, _ := strconv.ParseInt(createdByMatches[1], 10, 64)
+			g.CreatedBy = int(createdBy)
+		} else if strings.HasPrefix(l, "\t") || strings.HasPrefix(l, " ") {
 			// sigquit dumps include fp, sp, and pc for each line, so we only
-			// want the line itself here
+			// want the location spec to add to the hash
 			l = strings.TrimSpace(l)
 			parts := strings.Split(l, " ")
 			fl := parts[0]
-
-			h := md5.New()
-			fmt.Fprint(h, fl)
-			g.lineMd5 = append(g.lineMd5, string(h.Sum(nil)))
-
-			fmt.Fprint(g.fullHasher, fl)
+			fmt.Fprint(g.hasher, fl)
 		}
 	}
 }
@@ -232,8 +235,7 @@ func (g *Goroutine) Freeze() {
 		g.isFrozen = true
 		g.Trace = g.buf.String()
 		g.buf = nil
-
-		g.fullMd5 = string(g.fullHasher.Sum(nil))
+		g.hash = string(g.hasher.Sum(nil))
 	}
 }
 

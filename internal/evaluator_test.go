@@ -22,58 +22,34 @@ func TestEvaluator(t *testing.T) {
 
 	// TODO: this would be nicer if we had testdata files we could read in
 	g1 := NewGoroutineDump()
-	g1.Add(&Goroutine{
-		ID:     1,
-		Header: "goroutine 1 [chan receive 5 min]",
-		Trace: `goroutine 1 [chan receive 5 min]:
+	g1.Add(testGoroutineFromStack(`goroutine 1 [chan receive, 5 minutes]:
 main.main()
 	/home/tim/src/tgross/sdnotifying/main.go:62 +0x1e5
-`,
-		LineCount: 3,
-		Duration:  5,
-		State:     "chan receive",
-	})
-	g1.Add(&Goroutine{
-		ID:     2,
-		Header: "goroutine 2 [syscall]",
-		Trace: `goroutine 2 [syscall]:
+`))
+
+	g1.Add(testGoroutineFromStack(`goroutine 2 [syscall]:
 os/signal.signal_recv()
 	/usr/local/go/src/runtime/sigqueue.go:152 +0x29
 os/signal.loop()
 	/usr/local/go/src/os/signal/signal_unix.go:23 +0x13
 created by os/signal.Notify.func1.1 in goroutine 1
 	/usr/local/go/src/os/signal/signal.go:151 +0x1f
-`,
-		LineCount: 7,
-		State:     "syscall",
-	})
-	g1.Add(&Goroutine{
-		ID:     3,
-		Header: "goroutine 3 [select 1 min]",
-		Trace: `main.main()
+`))
+
+	g1.Add(testGoroutineFromStack(`goroutine 3 [select, 1 minutes]:
+		main.main()
 	/home/tim/src/tgross/sdnotifying/main.go:62 +0x1e5
-`,
-		LineCount: 3,
-		Duration:  1,
-		State:     "select",
-	})
+`))
 
 	g2 := NewGoroutineDump()
-	g2.Add(&Goroutine{
-		ID:     20,
-		Header: "goroutine 20 [runnable]",
-		Trace: `goroutine 20 [runnable]:
+	g2.Add(testGoroutineFromStack(`goroutine 20 [runnable]:
 net/http.(*connReader).startBackgroundRead.gowrap2()
 	/usr/local/go/src/net/http/server.go:677
 runtime.goexit({})
 	/usr/local/go/src/runtime/asm_amd64.s:1695 +0x1
 created by net/http.(*connReader).startBackgroundRead in goroutine 37
 	/usr/local/go/src/net/http/server.go:677 +0xba
-`,
-		LineCount: 7,
-		Duration:  0,
-		State:     "runnable",
-	})
+`))
 
 	env["g1"] = Value{Tag: TagDump, Data: g1}
 	env["g2"] = Value{Tag: TagDump, Data: g2}
@@ -82,9 +58,8 @@ created by net/http.(*connReader).startBackgroundRead in goroutine 37
 		name         string
 		src          string
 		expect       func(*testing.T, *GoroutineDump)
+		expectDiff   func(*testing.T, *Diff)
 		expectErrMsg string
-
-		notImplemented bool // temporary until
 	}{
 		{
 			name:         "empty src",
@@ -134,27 +109,29 @@ created by net/http.(*connReader).startBackgroundRead in goroutine 37
 			},
 		},
 		{
-			name:           "diffed expressions",
-			notImplemented: true, // TODO
+			name: "diffed expressions",
 			src: `l, c, r = diff(
 				g1.where(.duration > 0),
 				g1.delete(.state == "select"))`,
-			expect: func(t *testing.T, dump *GoroutineDump) {
-				// TODO: this should accept multiple dumps
-				must.Eq(t, 1, dump.Len())
+			expectDiff: func(t *testing.T, diff *Diff) {
+				must.Eq(t, 1, diff.Left.Len())
+				must.Eq(t, 3, diff.Left.Next().ID)
+				must.Eq(t, 1, diff.Right.Len())
+				must.Eq(t, 2, diff.Right.Next().ID)
+				must.Eq(t, 1, diff.Common.Len())
+				must.Eq(t, 1, diff.Common.Next().ID)
 			},
 		},
 		{
-			name:           "unioned expressions",
-			notImplemented: true, // TODO
+			name: "unioned expressions",
 			src: `union(
 				g1.where(.duration > 0 and .lines > 0),
 				g2.where(.state == "runnable"))`,
 			expect: func(t *testing.T, dump *GoroutineDump) {
 				must.Eq(t, 3, dump.Len())
+				must.Eq(t, 20, dump.Next().ID)
 				must.Eq(t, 1, dump.Next().ID)
 				must.Eq(t, 3, dump.Next().ID)
-				must.Eq(t, 20, dump.Next().ID)
 			},
 		},
 		{
@@ -171,9 +148,6 @@ created by net/http.(*connReader).startBackgroundRead in goroutine 37
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			if tc.notImplemented {
-				t.Skip("TODO not yet implemented")
-			}
 			errRecorder := new(bytes.Buffer)
 
 			e := NewEvaluator(&Config{
@@ -189,9 +163,15 @@ created by net/http.(*connReader).startBackgroundRead in goroutine 37
 				must.NoError(t, err)
 				got, _ := e.vm.pop()
 				must.NotNil(t, got)
-				dump, ok := got.Data.(*GoroutineDump)
-				must.True(t, ok, must.Sprintf("did not return dump: %v", dump))
-				tc.expect(t, dump)
+				if tc.expect != nil {
+					dump, ok := got.Data.(*GoroutineDump)
+					must.True(t, ok, must.Sprintf("did not return dump: %+v", got))
+					tc.expect(t, dump)
+				} else if tc.expectDiff != nil {
+					diff, ok := got.Data.(*Diff)
+					must.True(t, ok, must.Sprintf("did not return diff: %+v", got))
+					tc.expectDiff(t, diff)
+				}
 			}
 		})
 	}
@@ -203,41 +183,21 @@ func BenchmarkEvaluator(b *testing.B) {
 
 	// TODO: this would be nicer if we had testdata files we could read in
 	g1 := NewGoroutineDump()
-	g1.Add(&Goroutine{
-		ID:     1,
-		Header: "goroutine 1 [chan receive 5 min]",
-		Trace: `goroutine 1 [chan receive 5 min]:
+	g1.Add(testGoroutineFromStack(`goroutine 1 [chan receive 5 min]:
 main.main()
 	/home/tim/src/tgross/sdnotifying/main.go:62 +0x1e5
-`,
-		LineCount: 3,
-		Duration:  5,
-		State:     "chan receive",
-	})
-	g1.Add(&Goroutine{
-		ID:     2,
-		Header: "goroutine 2 [syscall]",
-		Trace: `goroutine 2 [syscall]:
+`))
+	g1.Add(testGoroutineFromStack(`goroutine 2 [syscall]:
 os/signal.signal_recv()
 	/usr/local/go/src/runtime/sigqueue.go:152 +0x29
 os/signal.loop()
 	/usr/local/go/src/os/signal/signal_unix.go:23 +0x13
 created by os/signal.Notify.func1.1 in goroutine 1
 	/usr/local/go/src/os/signal/signal.go:151 +0x1f
-`,
-		LineCount: 7,
-		State:     "syscall",
-	})
-	g1.Add(&Goroutine{
-		ID:     3,
-		Header: "goroutine 3 [select 1 min]",
-		Trace: `main.main()
+`))
+	g1.Add(testGoroutineFromStack(`main.main()
 	/home/tim/src/tgross/sdnotifying/main.go:62 +0x1e5
-`,
-		LineCount: 3,
-		Duration:  1,
-		State:     "select",
-	})
+`))
 
 	env["g1"] = Value{Tag: TagDump, Data: g1}
 

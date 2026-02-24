@@ -54,8 +54,8 @@ func TestVM_SimpleWhere(t *testing.T) {
 	vm.Reset(chunk)
 
 	gd := &GoroutineDump{}
-	gd.Add(&Goroutine{ID: 1, Duration: 20, State: "select"})
-	gd.Add(&Goroutine{ID: 2, Duration: 0, State: "running"})
+	gd.Add(testGoroutine(`goroutine 1 [select, 20 minutes]:`))
+	gd.Add(testGoroutine(`goroutine 2 [running]:`))
 
 	vm.env = map[string]Value{
 		"g": {Tag: TagDump, Data: gd},
@@ -102,13 +102,13 @@ func TestVM_BinaryExpression(t *testing.T) {
 			constants: []any{"g1", "g2"},
 			g1Fn: func() *GoroutineDump {
 				g1 := NewGoroutineDump()
-				g1.Add(&Goroutine{ID: 1, Duration: 20, State: "select"})
-				g1.Add(&Goroutine{ID: 2, Duration: 0, State: "running"})
+				g1.Add(testGoroutine(`goroutine 1 [select, 20 minutes]:`))
+				g1.Add(testGoroutine(`goroutine 2 [running]:`))
 				return g1
 			},
 			g2Fn: func() *GoroutineDump {
 				g2 := NewGoroutineDump()
-				g2.Add(&Goroutine{ID: 3, Duration: 20, State: "IO wait"})
+				g2.Add(testGoroutine(`goroutine 3 [select, 10 IO wait]:`))
 				return g2
 			},
 			expectFn: func(t *testing.T, g *GoroutineDump) {
@@ -139,15 +139,15 @@ func TestVM_BinaryExpression(t *testing.T) {
 			constants: []any{"g1", "g2", ".duration", 10},
 			g1Fn: func() *GoroutineDump {
 				g1 := NewGoroutineDump()
-				g1.Add(&Goroutine{ID: 1, Duration: 20, State: "select"})
-				g1.Add(&Goroutine{ID: 2, Duration: 0, State: "running"})
+				g1.Add(testGoroutine(`goroutine 1 [select, 20 minutes]:`))
+				g1.Add(testGoroutine(`goroutine 2 [running]:`))
 				return g1
 			},
 			g2Fn: func() *GoroutineDump {
 				g2 := NewGoroutineDump()
-				g2.Add(&Goroutine{ID: 3, Duration: 20, State: "IO wait"})
-				g2.Add(&Goroutine{ID: 98, Duration: 0, State: "chan receive"})
-				g2.Add(&Goroutine{ID: 99, Duration: 0, State: "running"})
+				g2.Add(testGoroutine(`goroutine 3 [IO wait, 20 minutes]:`))
+				g2.Add(testGoroutine(`goroutine 98 [chan receive]:`))
+				g2.Add(testGoroutine(`goroutine 99 [running]:`))
 				return g2
 			},
 			expectFn: func(t *testing.T, g *GoroutineDump) {
@@ -178,15 +178,15 @@ func TestVM_BinaryExpression(t *testing.T) {
 			constants: []any{"g1", "g2", ".duration", 10},
 			g1Fn: func() *GoroutineDump {
 				g1 := NewGoroutineDump()
-				g1.Add(&Goroutine{ID: 2, Duration: 20, State: "IO wait"})
-				g1.Add(&Goroutine{ID: 98, Duration: 0, State: "chan receive"})
-				g1.Add(&Goroutine{ID: 99, Duration: 0, State: "running"})
+				g1.Add(testGoroutine(`goroutine 2 [IO wait, 20 minutes]:`))
+				g1.Add(testGoroutine(`goroutine 98 [chan receive]:`))
+				g1.Add(testGoroutine(`goroutine 99 [running]:`))
 				return g1
 			},
 			g2Fn: func() *GoroutineDump {
 				g2 := NewGoroutineDump()
-				g2.Add(&Goroutine{ID: 3, Duration: 20, State: "select"})
-				g2.Add(&Goroutine{ID: 1, Duration: 0, State: "running"})
+				g2.Add(testGoroutine(`goroutine 3 [select, 20 minutes]:`))
+				g2.Add(testGoroutine(`goroutine 1 [running]:`))
 				return g2
 			},
 			expectFn: func(t *testing.T, g *GoroutineDump) {
@@ -208,14 +208,14 @@ func TestVM_BinaryExpression(t *testing.T) {
 			constants: []any{"g1", "g2"},
 			g1Fn: func() *GoroutineDump {
 				g1 := NewGoroutineDump()
-				g1.Add(&Goroutine{ID: 1, Duration: 20, State: "select"})
-				g1.Add(&Goroutine{ID: 2, Duration: 0, State: "running"})
+				g1.Add(testGoroutine(`goroutine 1 [select, 20 minutes]:`))
+				g1.Add(testGoroutine(`goroutine 2 [running]:`))
 				return g1
 			},
 			g2Fn: func() *GoroutineDump {
 				g2 := NewGoroutineDump()
-				g2.Add(&Goroutine{ID: 1, Duration: 20, State: "select"})
-				g2.Add(&Goroutine{ID: 3, Duration: 10, State: "IO wait"})
+				g2.Add(testGoroutine(`goroutine 1 [select, 20 minutes]:`))
+				g2.Add(testGoroutine(`goroutine 3 [IO wait, 10 minutes]:`))
 				return g2
 			},
 			expectFn: func(t *testing.T, g *GoroutineDump) {
@@ -270,12 +270,12 @@ func TestVM_MultiAssignDiff(t *testing.T) {
 	vm.Reset(chunk)
 
 	g1 := NewGoroutineDump()
-	g1.Add(&Goroutine{ID: 1, Duration: 20, State: "select"})
-	g1.Add(&Goroutine{ID: 2, Duration: 0, State: "running"})
+	g1.Add(testGoroutine(`goroutine 1 [select, 20 minutes]:`))
+	g1.Add(testGoroutine(`goroutine 2 [running]:`))
 
 	g2 := NewGoroutineDump()
-	g2.Add(&Goroutine{ID: 1, Duration: 20, State: "select"})
-	g2.Add(&Goroutine{ID: 3, Duration: 10, State: "IO wait"})
+	g2.Add(testGoroutine(`goroutine 1 [select, 20 minutes]:`))
+	g2.Add(testGoroutine(`goroutine 3 [IO wait, 10 minutes]:`))
 
 	vm.env = map[string]Value{
 		"g1": {Tag: TagDump, Data: g1},
@@ -293,7 +293,7 @@ func TestVM_MultiAssignDiff(t *testing.T) {
 	must.Eq(t, "[3]", gd4.String())
 
 	gd5 := expectDumpFromEnv(t, vm.env, "g5")
-	must.Eq(t, "[1 1]", gd5.String())
+	must.Eq(t, "[1]", gd5.String())
 }
 
 func TestVM_Show(t *testing.T) {
@@ -331,18 +331,6 @@ goroutine 3 [IO wait, 10 minutes]:
 `, recorder.String())
 }
 
-func testGoroutine(header string, lines ...string) *Goroutine {
-	g, err := NewGoroutine(header)
-	if err != nil {
-		panic(err)
-	}
-	for _, line := range lines {
-		g.AddLine(line)
-	}
-	g.Freeze()
-	return g
-}
-
 func TestVM_CommandVars(t *testing.T) {
 	// source: `vars`
 	chunk := &Chunk{
@@ -354,13 +342,13 @@ func TestVM_CommandVars(t *testing.T) {
 	vm.Reset(chunk)
 
 	g1 := NewGoroutineDump()
-	g1.Add(&Goroutine{ID: 1, Duration: 20, State: "select"})
-	g1.Add(&Goroutine{ID: 2, Duration: 0, State: "running"})
-	g1.Add(&Goroutine{ID: 3, Duration: 10, State: "IO wait"})
+	g1.Add(testGoroutine(`goroutine 1 [select, 20 minutes]:`))
+	g1.Add(testGoroutine(`goroutine 2 [running]:`))
+	g1.Add(testGoroutine(`goroutine 3 [IO wait, 10 minutes]:`))
 
 	g2 := NewGoroutineDump()
-	g2.Add(&Goroutine{ID: 1, Duration: 20, State: "select"})
-	g2.Add(&Goroutine{ID: 3, Duration: 10, State: "IO wait"})
+	g2.Add(testGoroutine(`goroutine 1 [select, 20 minutes]:`))
+	g2.Add(testGoroutine(`goroutine 3 [IO wait, 10 minutes]:`))
 
 	vm.env = map[string]Value{
 		"g1": {Tag: TagDump, Data: g1},

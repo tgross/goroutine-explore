@@ -428,8 +428,6 @@ func opFuncUnion(vm *VM, _ OpCode, _ uint) error {
 		return err
 	}
 
-	// TODO: obviously we need to make sure these get de-duplicated in the Add
-	// method
 	g := NewGoroutineDump()
 	for _, lg := range left.goroutines {
 		g.Add(lg)
