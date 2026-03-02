@@ -6,6 +6,7 @@ package internal
 import (
 	"bufio"
 	"bytes"
+	"encoding/base64"
 	"fmt"
 )
 
@@ -23,7 +24,8 @@ func testGoroutine(header string, lines ...string) *Goroutine {
 
 	// fake a hash if there are no lines
 	if len(lines) == 0 {
-		g.hash = string(g.hasher.Sum([]byte(header)))
+		g.hash = base64.StdEncoding.EncodeToString(
+			[]byte(header))
 	}
 	return g
 }

@@ -116,10 +116,11 @@ created by net/http.(*connReader).startBackgroundRead in goroutine 37
 			expectDiff: func(t *testing.T, diff *Diff) {
 				must.Eq(t, 1, diff.Left.Len())
 				must.Eq(t, 3, diff.Left.Next().ID)
+				must.Eq(t, 2, diff.Common.Len())
+				must.Eq(t, 1, diff.Common.Next().ID)
+				must.Eq(t, 1, diff.Common.Next().ID) // not indexed yet
 				must.Eq(t, 1, diff.Right.Len())
 				must.Eq(t, 2, diff.Right.Next().ID)
-				must.Eq(t, 1, diff.Common.Len())
-				must.Eq(t, 1, diff.Common.Next().ID)
 			},
 		},
 		{

@@ -6,6 +6,7 @@ package internal
 import (
 	"bytes"
 	"crypto/sha256"
+	"encoding/base64"
 	"fmt"
 	"hash"
 	"maps"
@@ -17,11 +18,6 @@ import (
 	"strings"
 )
 
-/*
-The types in this file are placeholders until the evaluator gets wired up into
-the main application
-*/
-
 type Diff struct {
 	Left   *GoroutineDump
 	Right  *GoroutineDump
@@ -30,23 +26,63 @@ type Diff struct {
 
 type GoroutineDump struct {
 	goroutines []*Goroutine
-	iterIndex  int
+
+	// index is a duplicated sorted list of the goroutines in the dump
+	index []*Goroutine
+
+	// duplicates is a map of hash to duplicate IDs for that same hash,
+	// excluding the goroutine that's in the index
+	duplicates map[string][]int
+
+	// isIndexed is a flag that we set to avoid reindexing a dump
+	// repeatedly. Dump contents should be immutable once returned from the VM
+	isIndexed bool
+
+	// iterIndex is the index to the goroutines field for iterating through the
+	// dump
+	iterIndex int
 }
 
 func NewGoroutineDump() *GoroutineDump {
 	gd := &GoroutineDump{
 		goroutines: []*Goroutine{},
+		index:      []*Goroutine{},
+		duplicates: map[string][]int{},
 	}
 	return gd
 }
 
 func (gd *GoroutineDump) Add(g *Goroutine) {
-	for _, ex := range gd.goroutines {
-		if g.hash == ex.hash {
-			return
+	gd.goroutines = append(gd.goroutines, g)
+	if gd.isIndexed {
+		panic("indexed goroutine dumps should never be mutated")
+	}
+}
+
+// Sort sorts the goroutines by ID. Generally speaking we only need this once
+// we've unioned two dumps
+func (gd *GoroutineDump) Sort() {
+	sort.Slice(gd.goroutines, func(i, j int) bool {
+		return gd.goroutines[i].ID < gd.goroutines[j].ID
+	})
+}
+
+// Index creates an lookup table for duplicates. It assumes the dump is already
+// sorted.
+func (gd *GoroutineDump) Index() {
+	gd.isIndexed = true
+	gd.index = []*Goroutine{}
+	gd.duplicates = map[string][]int{}
+
+	for _, g := range gd.goroutines {
+		if dupe, ok := gd.duplicates[g.hash]; ok {
+			dupe = append(dupe, g.ID)
+			gd.duplicates[g.hash] = dupe
+		} else {
+			gd.duplicates[g.hash] = []int{}
+			gd.index = append(gd.index, g)
 		}
 	}
-	gd.goroutines = append(gd.goroutines, g)
 }
 
 func (gd *GoroutineDump) Next() *Goroutine {
@@ -63,6 +99,8 @@ func (gd *GoroutineDump) Next() *Goroutine {
 func (gd *GoroutineDump) Copy() *GoroutineDump {
 	return &GoroutineDump{
 		goroutines: slices.Clone(gd.goroutines),
+		index:      []*Goroutine{},
+		duplicates: map[string][]int{},
 	}
 }
 
@@ -75,6 +113,7 @@ func (gd *GoroutineDump) Has(p *Goroutine) bool {
 	return false
 }
 
+// TODO: can this return an iter.Seq instead?
 func (gd *GoroutineDump) StartIter() {
 	gd.iterIndex = 0
 }
@@ -96,15 +135,30 @@ func (gd *GoroutineDump) String() string {
 }
 
 // Show displays the goroutines with the given limit and offset
-func (gd *GoroutineDump) Show(w *Writer, limit, offset int) {
-	if limit == 0 {
-		limit = gd.Len() - offset
-	} else {
-		limit = min(limit, gd.Len()-offset)
+func (gd *GoroutineDump) Show(w *Writer, pragma PragmaDedup, limit, offset int) {
+	if pragma == PragmaDedupNone {
+		limit := safeLimit(gd.Len(), limit, offset)
+		for i := offset; i < offset+limit; i++ {
+			gd.goroutines[i].Print(w, nil, PragmaDedupNone)
+		}
+		return
 	}
+
+	if !gd.isIndexed {
+		gd.Index()
+	}
+	limit = safeLimit(len(gd.index), limit, offset)
 	for i := offset; i < offset+limit; i++ {
-		gd.goroutines[i].Print(w)
+		g := gd.index[i]
+		g.Print(w, gd.duplicates[g.hash], pragma)
 	}
+}
+
+func safeLimit(size, limit, offset int) int {
+	if limit == 0 {
+		return size - offset
+	}
+	return min(limit, size-offset)
 }
 
 func (gd *GoroutineDump) Summary(w *Writer, name string) {
@@ -138,7 +192,7 @@ func (gd GoroutineDump) Save(fn string) error {
 
 	w := NewWriter(f)
 	for _, g := range gd.goroutines {
-		g.Print(w)
+		g.Print(w, nil, PragmaDedupNone)
 	}
 
 	return nil
@@ -204,7 +258,7 @@ func (g *Goroutine) Debug() string {
 	if g == nil {
 		return "<nil>"
 	}
-	return g.Header // TODO
+	return fmt.Sprintf("%s (%s)", g.Header, g.hash[:20])
 }
 
 // AddLine appends a line to the goroutine info.
@@ -235,22 +289,32 @@ func (g *Goroutine) Freeze() {
 		g.isFrozen = true
 		g.Trace = g.buf.String()
 		g.buf = nil
-		g.hash = string(g.hasher.Sum(nil))
+		g.hash = base64.StdEncoding.EncodeToString(
+			[]byte(g.hasher.Sum(nil)))
 	}
 }
 
 // PrintWithColor outputs the goroutine details to stdout with color.
-func (g Goroutine) Print(w *Writer) {
+func (g Goroutine) Print(w *Writer, duplicateIDs []int, pragma PragmaDedup) {
 	fmt.Fprint(w.blue(), g.Header)
-	if len(g.Duplicates) > 0 {
-		fmt.Fprintf(w.red(), "%d times [", len(g.Duplicates))
-		for i, id := range g.Duplicates {
-			if i > 0 {
-				fmt.Fprint(w, ", ")
+	switch pragma {
+	case PragmaDedupNone:
+	case PragmaDedupIDs:
+		if len(duplicateIDs) > 0 {
+			fmt.Fprintf(w.green(), " %d times [%d, ", len(duplicateIDs)+1, g.ID)
+
+			for i, id := range duplicateIDs {
+				if i > 0 {
+					fmt.Fprint(w, ", ")
+				}
+				fmt.Fprintf(w.green(), "%d", id)
 			}
-			fmt.Fprintf(w.green(), "%d", id)
+			fmt.Fprint(w.green(), "]")
 		}
-		fmt.Fprint(w.red(), "]")
+	case PragmaDedupNumber:
+		if len(duplicateIDs) > 0 {
+			fmt.Fprintf(w.green(), " %d times", len(duplicateIDs)+1)
+		}
 	}
 	fmt.Fprintf(w, "\n%s\n", g.Trace)
 }

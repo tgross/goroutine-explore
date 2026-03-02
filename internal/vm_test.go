@@ -330,7 +330,7 @@ func TestVM_SetFunctions(t *testing.T) {
 
 func TestVM_MultiAssignDiff(t *testing.T) {
 
-	// source: `g3, g4, g4 = g1.diff(g2)`
+	// source: `g3, g4, g5 = g1.diff(g2)`
 	chunk := &Chunk{
 		ops: []Op{
 			encode(OpCodeLoadGoroutineDump, 4), // load g1
@@ -365,10 +365,10 @@ func TestVM_MultiAssignDiff(t *testing.T) {
 	must.Eq(t, "[2]", gd3.String())
 
 	gd4 := expectDumpFromEnv(t, vm.env, "g4")
-	must.Eq(t, "[3]", gd4.String())
+	must.Eq(t, "[1 1]", gd4.String()) // not indexed so not de-duplicated
 
 	gd5 := expectDumpFromEnv(t, vm.env, "g5")
-	must.Eq(t, "[1]", gd5.String())
+	must.Eq(t, "[3]", gd5.String())
 }
 
 func TestVM_Show(t *testing.T) {

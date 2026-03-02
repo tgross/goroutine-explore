@@ -670,11 +670,11 @@ func (vm *VM) handleMultiAssignment(m MultiAssignment) error {
 		if err != nil {
 			return err
 		}
-		err = vm.assign(m[1], Value{TagDump, diff.Right})
+		err = vm.assign(m[1], Value{TagDump, diff.Common})
 		if err != nil {
 			return err
 		}
-		err = vm.assign(m[2], Value{TagDump, diff.Common})
+		err = vm.assign(m[2], Value{TagDump, diff.Right})
 		if err != nil {
 			return err
 		}
@@ -923,6 +923,6 @@ func opFuncShowDump(vm *VM, _ OpCode, _ uint) error {
 		return err
 	}
 
-	dump.Show(vm.wOut, limit, offset)
+	dump.Show(vm.wOut, PragmaDedup(vm.pragma.ShowDedup), limit, offset)
 	return nil
 }
