@@ -20,36 +20,13 @@ func TestEvaluator(t *testing.T) {
 	tempDir := t.TempDir()
 	env := map[string]Value{}
 
-	// TODO: this would be nicer if we had testdata files we could read in
 	g1 := NewGoroutineDump()
-	g1.Add(testGoroutineFromStack(`goroutine 1 [chan receive, 5 minutes]:
-main.main()
-	/home/tim/src/tgross/sdnotifying/main.go:62 +0x1e5
-`))
-
-	g1.Add(testGoroutineFromStack(`goroutine 2 [syscall]:
-os/signal.signal_recv()
-	/usr/local/go/src/runtime/sigqueue.go:152 +0x29
-os/signal.loop()
-	/usr/local/go/src/os/signal/signal_unix.go:23 +0x13
-created by os/signal.Notify.func1.1 in goroutine 1
-	/usr/local/go/src/os/signal/signal.go:151 +0x1f
-`))
-
-	g1.Add(testGoroutineFromStack(`goroutine 3 [select, 1 minutes]:
-		main.main()
-	/home/tim/src/tgross/sdnotifying/main.go:62 +0x1e5
-`))
+	g1.Add(mockGoroutine(1, "chan receive, 5 minutes"))
+	g1.Add(mockGoroutine(2, "syscall"))
+	g1.Add(mockGoroutine(3, "select, 1 minutes"))
 
 	g2 := NewGoroutineDump()
-	g2.Add(testGoroutineFromStack(`goroutine 20 [runnable]:
-net/http.(*connReader).startBackgroundRead.gowrap2()
-	/usr/local/go/src/net/http/server.go:677
-runtime.goexit({})
-	/usr/local/go/src/runtime/asm_amd64.s:1695 +0x1
-created by net/http.(*connReader).startBackgroundRead in goroutine 37
-	/usr/local/go/src/net/http/server.go:677 +0xba
-`))
+	g2.Add(mockGoroutine(20, "runnable"))
 
 	env["g1"] = Value{Tag: TagDump, Data: g1}
 	env["g2"] = Value{Tag: TagDump, Data: g2}
@@ -184,21 +161,9 @@ func BenchmarkEvaluator(b *testing.B) {
 
 	// TODO: this would be nicer if we had testdata files we could read in
 	g1 := NewGoroutineDump()
-	g1.Add(testGoroutineFromStack(`goroutine 1 [chan receive 5 min]:
-main.main()
-	/home/tim/src/tgross/sdnotifying/main.go:62 +0x1e5
-`))
-	g1.Add(testGoroutineFromStack(`goroutine 2 [syscall]:
-os/signal.signal_recv()
-	/usr/local/go/src/runtime/sigqueue.go:152 +0x29
-os/signal.loop()
-	/usr/local/go/src/os/signal/signal_unix.go:23 +0x13
-created by os/signal.Notify.func1.1 in goroutine 1
-	/usr/local/go/src/os/signal/signal.go:151 +0x1f
-`))
-	g1.Add(testGoroutineFromStack(`main.main()
-	/home/tim/src/tgross/sdnotifying/main.go:62 +0x1e5
-`))
+	g1.Add(mockGoroutine(1, "chan receive 5 min"))
+	g1.Add(mockGoroutine(2, "syscall"))
+	g1.Add(mockGoroutine(3, "running"))
 
 	env["g1"] = Value{Tag: TagDump, Data: g1}
 

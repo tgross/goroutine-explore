@@ -57,9 +57,9 @@ func TestVM_SimpleWhere(t *testing.T) {
 			},
 			constants: []any{"g2", "g1", ".duration", 10},
 			g1Fn: func(g1 *GoroutineDump) {
-				g1.Add(testGoroutine(`goroutine 1 [running]:`))
-				g1.Add(testGoroutine(`goroutine 2 [select, 20 minutes]:`))
-				g1.Add(testGoroutine(`goroutine 3 [IO wait, 5 minutes]:`))
+				g1.Add(mockMinGoroutine(`goroutine 1 [running]:`))
+				g1.Add(mockMinGoroutine(`goroutine 2 [select, 20 minutes]:`))
+				g1.Add(mockMinGoroutine(`goroutine 3 [IO wait, 5 minutes]:`))
 			},
 			expectFn: func(t *testing.T, g2 *GoroutineDump) {
 				must.Eq(t, 1, g2.Len())
@@ -83,9 +83,9 @@ func TestVM_SimpleWhere(t *testing.T) {
 			},
 			constants: []any{"g2", "g1", ".state", "running"},
 			g1Fn: func(g1 *GoroutineDump) {
-				g1.Add(testGoroutine(`goroutine 1 [select, 20 minutes]:`))
-				g1.Add(testGoroutine(`goroutine 2 [running]:`))
-				g1.Add(testGoroutine(`goroutine 3 [IO wait, 5 minutes]:`))
+				g1.Add(mockMinGoroutine(`goroutine 1 [select, 20 minutes]:`))
+				g1.Add(mockMinGoroutine(`goroutine 2 [running]:`))
+				g1.Add(mockMinGoroutine(`goroutine 3 [IO wait, 5 minutes]:`))
 			},
 			expectFn: func(t *testing.T, g2 *GoroutineDump) {
 				must.Eq(t, 2, g2.Len())
@@ -110,13 +110,11 @@ func TestVM_SimpleWhere(t *testing.T) {
 			},
 			constants: []any{"g2", "g1", ".trace", "sdnotifying"},
 			g1Fn: func(g1 *GoroutineDump) {
-				g1.Add(testGoroutine(`goroutine 1 [running]:`))
-				g1.Add(testGoroutineFromStack(`goroutine 2 [select, 1 minutes]:
-main.main()
-	/home/tim/src/tgross/sdnotifying/main.go:62 +0x1e5
+				g1.Add(mockGoroutine(1, "running"))
+				g1.Add(mockGoroutine(2, "select, 1 minutes", `main.main()
+	/src/sdnotifying/main.go:62 +0x1e5
 `))
-				g1.Add(testGoroutine(`goroutine 3 [syscall]:
-os/signal.signal_recv()
+				g1.Add(mockGoroutine(3, "syscall", `os/signal.signal_recv()
 	/usr/local/go/src/runtime/sigqueue.go:152 +0x29
 				`))
 			},
@@ -177,13 +175,13 @@ func TestVM_SetFunctions(t *testing.T) {
 			constants: []any{"g1", "g2"},
 			g1Fn: func() *GoroutineDump {
 				g1 := NewGoroutineDump()
-				g1.Add(testGoroutine(`goroutine 1 [select, 20 minutes]:`))
-				g1.Add(testGoroutine(`goroutine 2 [running]:`))
+				g1.Add(mockMinGoroutine(`goroutine 1 [select, 20 minutes]:`))
+				g1.Add(mockMinGoroutine(`goroutine 2 [running]:`))
 				return g1
 			},
 			g2Fn: func() *GoroutineDump {
 				g2 := NewGoroutineDump()
-				g2.Add(testGoroutine(`goroutine 3 [select, 10 IO wait]:`))
+				g2.Add(mockMinGoroutine(`goroutine 3 [select, 10 IO wait]:`))
 				return g2
 			},
 			expectFn: func(t *testing.T, g *GoroutineDump) {
@@ -214,15 +212,15 @@ func TestVM_SetFunctions(t *testing.T) {
 			constants: []any{"g1", "g2", ".duration", 10},
 			g1Fn: func() *GoroutineDump {
 				g1 := NewGoroutineDump()
-				g1.Add(testGoroutine(`goroutine 1 [select, 20 minutes]:`))
-				g1.Add(testGoroutine(`goroutine 2 [running]:`))
+				g1.Add(mockMinGoroutine(`goroutine 1 [select, 20 minutes]:`))
+				g1.Add(mockMinGoroutine(`goroutine 2 [running]:`))
 				return g1
 			},
 			g2Fn: func() *GoroutineDump {
 				g2 := NewGoroutineDump()
-				g2.Add(testGoroutine(`goroutine 3 [IO wait, 20 minutes]:`))
-				g2.Add(testGoroutine(`goroutine 98 [chan receive]:`))
-				g2.Add(testGoroutine(`goroutine 99 [running]:`))
+				g2.Add(mockMinGoroutine(`goroutine 3 [IO wait, 20 minutes]:`))
+				g2.Add(mockMinGoroutine(`goroutine 98 [chan receive]:`))
+				g2.Add(mockMinGoroutine(`goroutine 99 [running]:`))
 				return g2
 			},
 			expectFn: func(t *testing.T, g *GoroutineDump) {
@@ -253,15 +251,15 @@ func TestVM_SetFunctions(t *testing.T) {
 			constants: []any{"g1", "g2", ".duration", 10},
 			g1Fn: func() *GoroutineDump {
 				g1 := NewGoroutineDump()
-				g1.Add(testGoroutine(`goroutine 2 [IO wait, 20 minutes]:`))
-				g1.Add(testGoroutine(`goroutine 98 [chan receive]:`))
-				g1.Add(testGoroutine(`goroutine 99 [running]:`))
+				g1.Add(mockMinGoroutine(`goroutine 2 [IO wait, 20 minutes]:`))
+				g1.Add(mockMinGoroutine(`goroutine 98 [chan receive]:`))
+				g1.Add(mockMinGoroutine(`goroutine 99 [running]:`))
 				return g1
 			},
 			g2Fn: func() *GoroutineDump {
 				g2 := NewGoroutineDump()
-				g2.Add(testGoroutine(`goroutine 3 [select, 20 minutes]:`))
-				g2.Add(testGoroutine(`goroutine 1 [running]:`))
+				g2.Add(mockMinGoroutine(`goroutine 3 [select, 20 minutes]:`))
+				g2.Add(mockMinGoroutine(`goroutine 1 [running]:`))
 				return g2
 			},
 			expectFn: func(t *testing.T, g *GoroutineDump) {
@@ -283,14 +281,14 @@ func TestVM_SetFunctions(t *testing.T) {
 			constants: []any{"g1", "g2"},
 			g1Fn: func() *GoroutineDump {
 				g1 := NewGoroutineDump()
-				g1.Add(testGoroutine(`goroutine 1 [select, 20 minutes]:`))
-				g1.Add(testGoroutine(`goroutine 2 [running]:`))
+				g1.Add(mockMinGoroutine(`goroutine 1 [select, 20 minutes]:`))
+				g1.Add(mockMinGoroutine(`goroutine 2 [running]:`))
 				return g1
 			},
 			g2Fn: func() *GoroutineDump {
 				g2 := NewGoroutineDump()
-				g2.Add(testGoroutine(`goroutine 1 [select, 20 minutes]:`))
-				g2.Add(testGoroutine(`goroutine 3 [IO wait, 10 minutes]:`))
+				g2.Add(mockMinGoroutine(`goroutine 1 [select, 20 minutes]:`))
+				g2.Add(mockMinGoroutine(`goroutine 3 [IO wait, 10 minutes]:`))
 				return g2
 			},
 			expectFn: func(t *testing.T, g *GoroutineDump) {
@@ -345,12 +343,12 @@ func TestVM_MultiAssignDiff(t *testing.T) {
 	vm.Reset(chunk)
 
 	g1 := NewGoroutineDump()
-	g1.Add(testGoroutine(`goroutine 1 [select, 20 minutes]:`))
-	g1.Add(testGoroutine(`goroutine 2 [running]:`))
+	g1.Add(mockMinGoroutine(`goroutine 1 [select, 20 minutes]:`))
+	g1.Add(mockMinGoroutine(`goroutine 2 [running]:`))
 
 	g2 := NewGoroutineDump()
-	g2.Add(testGoroutine(`goroutine 1 [select, 20 minutes]:`))
-	g2.Add(testGoroutine(`goroutine 3 [IO wait, 10 minutes]:`))
+	g2.Add(mockMinGoroutine(`goroutine 1 [select, 20 minutes]:`))
+	g2.Add(mockMinGoroutine(`goroutine 3 [IO wait, 10 minutes]:`))
 
 	vm.env = map[string]Value{
 		"g1": {Tag: TagDump, Data: g1},
@@ -388,9 +386,9 @@ func TestVM_Show(t *testing.T) {
 	vm.Reset(chunk)
 
 	g1 := NewGoroutineDump()
-	g1.Add(testGoroutine("goroutine 1 [select, 20 minutes]:"))
-	g1.Add(testGoroutine("goroutine 2 [running]:"))
-	g1.Add(testGoroutine("goroutine 3 [IO wait, 10 minutes]:"))
+	g1.Add(mockMinGoroutine("goroutine 1 [select, 20 minutes]:"))
+	g1.Add(mockMinGoroutine("goroutine 2 [running]:"))
+	g1.Add(mockMinGoroutine("goroutine 3 [IO wait, 10 minutes]:"))
 	vm.env = map[string]Value{"g1": {Tag: TagDump, Data: g1}}
 	err := vm.Run(context.TODO())
 	must.NoError(t, err)
@@ -417,13 +415,13 @@ func TestVM_CommandVars(t *testing.T) {
 	vm.Reset(chunk)
 
 	g1 := NewGoroutineDump()
-	g1.Add(testGoroutine(`goroutine 1 [select, 20 minutes]:`))
-	g1.Add(testGoroutine(`goroutine 2 [running]:`))
-	g1.Add(testGoroutine(`goroutine 3 [IO wait, 10 minutes]:`))
+	g1.Add(mockMinGoroutine(`goroutine 1 [select, 20 minutes]:`))
+	g1.Add(mockMinGoroutine(`goroutine 2 [running]:`))
+	g1.Add(mockMinGoroutine(`goroutine 3 [IO wait, 10 minutes]:`))
 
 	g2 := NewGoroutineDump()
-	g2.Add(testGoroutine(`goroutine 1 [select, 20 minutes]:`))
-	g2.Add(testGoroutine(`goroutine 3 [IO wait, 10 minutes]:`))
+	g2.Add(mockMinGoroutine(`goroutine 1 [select, 20 minutes]:`))
+	g2.Add(mockMinGoroutine(`goroutine 3 [IO wait, 10 minutes]:`))
 
 	vm.env = map[string]Value{
 		"g1": {Tag: TagDump, Data: g1},

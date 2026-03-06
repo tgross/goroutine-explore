@@ -5,27 +5,37 @@ package internal
 
 import (
 	"bytes"
-	"fmt"
+	"regexp"
 	"testing"
 
 	"github.com/shoenig/test/must"
 )
 
 func TestGoroutineDump_ShowOffset(t *testing.T) {
-	const dummyGoroutineMetaTmpl = `goroutine %d [%s]:`
-
 	dump := NewGoroutineDump()
-	for i := 0; i < 20; i++ {
-		gr, err := NewGoroutine(fmt.Sprintf(dummyGoroutineMetaTmpl, i, "running"))
-		must.NoError(t, err)
-		dump.goroutines = append(dump.goroutines, gr)
+
+	stack1 := mockStack(4)
+	stack2 := mockStack(5)
+	stack3 := mockStack(2)
+
+	for i := 1; i <= 5; i++ {
+		dump.Add(mockGoroutine(i, "runnable", stack1))
 	}
+	for i := 6; i <= 15; i++ {
+		dump.Add(mockGoroutine(i, "select, 5 minutes", stack2))
+	}
+	for i := 16; i <= 20; i++ {
+		dump.Add(mockGoroutine(i, "IO wait", stack3))
+	}
+
+	// use an un-anchored pattern so we can tolerate duplicates list
+	patt := regexp.MustCompile(`^goroutine\s+(\d+)\s+.*\[(.*)\]:`)
 
 	// round-trip everything we Show() back thru load()
 	getIDs := func(t *testing.T, buf *bytes.Buffer) []int {
 		t.Helper()
 		got := []int{}
-		out, err := loadFrom(buf)
+		out, err := loadFrom(buf, patt)
 		must.NoError(t, err)
 		for _, goroutine := range out.goroutines {
 			got = append(got, goroutine.ID)
@@ -36,37 +46,80 @@ func TestGoroutineDump_ShowOffset(t *testing.T) {
 	recorder := new(bytes.Buffer)
 	w := NewWriter(recorder)
 
-	recorder.Reset()
-	dump.Show(w, PragmaDedupNone, 25, 0)
-	must.Eq(t, []int{0, 1, 2, 3, 4, 5, 6, 7, 8, 9,
-		10, 11, 12, 13, 14, 15, 16, 17, 18, 19,
-	}, getIDs(t, recorder))
+	testCases := []struct {
+		name   string
+		pragma PragmaDedup
+		limit  int
+		offset int
+		expect []int
+	}{
+		{
+			name:   "no dedup limit more than total",
+			pragma: PragmaDedupNone,
+			limit:  25,
+			offset: 0,
+			expect: []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10,
+				11, 12, 13, 14, 15, 16, 17, 18, 19, 20},
+		},
+		{
+			name:   "no dedup offset pushes limit past end",
+			pragma: PragmaDedupNone,
+			limit:  25,
+			offset: 10,
+			expect: []int{11, 12, 13, 14, 15, 16, 17, 18, 19, 20},
+		},
+		{
+			name:   "no dedup offset more than total",
+			pragma: PragmaDedupNone,
+			limit:  5,
+			offset: 25,
+			expect: []int{},
+		},
+		{
+			name:   "with dedup limit more than total",
+			pragma: PragmaDedupIDs,
+			limit:  25,
+			offset: 0,
+			expect: []int{1, 6, 16},
+		},
+		{
+			name:   "with dedup offset pushes limit past end",
+			pragma: PragmaDedupIDs,
+			limit:  5,
+			offset: 1,
+			expect: []int{6, 16},
+		},
+		{
+			name:   "with dedup offset more than total",
+			pragma: PragmaDedupIDs,
+			limit:  5,
+			offset: 25,
+			expect: []int{},
+		},
+	}
 
-	recorder.Reset()
-	dump.Show(w, PragmaDedupNone, 5, 10)
-	must.Eq(t, []int{10, 11, 12, 13, 14}, getIDs(t, recorder))
-
-	recorder.Reset()
-	dump.Show(w, PragmaDedupNone, 20, 10)
-	must.Eq(t, []int{10, 11, 12, 13, 14, 15, 16, 17, 18, 19}, getIDs(t, recorder))
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			recorder.Reset()
+			dump.Show(w, tc.pragma, tc.limit, tc.offset)
+			must.Eq(t, tc.expect, getIDs(t, recorder))
+		})
+	}
 }
 
 func TestGoroutine_Indexing(t *testing.T) {
 
 	gd := NewGoroutineDump()
-	gd.Add(testGoroutine(`goroutine 20 [IO wait]:`))
+	gd.Add(mockGoroutine(20, "IO wait"))
 
+	stack1 := mockStack(4)
 	for i := 1; i < 5; i++ {
-		gd.Add(testGoroutineFromStack(fmt.Sprintf(`goroutine %d [runnable]:
-net/http.(*connReader).startBackgroundRead.gowrap2()
-	/usr/local/go/src/net/http/server.go:677`, i)))
+		gd.Add(mockGoroutine(i, "runnable", stack1))
 	}
 
+	stack2 := mockStack(5)
 	for i := 10; i > 5; i-- {
-		gd.Add(testGoroutineFromStack(fmt.Sprintf(
-			`goroutine %d [select, 1 minutes]:
-		main.main()
-	/home/tim/src/tgross/sdnotifying/main.go:62 +0x1e5`, i)))
+		gd.Add(mockGoroutine(i, "runnable", stack2))
 	}
 
 	gd.Sort()
