@@ -1,8 +1,9 @@
-goroutine-explore
+**goroutine-explore**
+
 Copyright (c) 2021-2026 The goroutine-explore contributors
 
 All contributions since November 11, 2021 are licensed under the Blue
-Oak Model License (1.0.0).
+Oak Model License (1.0.0). See the LICENSE.md file in this repository.
 
 ---
 
@@ -40,31 +41,31 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 The following components are included in this project:
 
 `golang.org/x/sys`
-https://pkg.go.dev/golang.org/x/sys
-Copyright (c) 2009 The Go Authors
-Licensed under the BSD-3-Clause License
+* https://pkg.go.dev/golang.org/x/sys
+* Copyright (c) 2009 The Go Authors
+* Licensed under the BSD-3-Clause License
 
 `google/go-cmp`
-https://github.com/google/go-cmp
-Copyright (c) 2017 The Go Authors
-Licensed under the BSD-3-Clause License
+* https://github.com/google/go-cmp
+* Copyright (c) 2017 The Go Authors
+* Licensed under the BSD-3-Clause License
 
 `mattn/go-isatty`
-https://github.com/mattn/go-isatty
-Copyright Yasuhiro Matsumoto
-Licensed under the MIT License
+* https://github.com/mattn/go-isatty
+* Copyright Yasuhiro Matsumoto
+* Licensed under the MIT License
 
 `mattn/go-runewidth`
-https://github.com/mattn/go-runwidth
-Copyright (c) 2016 Yasuhiro Matsumoto
-Licensed under the MIT License
+* https://github.com/mattn/go-runwidth
+* Copyright (c) 2016 Yasuhiro Matsumoto
+* Licensed under the MIT License
 
 `peterh/liner`
-https://github.com/peterh/liner
-Copyright (c) 2012 Peter Harris
-Licensed under the MIT License
+* https://github.com/peterh/liner
+* Copyright (c) 2012 Peter Harris
+* Licensed under the MIT License
 
 `shoenig/test`
-https://github.com/shoenig/test
-Copyright (c) The Test Authors
-Licensed under the Mozilla Public License, version 2.0
+* https://github.com/shoenig/test
+* Copyright (c) The Test Authors
+* Licensed under the Mozilla Public License, version 2.0
