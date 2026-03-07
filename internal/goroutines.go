@@ -188,14 +188,13 @@ func (gd GoroutineDump) Save(fn string) error {
 	if err != nil {
 		return err
 	}
-	defer f.Close() //nolint:errcheck
+	defer f.Close()
 
 	w := NewWriter(f)
 	for _, g := range gd.goroutines {
 		g.Print(w, nil, PragmaDedupNone)
 	}
-
-	return nil
+	return f.Sync()
 }
 
 type Goroutine struct {
@@ -294,8 +293,8 @@ func (g *Goroutine) Freeze() {
 	}
 }
 
-// PrintWithColor outputs the goroutine details to stdout with color.
-func (g Goroutine) Print(w *Writer, duplicateIDs []int, pragma PragmaDedup) {
+// Print outputs the goroutine details to stdout with color.
+func (g *Goroutine) Print(w *Writer, duplicateIDs []int, pragma PragmaDedup) {
 	fmt.Fprint(w.blue(), g.Header)
 	switch pragma {
 	case PragmaDedupNone:

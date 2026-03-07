@@ -2,15 +2,17 @@ version: '2'
 linters:
   enable:
     - errorlint
+    - gocritic
   settings:
     errcheck:
       check-type-assertions: true
       disable-default-exclusions: false
       verbose: true
       exclude-functions:
-        - fmt.Fprint
-        - fmt.Fprintf
-        - fmt.Fprintln
+        - "fmt.Fprint"
+        - "fmt.Fprintf"
+        - "fmt.Fprintln"
+        - "(*os.File).Close"
 formatters:
   enable:
     - goimports

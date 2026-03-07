@@ -63,7 +63,7 @@ func createLiner(e *internal.Evaluator) (*liner.State, error) {
 	})
 
 	if f, err := os.Open(getHistoryFile()); err == nil {
-		defer f.Close() //nolint:errcheck
+		defer f.Close()
 		_, err := lines.ReadHistory(f)
 		if err != nil {
 			return nil, err
@@ -73,13 +73,13 @@ func createLiner(e *internal.Evaluator) (*liner.State, error) {
 	return lines, nil
 }
 
-func saveLiner(liner *liner.State) error {
+func saveLiner(lines *liner.State) error {
 	f, err := os.Create(getHistoryFile())
 	if err != nil {
 		log.Fatal("Error writing history file: ", err)
 	}
-	defer f.Close() //nolint:errcheck
+	defer f.Close()
 
-	_, err = liner.WriteHistory(f)
+	_, err = lines.WriteHistory(f)
 	return err
 }

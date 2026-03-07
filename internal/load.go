@@ -32,7 +32,7 @@ func load(fn string) (*GoroutineDump, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer f.Close() //nolint:errcheck
+	defer f.Close()
 	return loadFrom(f, startLinePattern)
 }
 
@@ -45,7 +45,8 @@ func loadFrom(r io.Reader, startPattern *regexp.Regexp) (*GoroutineDump, error) 
 	scanner := bufio.NewScanner(r)
 	for scanner.Scan() {
 		line := scanner.Text()
-		if startPattern.MatchString(line) {
+		switch {
+		case startPattern.MatchString(line):
 			// Freeze any previous goroutine to tolerate dumps without line
 			// breaks
 			if goroutine != nil {
@@ -57,13 +58,13 @@ func loadFrom(r io.Reader, startPattern *regexp.Regexp) (*GoroutineDump, error) 
 				return nil, err
 			}
 			dump.Add(goroutine)
-		} else if line == "" {
+		case line == "":
 			// End of a goroutine section.
 			if goroutine != nil {
 				goroutine.Freeze()
 			}
 			goroutine = nil
-		} else if goroutine != nil {
+		case goroutine != nil:
 			goroutine.AddLine(line)
 		}
 	}

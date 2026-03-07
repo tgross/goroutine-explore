@@ -90,47 +90,49 @@ func repl(e *internal.Evaluator) int {
 	previousCtrlC := false
 
 	for {
-		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
-		defer stop()
-
-		src, err := nextSrc(lines)
-		if err != nil {
-			if errors.Is(err, liner.ErrPromptAborted) {
-				if previousCtrlC {
-					return 0 // 2 Ctrl-C in a row quits
-				}
-				previousCtrlC = true
-				continue // Ctrl-C
-			}
-			if errors.Is(err, io.EOF) {
-				return 0 // Ctrl-D quits
-			}
-			fmt.Println(err.Error())
-			return 1
-		}
-		previousCtrlC = false
-
-		// append to history even if it won't compile so that users can up-arrow
-		// to edit their mistake
-		lines.AppendHistory(src)
-
-		err = e.Eval(ctx, src)
+		err := replOnce(e, lines)
 		if err != nil {
 			switch {
 			case errors.Is(err, internal.ErrCommandQuit):
 				return 0
 			case errors.Is(err, internal.ErrNoSuchOpCode):
 				return 129
+			case errors.Is(err, liner.ErrPromptAborted):
+				if previousCtrlC {
+					return 0 // 2 Ctrl-C in a row quits
+				}
+				previousCtrlC = true
+				continue // Ctrl-C
+			case errors.Is(err, io.EOF):
+				return 0 // Ctrl-D quits
 			}
-			// any non-fatal error will already have been reported by the VM to
-			// stderr
-			continue
+			fmt.Println(err.Error())
+			return 1
 		}
-
-		// note: there's a tiny race between here and the next loop iteration
-		// where Ctrl-C is unhandled
-		stop()
+		previousCtrlC = false
 	}
+}
+
+func replOnce(e *internal.Evaluator, lines *liner.State) error {
+	// note: there's a race between here and the next loop iteration where
+	// Ctrl-C is unhandled
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+	defer stop()
+
+	src, err := nextSrc(lines)
+	if err != nil {
+		return err
+	}
+
+	// append to history even if it won't compile so that users can up-arrow to
+	// edit their mistake
+	lines.AppendHistory(src)
+
+	err = e.Eval(ctx, src)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 // nextSrc grabs the next line off the liner, and handles concatenating

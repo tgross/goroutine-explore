@@ -13,7 +13,7 @@ const (
 	TagString            // string
 	TagIdentifier        // identifier
 	TagFieldAccessor     // field accessor
-	TagCommand           //command
+	TagCommand           // command
 	TagDump              // dump
 	TagGoroutine         // goroutine
 	TagAddress           // address

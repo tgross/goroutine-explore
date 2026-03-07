@@ -354,7 +354,7 @@ func TestCompiler_Paths(t *testing.T) {
 
 func TestCompiler_DiffMultiAssign(t *testing.T) {
 
-	src := `g3, g4, g5 = g1.diff(g2)` //`| l, r, c = diff g2`
+	src := `g3, g4, g5 = g1.diff(g2)`
 	body := strings.NewReader(src)
 
 	tokenizer := NewTokenizer()

@@ -23,7 +23,7 @@ func opCommandListDir(vm *VM, _ OpCode, _ uint) error {
 	if err != nil {
 		return err
 	}
-	defer f.Close() //nolint:errcheck
+	defer f.Close()
 
 	fis, err := f.Readdir(-1)
 	if err != nil {
