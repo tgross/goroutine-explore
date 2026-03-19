@@ -5,7 +5,6 @@ package internal
 
 import (
 	"bytes"
-	"context"
 	"testing"
 
 	"github.com/shoenig/test/must"
@@ -140,7 +139,7 @@ func TestVM_SimpleWhere(t *testing.T) {
 				"g1": {Tag: TagDump, Data: g1},
 			}
 
-			err := vm.Run(context.TODO())
+			err := vm.Run(t.Context())
 			vm.debug()
 			must.NoError(t, err)
 
@@ -312,7 +311,7 @@ func TestVM_SetFunctions(t *testing.T) {
 				"g2": {Tag: TagDump, Data: tc.g2Fn()},
 			}
 
-			err := vm.Run(context.TODO())
+			err := vm.Run(t.Context())
 			vm.debug()
 			must.NoError(t, err)
 
@@ -355,7 +354,7 @@ func TestVM_MultiAssignDiff(t *testing.T) {
 		"g2": {Tag: TagDump, Data: g2},
 	}
 
-	err := vm.Run(context.TODO())
+	err := vm.Run(t.Context())
 	vm.debug()
 	must.NoError(t, err)
 
@@ -390,7 +389,7 @@ func TestVM_Show(t *testing.T) {
 	g1.Add(mockMinGoroutine("goroutine 2 [running]:"))
 	g1.Add(mockMinGoroutine("goroutine 3 [IO wait, 10 minutes]:"))
 	vm.env = map[string]Value{"g1": {Tag: TagDump, Data: g1}}
-	err := vm.Run(context.TODO())
+	err := vm.Run(t.Context())
 	must.NoError(t, err)
 	must.Eq(t, `goroutine 2 [running]:
 
@@ -428,7 +427,7 @@ func TestVM_CommandVars(t *testing.T) {
 		"g2": {Tag: TagDump, Data: g2},
 	}
 
-	err := vm.Run(context.TODO())
+	err := vm.Run(t.Context())
 	must.EqError(t, err, ErrCommandOk.Error())
 	must.Eq(t, `g1: 3
 g2: 2
@@ -437,7 +436,7 @@ g2: 2
 	vm.pragma.VarsDisplay = PragmaDisplaySummary
 	vm.Reset(chunk)
 	recorder.Reset()
-	err = vm.Run(context.TODO())
+	err = vm.Run(t.Context())
 	must.EqError(t, err, ErrCommandOk.Error())
 	must.Eq(t, `# of goroutines in "g1": 3
         IO wait: 1
@@ -505,7 +504,7 @@ func TestVM_CommandPragma(t *testing.T) {
 			}
 			vm := NewVM(&Config{WorkDir: t.TempDir()})
 			vm.Reset(chunk)
-			err := vm.Run(context.TODO())
+			err := vm.Run(t.Context())
 			vm.debug()
 			must.EqError(t, err, ErrCommandOk.Error())
 			tc.expectFn(t, vm.pragma)

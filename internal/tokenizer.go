@@ -24,7 +24,6 @@ type Token struct {
 }
 
 func (t Token) String() string {
-	// TODO: should we implement stringer or is that just code bloat?
 	return fmt.Sprintf("Token{Type: %v, Pos: %d:%d, Lexeme: %q}",
 		t.Type, t.Pos.Line, t.Pos.Column, t.Lexeme)
 }

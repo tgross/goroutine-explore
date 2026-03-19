@@ -651,8 +651,6 @@ func (p *Compiler) consume(want TokenType) (Token, error) {
 		return EmptyToken, compileErr(tok, "%w", err)
 	}
 	if tok.Type != want {
-		// TODO: we didn't implement stringer for Token but if we're going to
-		// return it in errors we probably should
 		return EmptyToken, compileErr(tok, "expected %v got %v", want, tok.Type)
 	}
 	tok, err = p.tokenizer.Next()
@@ -689,8 +687,6 @@ func (p *Compiler) expect(want TokenType) error {
 		return compileErr(tok, "expected %v, got error %v", want, err)
 	}
 	if tok.Type != want {
-		// TODO: we didn't implement stringer for Token but if we're going to
-		// return it in errors we probably should
 		return compileErr(tok, "expected %v, got %v", want, tok.Type)
 	}
 	_, err = p.tokenizer.Next()

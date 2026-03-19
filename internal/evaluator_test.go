@@ -5,7 +5,6 @@ package internal
 
 import (
 	"bytes"
-	"context"
 	"io"
 	"testing"
 
@@ -134,7 +133,7 @@ func TestEvaluator(t *testing.T) {
 				Stderr:  errRecorder,
 			})
 			e.vm.env = env // simulate earlier expressions
-			err := e.Eval(context.TODO(), tc.src)
+			err := e.Eval(t.Context(), tc.src)
 			if tc.expectErrMsg != "" {
 				test.EqError(t, err, tc.expectErrMsg)
 			} else {
@@ -176,7 +175,7 @@ func BenchmarkEvaluator(b *testing.B) {
 		Stderr:  io.Discard,
 	})
 	e.vm.env = env // simulate earlier expressions
-	ctx := context.TODO()
+	ctx := b.Context()
 
 	for b.Loop() {
 		err := e.Eval(ctx, src)
