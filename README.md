@@ -478,14 +478,15 @@ Example:
 
 Each dump item has 5 properties which can be used in conditionals:
 
-| property    | type   | meaning                                             |
-|-------------|--------|-----------------------------------------------------|
-| `.id`       | number | The goroutine ID.                                   |
-| `.dups`     | number | The number of duplicate traces.                     |
-| `.duration` | number | The waiting duration (in minutes) of a goroutine.   |
-| `.lines`    | number | The number of lines of the goroutine's stack trace. |
-| `.state`    | string | The running state of the goroutine.                 |
-| `.trace`    | string | The concatenated text of the goroutine stack trace. |
+| property     | type   | meaning                                             |
+|--------------|--------|-----------------------------------------------------|
+| `.id`        | number | The goroutine ID.                                   |
+| `.createdby` | number | The goroutine ID of the parent goroutine            |
+| `.dups`      | number | The number of duplicate traces.                     |
+| `.duration`  | number | The waiting duration (in minutes) of a goroutine.   |
+| `.lines`     | number | The number of lines of the goroutine's stack trace. |
+| `.state`     | string | The running state of the goroutine.                 |
+| `.trace`     | string | The concatenated text of the goroutine stack trace. |
 
 ### Diff
 

@@ -391,7 +391,7 @@ func opLoadString(vm *VM, _ OpCode, index uint) error {
 }
 
 func (vm *VM) fetchConstant(index uint) (any, error) {
-	if index > uint(len(vm.chunk.constants)) {
+	if index > uint(len(vm.chunk.constants)) || len(vm.chunk.constants) == 0 {
 		return nil, ErrExpectedConstantValueByte
 	}
 	con := vm.chunk.constants[index]
@@ -541,6 +541,10 @@ func opLoadFieldAccessor(vm *VM, _ OpCode, index uint) error {
 		vm.push(Value{Tag: TagNumber, Data: g.Duration})
 	case "state", ".state":
 		vm.push(Value{Tag: TagString, Data: g.State})
+	case "createdby", ".createdby", "createdBy", ".createdBy":
+		vm.push(Value{Tag: TagNumber, Data: g.CreatedBy})
+	case "dups", ".dups":
+		vm.push(Value{Tag: TagNumber, Data: len(g.Duplicates)})
 	}
 
 	return nil
@@ -808,22 +812,6 @@ func opCommandQuit(vm *VM, _ OpCode, _ uint) error {
 	}
 
 	return ErrCommandQuit
-}
-
-func opCommandHelp(vm *VM, _ OpCode, index uint) error {
-	// TODO: what about when we have no topic?
-	con, err := vm.fetchConstant(index)
-	if err != nil {
-		return err
-	}
-	topic, ok := con.(string)
-	if !ok {
-		return fmt.Errorf("help topics must be strings")
-	}
-
-	// TODO: lookup topic
-	fmt.Fprintf(vm.wOut, "help for topic: %s", topic)
-	return ErrCommandOk
 }
 
 func opCommandGetPragma(vm *VM, _ OpCode, _ uint) error {

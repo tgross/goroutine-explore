@@ -382,7 +382,7 @@ func (p *Compiler) parseCommand(cmd Token) error {
 			if !ok {
 				panic("got a command token for a non-command")
 			}
-			if len(sig.args) > 0 {
+			if sig.minArgs > 0 {
 				return compileErr(cmd, "%w for %q command, got none",
 					ErrMissingArgs, cmd.Lexeme)
 			}
@@ -411,31 +411,32 @@ const (
 // signatures are the type signature of every function, not including the
 // receiver, which is always an expression
 var signatures = map[string]struct {
-	op   OpCode
-	args []argType
+	op      OpCode
+	args    []argType
+	minArgs int
 }{
-	"union":     {OpCodeFuncUnion, []argType{expr}},
-	"diff":      {OpCodeFuncDiff, []argType{expr}},
-	"intersect": {OpCodeFuncIntersect, []argType{expr}},
-	"load":      {OpCodeFuncLoad, []argType{str}},
-	"save":      {OpCodeFuncSave, []argType{str}},
-	"as":        {OpCodeAssignment, []argType{identifier}},
+	"union":     {OpCodeFuncUnion, []argType{expr}, 1},
+	"diff":      {OpCodeFuncDiff, []argType{expr}, 1},
+	"intersect": {OpCodeFuncIntersect, []argType{expr}, 1},
+	"load":      {OpCodeFuncLoad, []argType{str}, 1},
+	"save":      {OpCodeFuncSave, []argType{str}, 1},
+	"as":        {OpCodeAssignment, []argType{identifier}, 1},
 	"show": {OpCodeFuncShowDump, []argType{
-		numeric | optional, numeric | optional}},
+		numeric | optional, numeric | optional}, 0},
 
 	// these have more complex handling so we don't have a single OpCode
-	"where":  {OpCodeNoop, []argType{predicate}},
-	"delete": {OpCodeNoop, []argType{predicate}},
+	"where":  {OpCodeNoop, []argType{predicate}, 1},
+	"delete": {OpCodeNoop, []argType{predicate}, 1},
 
 	// commands
-	"cd":    {OpCodeCommandChangeDir, []argType{str}},
-	"ls":    {OpCodeCommandListDir, nil},
-	"empty": {OpCodeCommandEmpty, nil},
-	"exit":  {OpCodeCommandQuit, nil},
-	"quit":  {OpCodeCommandQuit, nil},
-	"help":  {OpCodeCommandHelp, nil},
-	"pwd":   {OpCodeCommandGetWorkingDir, nil},
-	"vars":  {OpCodeCommandVars, nil},
+	"cd":    {OpCodeCommandChangeDir, []argType{str}, 1},
+	"ls":    {OpCodeCommandListDir, nil, 0},
+	"empty": {OpCodeCommandEmpty, nil, 0},
+	"exit":  {OpCodeCommandQuit, nil, 0},
+	"quit":  {OpCodeCommandQuit, nil, 0},
+	"help":  {OpCodeCommandHelp, []argType{str | optional}, 0},
+	"pwd":   {OpCodeCommandGetWorkingDir, nil, 0},
+	"vars":  {OpCodeCommandVars, nil, 0},
 }
 
 func (p *Compiler) parseFunctionArgs(fun Token) error {
