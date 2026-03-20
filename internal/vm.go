@@ -10,6 +10,7 @@ import (
 	"maps"
 	"os"
 	"reflect"
+	"regexp"
 	"slices"
 	"sort"
 	"strings"
@@ -33,18 +34,20 @@ type VM struct {
 
 	regGoroutine *Goroutine
 	regDumpDst   *GoroutineDump
+	regexCache   map[string]*regexp.Regexp
 }
 
 func NewVM(cfg *Config) *VM {
 	wOut, wErr := NewWritersFrom(cfg)
 	return &VM{
-		stack:  make([]Value, 0, defaultStackLimit),
-		env:    make(map[string]Value),
-		pragma: NewPragma(),
-		cwd:    cfg.WorkDir,
-		gas:    defaultGas,
-		wOut:   wOut,
-		wErr:   wErr,
+		stack:      make([]Value, 0, defaultStackLimit),
+		env:        make(map[string]Value),
+		pragma:     NewPragma(),
+		cwd:        cfg.WorkDir,
+		gas:        defaultGas,
+		wOut:       wOut,
+		wErr:       wErr,
+		regexCache: make(map[string]*regexp.Regexp),
 	}
 }
 
@@ -53,6 +56,7 @@ func (vm *VM) Reset(chunk *Chunk) {
 	vm.chunk = chunk
 	vm.stack = make([]Value, 0, vm.pragma.StackSize)
 	vm.gas = defaultGas
+	vm.regexCache = make(map[string]*regexp.Regexp)
 }
 
 //go:generate go run ../tools/jumptable chunk.go jumptable.go
@@ -301,6 +305,7 @@ func compare[T ordered](left, right T, instruction OpCode) bool {
 		return left == right
 	case OpCodeNotEqual:
 		return left != right
+		// TODO: implement smart case folding for strings
 	}
 	return false
 }
@@ -316,6 +321,31 @@ func opContains(vm *VM, instruction OpCode, _ uint) error {
 	}
 
 	val := strings.Contains(left, right)
+	vm.push(Value{Tag: TagBool, Data: val})
+	return nil
+}
+
+func opRegexMatches(vm *VM, instruction OpCode, _ uint) error {
+	right, err := vm.popString()
+	if err != nil {
+		return err
+	}
+	left, err := vm.popString()
+	if err != nil {
+		return err
+	}
+	re, ok := vm.regexCache[right]
+	if !ok || re == nil {
+		re, err = regexp.Compile(right)
+		if err != nil {
+			return err
+		}
+		vm.regexCache[right] = re
+	}
+	val := re.MatchString(left)
+	if instruction == OpCodeRegexNotMatches {
+		val = !val
+	}
 	vm.push(Value{Tag: TagBool, Data: val})
 	return nil
 }

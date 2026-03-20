@@ -26,21 +26,24 @@ func _() {
 	_ = x[TokenGreaterThan-15]
 	_ = x[TokenGreaterEqualThan-16]
 	_ = x[TokenKeywordContains-17]
-	_ = x[TokenIdentifier-18]
-	_ = x[TokenString-19]
-	_ = x[TokenNumber-20]
-	_ = x[TokenFieldAccessor-21]
-	_ = x[TokenKeywordAnd-22]
-	_ = x[TokenKeywordOr-23]
-	_ = x[TokenCommand-24]
-	_ = x[TokenFunction-25]
-	_ = x[TokenMethod-26]
-	_ = x[TokenPragma-27]
+	_ = x[TokenKeywordMatches-18]
+	_ = x[TokenRegexMatch-19]
+	_ = x[TokenRegexNotMatch-20]
+	_ = x[TokenIdentifier-21]
+	_ = x[TokenString-22]
+	_ = x[TokenNumber-23]
+	_ = x[TokenFieldAccessor-24]
+	_ = x[TokenKeywordAnd-25]
+	_ = x[TokenKeywordOr-26]
+	_ = x[TokenCommand-27]
+	_ = x[TokenFunction-28]
+	_ = x[TokenMethod-29]
+	_ = x[TokenPragma-30]
 }
 
-const _TokenType_name = "invalidpipeleft parenright paren+-*/!,===!=<<=>>=containsidentifierstringnumberfield accessorandorcommandfunctionmethodpragma"
+const _TokenType_name = "invalidpipeleft parenright paren+-*/!,===!=<<=>>=containsmatch=~!~identifierstringnumberfield accessorandorcommandfunctionmethodpragma"
 
-var _TokenType_index = [...]uint8{0, 7, 11, 21, 32, 33, 34, 35, 36, 37, 38, 39, 41, 43, 44, 46, 47, 49, 57, 67, 73, 79, 93, 96, 98, 105, 113, 119, 125}
+var _TokenType_index = [...]uint8{0, 7, 11, 21, 32, 33, 34, 35, 36, 37, 38, 39, 41, 43, 44, 46, 47, 49, 57, 62, 64, 66, 76, 82, 88, 102, 105, 107, 114, 122, 128, 134}
 
 func (i TokenType) String() string {
 	idx := int(i) - 0

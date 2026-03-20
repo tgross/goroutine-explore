@@ -96,12 +96,14 @@ const (
 
 	// comparisons
 	OpCodeContains
-	OpCodeEqual        // opComparison
-	OpCodeGreater      // opComparison
-	OpCodeGreaterEqual // opComparison
-	OpCodeLess         // opComparison
-	OpCodeLessEqual    // opComparison
-	OpCodeNotEqual     // opComparison
+	OpCodeRegexMatches
+	OpCodeRegexNotMatches // opRegexMatches
+	OpCodeEqual           // opComparison
+	OpCodeGreater         // opComparison
+	OpCodeGreaterEqual    // opComparison
+	OpCodeLess            // opComparison
+	OpCodeLessEqual       // opComparison
+	OpCodeNotEqual        // opComparison
 
 	// control flow
 	OpCodeJumpIfFalse // opConditionalJump

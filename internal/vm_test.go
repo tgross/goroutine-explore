@@ -122,6 +122,36 @@ func TestVM_SimpleWhere(t *testing.T) {
 				must.Eq(t, 2, g2.Next().ID)
 			},
 		},
+		{
+			name: "regex comparison",
+			ops: []Op{ // source: `g2 = g1.where(.trace ~= "sdn.*")`
+				encode(OpCodeLoadGoroutineDump, 1), // load g1
+				encode(OpCodeTempDump, 0),          // start
+				encode(OpCodeNextGoroutine, 9),     // addr when done
+				encode(OpCodeLoadFieldAccessor, 2), // load .trace
+				encode(OpCodeLoadString, 3),        // load pattern
+				encode(OpCodeRegexMatches, 0),      // compare
+				encode(OpCodeJumpIfFalse, 2),       // addr if false
+				encode(OpCodeAddGoroutine, 0),      // keep
+				encode(OpCodeJumpTo, 2),            // unconditional jump to addr
+				encode(OpCodePushDump, 0),          // push temp dump to stack
+				encode(OpCodeAssignment, 0),        // assign g2
+			},
+			constants: []any{"g2", "g1", ".trace", "sdn.*"},
+			g1Fn: func(g1 *GoroutineDump) {
+				g1.Add(mockGoroutine(1, "running"))
+				g1.Add(mockGoroutine(2, "select, 1 minutes", `main.main()
+	/src/sdnotifying/main.go:62 +0x1e5
+`))
+				g1.Add(mockGoroutine(3, "syscall", `os/signal.signal_recv()
+	/usr/local/go/src/runtime/sigqueue.go:152 +0x29
+				`))
+			},
+			expectFn: func(t *testing.T, g2 *GoroutineDump) {
+				must.Eq(t, 1, g2.Len())
+				must.Eq(t, 2, g2.Next().ID)
+			},
+		},
 	}
 
 	for _, tc := range testCases {

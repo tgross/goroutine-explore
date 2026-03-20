@@ -100,11 +100,14 @@ func NewCompiler() *Compiler {
 	setupInfix(TokenKeywordOr, BindingOr, p.parseBinaryLogicExpr)
 	setupInfix(TokenEqual, BindingEq, p.parseCompareExpr)
 	setupInfix(TokenNotEqual, BindingEq, p.parseCompareExpr)
+	setupInfix(TokenRegexMatch, BindingEq, p.parseCompareExpr)
+	setupInfix(TokenRegexNotMatch, BindingEq, p.parseCompareExpr)
 	setupInfix(TokenGreaterEqualThan, BindingCompare, p.parseCompareExpr)
 	setupInfix(TokenGreaterThan, BindingCompare, p.parseCompareExpr)
 	setupInfix(TokenLessEqualThan, BindingCompare, p.parseCompareExpr)
 	setupInfix(TokenLessThan, BindingCompare, p.parseCompareExpr)
 	setupInfix(TokenKeywordContains, BindingCompare, p.parseCompareExpr)
+	setupInfix(TokenKeywordMatches, BindingCompare, p.parseCompareExpr)
 	setupInfix(TokenPipe, BindingPipe, p.parsePipeExpr)
 
 	return p
@@ -312,6 +315,10 @@ func (p *Compiler) parseCompareExpr(tok Token) error {
 		p.emitByte(OpCodeLessEqual)
 	case TokenKeywordContains:
 		p.emitByte(OpCodeContains)
+	case TokenKeywordMatches, TokenRegexMatch:
+		p.emitByte(OpCodeRegexMatches)
+	case TokenRegexNotMatch:
+		p.emitByte(OpCodeRegexNotMatches)
 	}
 
 	return nil

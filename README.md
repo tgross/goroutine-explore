@@ -452,7 +452,7 @@ expressions can contain any of the following:
 * Numeric comparison (`>`, `>=`, `<`, `<=`, `==`, `!=`): can be applied to the
   numeric fields `.id`, `.dups`, `.lines`, and `.duration`.
 * String comparison (`==`, `!=`): can be applied to string fields `.state` and `.trace`.
-* Regex comparison (`=~`, `!~`): These use Go's standard
+* Regex comparison (`=~` or `matches`, `!~`): These use Go's standard
   [`regexp`](https://pkg.go.dev/regexp) flavor of regex. The left side is a
   string field like `.trace` and the right side is the literal pattern.
 * `contains`: is a binary operator. The left side is a string field like

@@ -52,6 +52,9 @@ const (
 	TokenGreaterThan      // >
 	TokenGreaterEqualThan // >=
 	TokenKeywordContains  // contains
+	TokenKeywordMatches   // match
+	TokenRegexMatch       // =~
+	TokenRegexNotMatch    // !~
 
 	// literals
 	TokenIdentifier    // identifier
@@ -190,7 +193,11 @@ func (s *Tokenizer) next() (Token, error) {
 
 		case "contains":
 			// TODO: need other string operators
+			// - "matches"
+			// - "in"
 			token.Type = TokenKeywordContains
+		case "matches":
+			token.Type = TokenKeywordMatches
 		case "cd", "empty", "exit", "help", "ls", "pwd", "quit", "vars":
 			token.Type = TokenCommand
 		case "pragma":
@@ -235,18 +242,28 @@ func (s *Tokenizer) next() (Token, error) {
 	case '=':
 		token.Type = TokenAssign
 		peek := s.scanner.Peek()
-		if peek == '=' {
+		switch peek {
+		case '=':
 			s.scanner.Next()
 			token.Lexeme = "=="
 			token.Type = TokenEqual
+		case '~':
+			s.scanner.Next()
+			token.Lexeme = "!~"
+			token.Type = TokenRegexMatch
 		}
 	case '!':
 		token.Type = TokenBang
 		peek := s.scanner.Peek()
-		if peek == '=' {
+		switch peek {
+		case '=':
 			s.scanner.Next()
 			token.Lexeme = "!="
 			token.Type = TokenNotEqual
+		case '~':
+			s.scanner.Next()
+			token.Lexeme = "!~"
+			token.Type = TokenRegexNotMatch
 		}
 	case '>':
 		token.Type = TokenGreaterThan
