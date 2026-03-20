@@ -115,8 +115,6 @@ func repl(e *internal.Evaluator) int {
 			case errors.Is(err, io.EOF):
 				return 0 // Ctrl-D quits
 			}
-			fmt.Println(err.Error())
-			return 1
 		}
 		previousCtrlC = false
 	}
