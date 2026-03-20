@@ -110,7 +110,8 @@ func (e *Evaluator) Eval(ctx context.Context, src string) error {
 	err = e.vm.Run(ctx)
 	if err != nil {
 		switch {
-		case errors.Is(err, ErrCommandQuit):
+		case errors.Is(err, ErrCommandQuit),
+			errors.Is(err, ErrCommandConfirm):
 		case errors.Is(err, ErrCommandOk),
 			errors.Is(err, context.Canceled):
 			err = nil

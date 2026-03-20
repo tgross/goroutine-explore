@@ -93,6 +93,15 @@ func repl(e *internal.Evaluator) int {
 		err := replOnce(e, lines)
 		if err != nil {
 			switch {
+			case errors.Is(err, internal.ErrCommandConfirm):
+				var confirm internal.ConfirmationAction
+				errors.As(err, &confirm)
+				confirmPrompt := confirm.Error()
+				confirmation, _ := lines.Prompt(confirmPrompt)
+				if strings.ToLower(confirmation) == "y" {
+					confirm.Run()
+				}
+				continue
 			case errors.Is(err, internal.ErrCommandQuit):
 				return 0
 			case errors.Is(err, internal.ErrNoSuchOpCode):

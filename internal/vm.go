@@ -243,8 +243,9 @@ var (
 	ErrNoSuchPragma              = errors.New("no pragma with name")
 	ErrExpectedDiffAssign        = errors.New("assigning a diff must have 3 identifiers or \"_\"")
 
-	ErrCommandQuit = errors.New("user quit")
-	ErrCommandOk   = errors.New("command ok")
+	ErrCommandQuit    = errors.New("user quit")
+	ErrCommandOk      = errors.New("command ok")
+	ErrCommandConfirm = errors.New("are you sure?")
 )
 
 func opNoop(_ *VM, _ OpCode, _ uint) error { return nil }
@@ -739,12 +740,43 @@ func opCommandChangeDir(vm *VM, _ OpCode, index uint) error {
 	return ErrCommandOk
 }
 
+// ConfirmationAction lets us close over a function and smuggle it back out to
+// the REPL for execution
+type ConfirmationAction struct {
+	fn     func()
+	prompt string
+}
+
+func (c ConfirmationAction) Error() string {
+	return c.prompt
+}
+
+func (c ConfirmationAction) Run() {
+	c.fn()
+}
+
 func opCommandEmpty(vm *VM, _ OpCode, _ uint) error {
+	if vm.pragma.EmptyConfirm {
+		confirm := ConfirmationAction{
+			fn:     func() { vm.env = map[string]Value{} },
+			prompt: "Are you sure you want to empty workspace? [y/N] ",
+		}
+		return fmt.Errorf("%w: %w", ErrCommandConfirm, confirm)
+	}
+
 	vm.env = map[string]Value{}
 	return ErrCommandOk
 }
 
-func opCommandQuit(_ *VM, _ OpCode, _ uint) error {
+func opCommandQuit(vm *VM, _ OpCode, _ uint) error {
+	if vm.pragma.ExitConfirm {
+		confirm := ConfirmationAction{
+			fn:     func() { os.Exit(0) },
+			prompt: "Are you sure you want to quit? [y/N] ",
+		}
+		return fmt.Errorf("%w: %w", ErrCommandConfirm, confirm)
+	}
+
 	return ErrCommandQuit
 }
 
