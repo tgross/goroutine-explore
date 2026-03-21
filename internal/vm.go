@@ -305,7 +305,6 @@ func compare[T ordered](left, right T, instruction OpCode) bool {
 		return left == right
 	case OpCodeNotEqual:
 		return left != right
-		// TODO: implement smart case folding for strings
 	}
 	return false
 }
