@@ -859,6 +859,8 @@ func opCommandSetPragma(vm *VM, _ OpCode, _ uint) error {
 		err = popAndSet(vm, &vm.pragma.ExitConfirm)
 	case "show.color":
 		err = popAndSet(vm, &vm.pragma.ShowColor)
+		vm.wOut.useColor = vm.pragma.ShowColor
+		vm.wErr.useColor = vm.pragma.ShowColor
 	case "show.count":
 		err = popAndSet(vm, &vm.pragma.ShowCount)
 	case "ls.format":

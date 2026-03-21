@@ -25,8 +25,19 @@ import (
 func main() {
 	var version bool
 	var expr string
-	flag.BoolVar(&version, "version", false, "display the version")
-	flag.StringVar(&expr, "expression", "", "execute an expression")
+	var pragmaLong flagStrings
+	var pragmaShort flagStrings
+	flag.BoolVar(&version, "v", false, "(short) display the version")
+	flag.BoolVar(&version, "version", version, "(long) display the version")
+	flag.StringVar(&expr, "e", "", "(short) execute an expression")
+	flag.StringVar(&expr, "expression", expr, `(long) execute an expression`)
+	flag.Var(&pragmaShort, "p",
+		`(short) change a configuration value. expects a key-value pair
+like -p show.color=false`)
+	flag.Var(&pragmaLong, "pragma",
+		`(long) change a configuration value. expects a key-value pair
+like -pragma show.color=false`)
+
 	flag.Parse()
 	if version {
 		fmt.Println(Version())
@@ -42,18 +53,33 @@ func main() {
 	useColor := os.Getenv("NO_COLOR") != "1" &&
 		isatty.IsTerminal(os.Stdout.Fd())
 
-	// TODO: would be nice if we could pass pragmas from args too
 	e := internal.NewEvaluator(&internal.Config{
 		WorkDir: wd,
 		Stdout:  os.Stdout,
 		Stderr:  os.Stderr,
 		Color:   useColor,
 	})
+	for _, p := range append(pragmaShort, pragmaLong...) {
+		if evalOnce(e, "pragma."+p) > 0 {
+			os.Exit(1)
+		}
+	}
 	if expr != "" {
 		os.Exit(evalOnce(e, expr))
 	}
 
 	os.Exit(repl(e))
+}
+
+type flagStrings []string
+
+func (s *flagStrings) String() string {
+	return fmt.Sprint(*s)
+}
+
+func (s *flagStrings) Set(value string) error {
+	*s = append(*s, value)
+	return nil
 }
 
 func evalOnce(e *internal.Evaluator, src string) int {
