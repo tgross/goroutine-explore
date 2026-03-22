@@ -86,9 +86,6 @@ func NewTokenizer() *Tokenizer {
 	s.Mode = scanner.ScanIdents | scanner.ScanChars |
 		scanner.ScanInts | scanner.ScanStrings | scanner.SkipComments
 
-	// TODO: do we want to keep newlines in the tokenizer?
-	//	s.Whitespace ^= 1 << '\n' // newlines are significant
-
 	// identifiers can start with . or $
 	s.IsIdentRune = func(ch rune, i int) bool {
 		return (ch == '$' || ch == '.') && i == 0 ||
@@ -168,7 +165,6 @@ func (s *Tokenizer) next() (Token, error) {
 		token.Type = TokenIdentifier
 		// we can't detect these invalid single-char identifiers in the scanner
 		if token.Lexeme == "." || token.Lexeme == "$" {
-			// TODO: return a rich error here explaining why with location
 			return token, fmt.Errorf("invalid identifier")
 		}
 
@@ -202,10 +198,23 @@ func (s *Tokenizer) next() (Token, error) {
 			token.Type = TokenCommand
 		case "pragma":
 			token.Type = TokenPragma
-		}
-		// TODO: can't we just hard-code the accessors?
-		if strings.HasPrefix(token.Lexeme, ".") {
+		case "id", ".id", "header", ".header",
+			"trace", ".trace", "lines", ".lines",
+			"duration", ".duration", "state", ".state",
+			"createdby", ".createdby", "createdBy", ".createdBy",
+			"dups", ".dups":
 			token.Type = TokenFieldAccessor
+
+		case ".confirm", ".empty", ".exit",
+			".limits", ".steps", ".stack",
+			".ls", ".format",
+			".color", ".count", ".dedup",
+			".vars", ".display":
+			token.Type = TokenFieldAccessor
+		}
+		if token.Type != TokenFieldAccessor &&
+			strings.HasPrefix(token.Lexeme, ".") {
+			return token, fmt.Errorf("no such field")
 		}
 
 	case scanner.Int:
@@ -283,8 +292,6 @@ func (s *Tokenizer) next() (Token, error) {
 		}
 
 	default:
-		// TODO: we can return a rich error here with position so that the
-		// caller can do fancy error reporting
 		return Token{}, errors.New("invalid token")
 
 	}

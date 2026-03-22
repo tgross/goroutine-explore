@@ -233,7 +233,7 @@ var (
 	ErrOutOfGas                  = errors.New("processed more than maximum number of instructions")
 	ErrEmptyStack                = errors.New("tried to pop off empty stack")
 	ErrUnexpectedStackState      = errors.New("unexpected stack state")
-	ErrUnexpectedRegisterState   = errors.New("unexpected register state")
+	ErrNotIterating              = errors.New("not iterating a goroutine dump")
 	ErrOutOfStackBounds          = errors.New("jump outside of stack bounds")
 	ErrInvalidType               = errors.New("invalid type for operation")
 	ErrWrongTag                  = errors.New("data had wrong tag for type")
@@ -528,7 +528,7 @@ func opLoadFieldAccessor(vm *VM, _ OpCode, index uint) error {
 	}
 	g := vm.regGoroutine
 	if g == nil {
-		return fmt.Errorf("%w: no goroutine", ErrUnexpectedRegisterState)
+		return fmt.Errorf("%w when accessing field %s", ErrNotIterating, name)
 	}
 
 	switch name {
