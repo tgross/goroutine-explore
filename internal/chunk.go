@@ -96,6 +96,7 @@ const (
 
 	// comparisons
 	OpCodeContains
+	OpCodeIn // opContains
 	OpCodeRegexMatches
 	OpCodeRegexNotMatches // opRegexMatches
 	OpCodeEqual           // opComparison

@@ -318,8 +318,12 @@ func opContains(vm *VM, instruction OpCode, _ uint) error {
 	if err != nil {
 		return err
 	}
-
-	val := strings.Contains(left, right)
+	var val bool
+	if instruction == OpCodeContains {
+		val = strings.Contains(left, right)
+	} else {
+		val = strings.Contains(right, left)
+	}
 	vm.push(Value{Tag: TagBool, Data: val})
 	return nil
 }

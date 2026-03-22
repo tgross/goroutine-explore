@@ -53,6 +53,7 @@ const (
 	TokenGreaterEqualThan // >=
 	TokenKeywordContains  // contains
 	TokenKeywordMatches   // match
+	TokenKeywordIn        // in
 	TokenRegexMatch       // =~
 	TokenRegexNotMatch    // !~
 
@@ -192,10 +193,9 @@ func (s *Tokenizer) next() (Token, error) {
 			token.Lexeme = strings.TrimPrefix(token.Lexeme, ".")
 
 		case "contains":
-			// TODO: need other string operators
-			// - "matches"
-			// - "in"
 			token.Type = TokenKeywordContains
+		case "in":
+			token.Type = TokenKeywordIn
 		case "matches":
 			token.Type = TokenKeywordMatches
 		case "cd", "empty", "exit", "help", "ls", "pwd", "quit", "vars":
