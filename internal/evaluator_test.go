@@ -6,6 +6,7 @@ package internal
 import (
 	"bytes"
 	"io"
+	"maps"
 	"testing"
 
 	"github.com/shoenig/test"
@@ -152,6 +153,55 @@ func TestEvaluator(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestEvaluator_PipelineEquivalence(t *testing.T) {
+	src0 := `g2 = g1.where(.state == "select" and .duration > 1)`
+	src1 := `g2 = g1.where(.state == "select").where(.duration > 1)`
+	src2 := `g2 = g1 | where(.state == "select") | where(.duration > 1)`
+
+	g1 := NewGoroutineDump()
+	g1.Add(mockGoroutine(1, "chan receive, 5 minutes"))
+	g1.Add(mockGoroutine(3, "select, 1 minutes"))
+	g1.Add(mockGoroutine(4, "select, 4 minutes"))
+	g1.Add(mockGoroutine(5, "select, 10 minutes"))
+
+	env0 := map[string]Value{}
+	env0["g1"] = Value{Tag: TagDump, Data: g1}
+	env1 := maps.Clone(env0)
+	env2 := maps.Clone(env1)
+
+	e := NewEvaluator(&Config{
+		WorkDir: t.TempDir(),
+		Stdout:  io.Discard,
+		Stderr:  io.Discard,
+	})
+
+	e.vm.env = env0
+	err := e.Eval(t.Context(), src0)
+	must.NoError(t, err)
+	got0, _ := e.vm.pop()
+	must.NotNil(t, got0)
+
+	e.vm.env = env1
+	err = e.Eval(t.Context(), src1)
+	must.NoError(t, err)
+	got1, _ := e.vm.pop()
+	e.vm.debug()
+	must.NotNil(t, got1)
+
+	e.vm.env = env2
+	err = e.Eval(t.Context(), src2)
+	must.NoError(t, err)
+	got2, _ := e.vm.pop()
+	must.NotNil(t, got2)
+
+	dump0, _ := got0.Data.(*GoroutineDump)
+	must.Eq(t, 2, dump0.Len(), must.Sprintf("%s", dump0.String()))
+	dump1, _ := got1.Data.(*GoroutineDump)
+	must.Eq(t, 2, dump1.Len(), must.Sprintf("%s", dump1.String()))
+	dump2, _ := got2.Data.(*GoroutineDump)
+	must.Eq(t, 2, dump2.Len(), must.Sprintf("%s", dump2.String()))
 }
 
 func BenchmarkEvaluator(b *testing.B) {

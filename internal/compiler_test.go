@@ -155,30 +155,6 @@ func TestCompiler_JumpPatch(t *testing.T) {
 	must.Len(t, 4, compiler.chunk.ops)
 }
 
-func TestCompiler_PipelineEquivalence(t *testing.T) {
-	t.Skip("TODO: these are not actually equivalent but we should probably have a test that shows a pipeline and a series of 'ands' have the equivalent *output*")
-	src1 := `g2 = g1 where .state == "select" where .duration > 1`
-	src2 := `g2 = g1 | where .state == "select" | where .duration > 1`
-
-	compiler := NewCompiler()
-
-	body := strings.NewReader(src1)
-	tokenizer := NewTokenizer()
-	tokenizer.Reset(t.Context(), body)
-	chunk, err := compiler.Compile(tokenizer)
-	must.NoError(t, err)
-	fmt.Println(chunk.disassemble(0))
-
-	expect := chunk.ops
-
-	body = strings.NewReader(src2)
-	tokenizer.Reset(t.Context(), body)
-	chunk, err = compiler.Compile(tokenizer)
-	must.NoError(t, err)
-	fmt.Println(chunk.disassemble(0))
-	must.Eq(t, expect, chunk.ops)
-}
-
 func TestCompiler_CompoundWhere(t *testing.T) {
 	src := `g.where(.duration > 10 and .state == "select")`
 	body := strings.NewReader(src)
@@ -286,6 +262,42 @@ func TestCompiler_NestedExpressions(t *testing.T) {
 		encode(OpCodeLoadNumber, 4),        // 13 load 0
 		encode(OpCodeFuncShowDump, 0),      // 14 show
 	}, chunk.ops)
+}
+
+func TestCompiler_ChainedWhere(t *testing.T) {
+	src := `g.where(.duration > 10).where(.state == "select")`
+	body := strings.NewReader(src)
+
+	tokenizer := NewTokenizer()
+	tokenizer.Reset(t.Context(), body)
+	compiler := NewCompiler()
+	chunk, err := compiler.Compile(tokenizer)
+	must.NoError(t, err)
+
+	fmt.Println(chunk.disassemble(0))
+	must.Eq(t, []Op{
+		encode(OpCodeLoadGoroutineDump, 0), // 00 load g
+		encode(OpCodeTempDump, 0),          // 01 scratch register
+		encode(OpCodeNextGoroutine, 9),     // 02 next w/ addr to jump when done
+		encode(OpCodeLoadFieldAccessor, 1), // 03 load .duration
+		encode(OpCodeLoadNumber, 2),        // 04 load 10
+		encode(OpCodeGreater, 0),           // 05 compare push bool to stack
+		encode(OpCodeJumpIfFalse, 2),       // 06 jump to next goroutine
+		encode(OpCodeAddGoroutine, 0),      // 07 keep
+		encode(OpCodeJumpTo, 2),            // 08 jump to next goroutine
+		encode(OpCodePushDump, 0),          // 09 push to stack
+		encode(OpCodeTempDump, 0),          // 10 scratch register
+		encode(OpCodeNextGoroutine, 18),    // 11 next w/ addr to jump when done
+		encode(OpCodeLoadFieldAccessor, 3), // 12 load .state
+		encode(OpCodeLoadString, 4),        // 13 load "select"
+		encode(OpCodeEqual, 0),             // 14 compare push bool to stack
+		encode(OpCodeJumpIfFalse, 11),      // 15 jump to next goroutine
+		encode(OpCodeAddGoroutine, 0),      // 16 keep
+		encode(OpCodeJumpTo, 11),           // 17 jump to next goroutine
+		encode(OpCodePushDump, 0),          // 18 push to stack
+	},
+		chunk.ops,
+	)
 }
 
 func TestCompiler_Paths(t *testing.T) {

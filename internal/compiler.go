@@ -110,6 +110,7 @@ func NewCompiler() *Compiler {
 	setupInfix(TokenKeywordIn, BindingCompare, p.parseCompareExpr)
 	setupInfix(TokenKeywordMatches, BindingCompare, p.parseCompareExpr)
 	setupInfix(TokenPipe, BindingPipe, p.parsePipeExpr)
+	setupInfix(TokenMethod, BindingFunc, p.parseMethod)
 
 	return p
 }

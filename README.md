@@ -320,6 +320,23 @@ lines show equivalent `where` function calls that compile to identical bytecode:
 >> g2 = g1 | where(.state == "select")
 ```
 
+You can chain function calls as well. For example, the following lines show
+equivalent compound or chained `where` function calls which will evaluate to
+identical values.
+
+```
+>> g2 = g1.where(.state == "select" and .duration > 1)
+
+>> g2 = g1 | where(.state == "select") | where(.duration > 1)
+
+>> g2 = g1.where(.state == "select").where(.duration > 1)
+```
+
+Note the compiler currently does not optimize pipelined or chained `where`
+expressions so if you have a very large goroutine dump to process, you'll get
+better performance if you turn chained `where` calls into a compound expressions
+on a single `where`.
+
 | Name        | Arguments               | Output  |
 |-------------|-------------------------|---------|
 | `as`        | dump, new variable name | dump    |
