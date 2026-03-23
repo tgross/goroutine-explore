@@ -113,8 +113,11 @@ func (gd *GoroutineDump) Has(p *Goroutine) bool {
 	return false
 }
 
-// TODO: can this return an iter.Seq instead?
 func (gd *GoroutineDump) StartIter() {
+	// note: we could implement a iter.Seq here but because we pull values we
+	// end up having to keep pointers to the (next, stop) functions in object
+	// state anyways, so until we need it for something else we'll use this
+	// simpler approach
 	gd.iterIndex = 0
 }
 
