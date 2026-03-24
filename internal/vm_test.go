@@ -398,39 +398,87 @@ func TestVM_MultiAssignDiff(t *testing.T) {
 	must.Eq(t, "[3]", gd5.String())
 }
 
-func TestVM_Show(t *testing.T) {
-	// source: `g1 | show(3, 1)`
-	chunk := &Chunk{
-		ops: []Op{
-			encode(OpCodeLoadGoroutineDump, 0), // load g1
-			encode(OpCodeLoadNumber, 1),        // load 1 (offset)
-			encode(OpCodeLoadNumber, 2),        // load 3 (limit)
-			encode(OpCodeFuncShowDump, 0),      // show
-		},
-		constants: []any{"g1", 1, 3},
-	}
-	vm := NewVM(&Config{WorkDir: t.TempDir()})
-	recorder := new(bytes.Buffer)
-	vm.wOut = NewWriter(recorder)
-	vm.Reset(chunk)
+func TestVM_ShowFunctions(t *testing.T) {
 
 	g1 := NewGoroutineDump()
 	g1.Add(mockMinGoroutine("goroutine 1 [select, 20 minutes]:"))
 	g1.Add(mockMinGoroutine("goroutine 2 [running]:"))
 	g1.Add(mockMinGoroutine("goroutine 3 [IO wait, 10 minutes]:"))
+
+	vm := NewVM(&Config{WorkDir: t.TempDir()})
+	recorder := new(bytes.Buffer)
+	vm.wOut = NewWriter(recorder)
 	vm.env = map[string]Value{"g1": {Tag: TagDump, Data: g1}}
-	err := vm.Run(t.Context())
-	must.NoError(t, err)
-	must.Eq(t, `goroutine 2 [running]:
+
+	testCases := []struct {
+		name   string
+		chunk  *Chunk
+		expect string
+	}{
+		{ // source: `g1 | show(3, 1)`
+			name: "show function",
+			chunk: &Chunk{
+				ops: []Op{
+					encode(OpCodeLoadGoroutineDump, 0), // load g1
+					encode(OpCodeLoadNumber, 1),        // load 1 (offset)
+					encode(OpCodeLoadNumber, 2),        // load 3 (limit)
+					encode(OpCodeFuncShowDump, 0),      // show
+				},
+				constants: []any{"g1", 1, 3},
+			},
+			expect: `goroutine 2 [running]:
 
 goroutine 3 [IO wait, 10 minutes]:
 
-# of goroutines: 3
-        IO wait: 1
-        running: 1
-         select: 1
+`,
+		},
+		{ // source: `g1 | json()`
+			name: "json function",
+			chunk: &Chunk{
+				ops: []Op{
+					encode(OpCodeLoadGoroutineDump, 0), // load g1
+					encode(OpCodeFuncJSON, 0),          // show
+				},
+				constants: []any{"g1", 1, 3},
+			},
+			expect: `[
+  {
+    "id": 1,
+    "duration": 20,
+    "state": "select",
+    "createdBy": 0,
+    "trace": "",
+    "lines": 1
+  },
+  {
+    "id": 2,
+    "duration": 0,
+    "state": "running",
+    "createdBy": 0,
+    "trace": "",
+    "lines": 1
+  },
+  {
+    "id": 3,
+    "duration": 10,
+    "state": "IO wait",
+    "createdBy": 0,
+    "trace": "",
+    "lines": 1
+  }
+]`,
+		},
+	}
 
-`, recorder.String())
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			vm.Reset(tc.chunk)
+			recorder.Reset()
+			err := vm.Run(t.Context())
+			must.NoError(t, err)
+			must.Eq(t, tc.expect, recorder.String())
+		})
+	}
 }
 
 func TestVM_CommandVars(t *testing.T) {

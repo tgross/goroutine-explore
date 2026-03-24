@@ -178,13 +178,13 @@ func (s *Tokenizer) next() (Token, error) {
 		case "or":
 			token.Type = TokenKeywordOr
 		case "where", "delete", "as", "save",
-			"show", "diff", "intersect", "union":
+			"show", "diff", "intersect", "union", "json":
 			token.Type = TokenFunction
 		case "load":
 			// load takes no expression argument, so treat it like a method
 			token.Type = TokenMethod
 		case ".where", ".delete", ".as", ".load", ".save",
-			".show", ".diff", ".intersect", ".union":
+			".show", ".diff", ".intersect", ".union", ".json":
 			token.Type = TokenMethod
 			token.Lexeme = strings.TrimPrefix(token.Lexeme, ".")
 

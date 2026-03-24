@@ -37,21 +37,22 @@ func _() {
 	_ = x[OpCodeFuncLoad-26]
 	_ = x[OpCodeFuncSave-27]
 	_ = x[OpCodeFuncShowDump-28]
-	_ = x[OpCodeFuncUnion-29]
-	_ = x[OpCodeCommandChangeDir-30]
-	_ = x[OpCodeCommandEmpty-31]
-	_ = x[OpCodeCommandGetWorkingDir-32]
-	_ = x[OpCodeCommandHelp-33]
-	_ = x[OpCodeCommandListDir-34]
-	_ = x[OpCodeCommandQuit-35]
-	_ = x[OpCodeCommandVars-36]
-	_ = x[OpCodeCommandSetPragma-37]
-	_ = x[OpCodeCommandGetPragma-38]
+	_ = x[OpCodeFuncJSON-29]
+	_ = x[OpCodeFuncUnion-30]
+	_ = x[OpCodeCommandChangeDir-31]
+	_ = x[OpCodeCommandEmpty-32]
+	_ = x[OpCodeCommandGetWorkingDir-33]
+	_ = x[OpCodeCommandHelp-34]
+	_ = x[OpCodeCommandListDir-35]
+	_ = x[OpCodeCommandQuit-36]
+	_ = x[OpCodeCommandVars-37]
+	_ = x[OpCodeCommandSetPragma-38]
+	_ = x[OpCodeCommandGetPragma-39]
 }
 
-const _OpCode_name = "OpCodeNoopOpCodeLoadGoroutineDumpOpCodeLoadFieldAccessorOpCodeLoadNumberOpCodeLoadStringOpCodeAssignmentOpCodePushBoolOpCodePushDumpOpCodeAddGoroutineOpCodeNextGoroutineOpCodeTempDumpOpCodeContainsOpCodeInOpCodeRegexMatchesOpCodeRegexNotMatchesOpCodeEqualOpCodeGreaterOpCodeGreaterEqualOpCodeLessOpCodeLessEqualOpCodeNotEqualOpCodeJumpIfFalseOpCodeJumpIfTrueOpCodeJumpToOpCodeFuncDiffOpCodeFuncIntersectOpCodeFuncLoadOpCodeFuncSaveOpCodeFuncShowDumpOpCodeFuncUnionOpCodeCommandChangeDirOpCodeCommandEmptyOpCodeCommandGetWorkingDirOpCodeCommandHelpOpCodeCommandListDirOpCodeCommandQuitOpCodeCommandVarsOpCodeCommandSetPragmaOpCodeCommandGetPragma"
+const _OpCode_name = "OpCodeNoopOpCodeLoadGoroutineDumpOpCodeLoadFieldAccessorOpCodeLoadNumberOpCodeLoadStringOpCodeAssignmentOpCodePushBoolOpCodePushDumpOpCodeAddGoroutineOpCodeNextGoroutineOpCodeTempDumpOpCodeContainsOpCodeInOpCodeRegexMatchesOpCodeRegexNotMatchesOpCodeEqualOpCodeGreaterOpCodeGreaterEqualOpCodeLessOpCodeLessEqualOpCodeNotEqualOpCodeJumpIfFalseOpCodeJumpIfTrueOpCodeJumpToOpCodeFuncDiffOpCodeFuncIntersectOpCodeFuncLoadOpCodeFuncSaveOpCodeFuncShowDumpOpCodeFuncJSONOpCodeFuncUnionOpCodeCommandChangeDirOpCodeCommandEmptyOpCodeCommandGetWorkingDirOpCodeCommandHelpOpCodeCommandListDirOpCodeCommandQuitOpCodeCommandVarsOpCodeCommandSetPragmaOpCodeCommandGetPragma"
 
-var _OpCode_index = [...]uint16{0, 10, 33, 56, 72, 88, 104, 118, 132, 150, 169, 183, 197, 205, 223, 244, 255, 268, 286, 296, 311, 325, 342, 358, 370, 384, 403, 417, 431, 449, 464, 486, 504, 530, 547, 567, 584, 601, 623, 645}
+var _OpCode_index = [...]uint16{0, 10, 33, 56, 72, 88, 104, 118, 132, 150, 169, 183, 197, 205, 223, 244, 255, 268, 286, 296, 311, 325, 342, 358, 370, 384, 403, 417, 431, 449, 463, 478, 500, 518, 544, 561, 581, 598, 615, 637, 659}
 
 func (i OpCode) String() string {
 	idx := int(i) - 0

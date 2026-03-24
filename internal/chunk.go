@@ -117,6 +117,7 @@ const (
 	OpCodeFuncLoad
 	OpCodeFuncSave
 	OpCodeFuncShowDump
+	OpCodeFuncJSON
 	OpCodeFuncUnion
 
 	// commands

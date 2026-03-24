@@ -70,6 +70,9 @@ func (gd *GoroutineDump) Sort() {
 // Index creates an lookup table for duplicates. It assumes the dump is already
 // sorted.
 func (gd *GoroutineDump) Index() {
+	if gd.isIndexed {
+		return
+	}
 	gd.isIndexed = true
 	gd.index = []*Goroutine{}
 	gd.duplicates = map[string][]int{}
@@ -201,14 +204,15 @@ func (gd GoroutineDump) Save(fn string) error {
 }
 
 type Goroutine struct {
-	ID         int
-	Header     string
-	Trace      string
-	LineCount  int
-	Duration   int    // In minutes, from meta in header
-	State      string // From meta in header
-	CreatedBy  int
-	Duplicates []int
+	ID        int    `json:"id"`
+	Duration  int    `json:"duration"` // In minutes, from meta in header
+	State     string `json:"state"`    // From meta in header
+	CreatedBy int    `json:"createdBy"`
+	Trace     string `json:"trace"`
+	LineCount int    `json:"lines"`
+
+	header     string
+	duplicates []int // duplicate IDs
 
 	buf      *bytes.Buffer // a copy of the original text from the dump
 	isFrozen bool          // once a goroutine is frozen, we never add to it again
@@ -247,12 +251,12 @@ func NewGoroutine(header string) (*Goroutine, error) {
 	return &Goroutine{
 		ID:         id,
 		LineCount:  1,
-		Header:     header,
+		header:     header,
 		buf:        &bytes.Buffer{},
 		Duration:   duration,
 		State:      state,
 		hasher:     sha256.New(),
-		Duplicates: []int{},
+		duplicates: []int{},
 	}, nil
 }
 
@@ -260,7 +264,7 @@ func (g *Goroutine) Debug() string {
 	if g == nil {
 		return "<nil>"
 	}
-	return fmt.Sprintf("%s (%s)", g.Header, g.hash[:20])
+	return fmt.Sprintf("%s (%s)", g.header, g.hash[:20])
 }
 
 // AddLine appends a line to the goroutine info.
@@ -298,7 +302,7 @@ func (g *Goroutine) Freeze() {
 
 // Print outputs the goroutine details to stdout with color.
 func (g *Goroutine) Print(w *Writer, duplicateIDs []int, pragma PragmaDedup) {
-	fmt.Fprint(w.blue(), g.Header)
+	fmt.Fprint(w.blue(), g.header)
 	switch pragma {
 	case PragmaDedupNone:
 	case PragmaDedupIDs:

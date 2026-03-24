@@ -5,6 +5,7 @@ package internal
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"maps"
@@ -35,6 +36,9 @@ type VM struct {
 	regGoroutine *Goroutine
 	regDumpDst   *GoroutineDump
 	regexCache   map[string]*regexp.Regexp
+
+	// didShow suppresses outputting a dump summary
+	didShow bool
 }
 
 func NewVM(cfg *Config) *VM {
@@ -57,6 +61,7 @@ func (vm *VM) Reset(chunk *Chunk) {
 	vm.stack = make([]Value, 0, vm.pragma.StackSize)
 	vm.gas = defaultGas
 	vm.regexCache = make(map[string]*regexp.Regexp)
+	vm.didShow = false
 }
 
 //go:generate go run ../tools/jumptable chunk.go jumptable.go
@@ -94,6 +99,9 @@ func (vm *VM) Run(ctx context.Context) error {
 
 	// TODO: would be nice to account for calls to show() so that summaries
 	// match the show() value, or just leave the summary off in that case
+	if vm.didShow {
+		return nil
+	}
 	val, err := vm.peek()
 	if err == nil {
 		switch val.Tag {
@@ -535,7 +543,7 @@ func opLoadFieldAccessor(vm *VM, _ OpCode, index uint) error {
 	case "id", ".id":
 		vm.push(Value{Tag: TagNumber, Data: g.ID})
 	case "header", ".header":
-		vm.push(Value{Tag: TagString, Data: g.Header})
+		vm.push(Value{Tag: TagString, Data: g.header})
 	case "trace", ".trace":
 		vm.push(Value{Tag: TagString, Data: g.Trace})
 	case "lines", ".lines":
@@ -547,7 +555,7 @@ func opLoadFieldAccessor(vm *VM, _ OpCode, index uint) error {
 	case "createdby", ".createdby", "createdBy", ".createdBy":
 		vm.push(Value{Tag: TagNumber, Data: g.CreatedBy})
 	case "dups", ".dups":
-		vm.push(Value{Tag: TagNumber, Data: len(g.Duplicates)})
+		vm.push(Value{Tag: TagNumber, Data: len(g.duplicates)})
 	}
 
 	return nil
@@ -979,5 +987,20 @@ func opFuncShowDump(vm *VM, _ OpCode, _ uint) error {
 	}
 
 	dump.Show(vm.wOut, PragmaDedup(vm.pragma.ShowDedup), limit, offset)
+	vm.didShow = true
+	return nil
+}
+
+func opFuncJSON(vm *VM, _ OpCode, _ uint) error {
+	dump, err := vm.peekDump()
+	if err != nil {
+		return err
+	}
+	buf, err := json.MarshalIndent(dump.goroutines, "", "  ")
+	if err != nil {
+		return err
+	}
+	_, _ = vm.wOut.Write(buf)
+	vm.didShow = true
 	return nil
 }

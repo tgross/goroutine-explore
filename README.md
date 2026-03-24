@@ -211,7 +211,8 @@ The available pragmas are as follows:
 ## Expressions
 
 All expressions return one or more goroutine dumps. The last expression on a
-line will print a summary of those goroutine dumps.
+line will print a summary of those goroutine dumps, unless you have used the
+`show` or `json` functions.
 
 ### Show a summary
 
@@ -343,6 +344,7 @@ on a single `where`.
 | `delete`    | dump, filter expression | dump    |
 | `diff`      | dump, dump              | 3 dumps |
 | `intersect` | dump, dump              | dump    |
+| `json`      | dump                    | dump    |
 | `load`      | string path             | dump    |
 | `save`      | dump, string path       | dump    |
 | `show`      | dump [limit, offset]    | dump    |
@@ -579,7 +581,39 @@ the same ID in both dumps will not be included if they are not identical.
         syscall: 2
 ```
 
+### JSON
+
+The `json` function takes a goroutine dump and outputs a pretty-printed JSON
+array of all the goroutines in the dump. Unlike the `show` function, no
+de-duplication of goroutines happens.
+
+```
+>> g2 = g1.where(.state == "select" and .duration > 10)
+>> g2.json()
+
+[
+ {
+   "id": 72,
+   "header": "goroutine 72 [select, 25 minutes]",
+   "createdBy": 10,
+   "duration": 25,
+   "state: "select",
+   "lines": 4,
+   "duplicates": [72, 54755, 76757, 299, 201],
+   "trace": "google.golang.org/grpc/transport.(*http2Server).keepalive(0xc4202f0420)\n\tgoogle.golang.org/grpc/transport/http2_server.go:919 +0x488\ncreated by google.golang.org/grpc/transport.newHTTP2Server\n\tgoogle.golang.org/grpc/transport/http2_server.go:226 +0x97c"
+ }
+ ...
+]
+```
+
+You can use the `load` and `json` function together to turn a goroutine dump
+file into JSON for processing with other tools like [`jq`][].
+
+```
+$ goroutine-explore -e 'load("testdata/goroutines.txt").json()' | jq .
+```
 
 [linuxerwang/goroutine-inspect]: https://github.com/linuxerwang/goroutine-inspect
 [`liner`]: https://github.com/peterh/liner?tab=readme-ov-file#line-editing
 [`pprof`]: https://pkg.go.dev/runtime/pprof#Profile
+[`jq`]: https://jqlang.org/

@@ -427,6 +427,7 @@ var signatures = map[string]struct {
 	"as":        {OpCodeAssignment, []argType{identifier}, 1},
 	"show": {OpCodeFuncShowDump, []argType{
 		numeric | optional, numeric | optional}, 0},
+	"json": {OpCodeFuncJSON, nil, 0},
 
 	// these have more complex handling so we don't have a single OpCode
 	"where":  {OpCodeNoop, []argType{predicate}, 1},
