@@ -56,7 +56,7 @@ The following components are included in this project:
 * Licensed under the MIT License
 
 `mattn/go-runewidth`
-* https://github.com/mattn/go-runwidth
+* https://github.com/mattn/go-runewidth
 * Copyright (c) 2016 Yasuhiro Matsumoto
 * Licensed under the MIT License
 

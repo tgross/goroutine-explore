@@ -43,6 +43,7 @@ check:
 	go vet ./...
 	golangci-lint run ./...
 	go mod tidy
+	./tools/check-notices.sh
 
 .PHONY: clean
 clean:
