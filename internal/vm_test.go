@@ -437,7 +437,7 @@ goroutine 3 [IO wait, 10 minutes]:
 			chunk: &Chunk{
 				ops: []Op{
 					encode(OpCodeLoadGoroutineDump, 0), // load g1
-					encode(OpCodeFuncJSON, 0),          // show
+					encode(OpCodeFuncToJSON, 0),        // show
 				},
 				constants: []any{"g1", 1, 3},
 			},
@@ -589,6 +589,55 @@ func TestVM_CommandPragma(t *testing.T) {
 		})
 	}
 
+}
+
+func TestVM_Graph(t *testing.T) {
+	gd := mockDumpForGraph()
+	predicate := NewGoroutineDump()
+	predicate.Add(gd.byID(6))
+	predicate.Add(gd.byID(12))
+
+	// source: `g1 = g.graph(id == 6 or id == 12)`
+	chunk := &Chunk{
+		ops: []Op{
+			encode(OpCodeLoadGoroutineDump, 1), // 00 load g
+			encode(OpCodeDup, 0),               // 01 dupe on stack
+			encode(OpCodeTempDump, 0),          // 02 temp dump to reg
+			encode(OpCodeNextGoroutine, 16),    // 03 next goroutine
+			encode(OpCodeLoadFieldAccessor, 2), // 04 load .id
+			encode(OpCodeLoadNumber, 3),        // 05 load 6
+			encode(OpCodeEqual, 0),             // 06 compare, push bool to stack
+			encode(OpCodeJumpIfFalse, 10),      // 07 jump to next condition
+			encode(OpCodePushBool, 1),          // 08 push true to stack
+			encode(OpCodeJumpTo, 13),           // 09 jump past next condition
+			encode(OpCodeLoadFieldAccessor, 2), // 10 load .id
+			encode(OpCodeLoadNumber, 4),        // 11 load 12
+			encode(OpCodeEqual, 0),             // 12 compare, push bool to stack
+			encode(OpCodeJumpIfFalse, 3),       // 13 next goroutine
+			encode(OpCodeAddGoroutine, 0),      // 14 add goroutine
+			encode(OpCodeJumpTo, 3),            // 15 next goroutine
+			encode(OpCodePushDump, 0),          // 16 push
+			encode(OpCodeFuncGraph, 0),         // 18 pop 2 dumps and graph
+			encode(OpCodeAssignment, 0),        // 18 assign result to g1
+		},
+		constants: []any{"g1", "g", ".id", 6, 12},
+	}
+
+	vm := NewVM(&Config{WorkDir: t.TempDir()})
+	vm.Reset(chunk)
+	vm.env = map[string]Value{
+		"g": {Tag: TagDump, Data: gd},
+	}
+
+	err := vm.Run(t.Context())
+	vm.debug()
+	must.NoError(t, err)
+
+	result, _ := vm.pop()
+	must.Eq(t, TagDump, result.Tag)
+	g1, ok := result.Data.(*GoroutineDump)
+	must.True(t, ok)
+	must.Eq(t, "[1 2 4 6 10 12 14]", g1.String())
 }
 
 func expectDumpFromEnv(t *testing.T, env map[string]Value, name string) *GoroutineDump {

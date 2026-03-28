@@ -13,9 +13,9 @@ import (
 	"github.com/shoenig/test/must"
 )
 
-// TestEvaluator is "end-to-end" tests of the evaluator, asserting expected
+// TestEvaluatorE2E is "end-to-end" tests of the evaluator, asserting expected
 // output given an environment
-func TestEvaluator(t *testing.T) {
+func TestEvaluatorE2E(t *testing.T) {
 
 	tempDir := t.TempDir()
 	env := map[string]Value{}

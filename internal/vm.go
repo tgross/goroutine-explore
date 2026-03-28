@@ -262,6 +262,16 @@ var (
 
 func opNoop(_ *VM, _ OpCode, _ uint) error { return nil }
 
+func opDup(vm *VM, _ OpCode, _ uint) error {
+	val, err := vm.peek()
+	if err != nil {
+		return err
+	}
+	dup := val
+	vm.push(dup)
+	return nil
+}
+
 func opComparison(vm *VM, instruction OpCode, _ uint) error {
 	right, err := vm.pop()
 	if err != nil {
@@ -991,7 +1001,7 @@ func opFuncShowDump(vm *VM, _ OpCode, _ uint) error {
 	return nil
 }
 
-func opFuncJSON(vm *VM, _ OpCode, _ uint) error {
+func opFuncToJSON(vm *VM, _ OpCode, _ uint) error {
 	dump, err := vm.peekDump()
 	if err != nil {
 		return err

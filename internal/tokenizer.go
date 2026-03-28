@@ -177,14 +177,14 @@ func (s *Tokenizer) next() (Token, error) {
 			token.Type = TokenKeywordAnd
 		case "or":
 			token.Type = TokenKeywordOr
-		case "where", "delete", "as", "save",
-			"show", "diff", "intersect", "union", "json":
+		case "where", "delete", "as", "save", "graph",
+			"show", "diff", "intersect", "union", "json", "dot":
 			token.Type = TokenFunction
 		case "load":
 			// load takes no expression argument, so treat it like a method
 			token.Type = TokenMethod
-		case ".where", ".delete", ".as", ".load", ".save",
-			".show", ".diff", ".intersect", ".union", ".json":
+		case ".where", ".delete", ".as", ".load", ".save", ".graph",
+			".show", ".diff", ".intersect", ".union", ".json", ".dot":
 			token.Type = TokenMethod
 			token.Lexeme = strings.TrimPrefix(token.Lexeme, ".")
 
@@ -201,8 +201,7 @@ func (s *Tokenizer) next() (Token, error) {
 		case "id", ".id", "header", ".header",
 			"trace", ".trace", "lines", ".lines",
 			"duration", ".duration", "state", ".state",
-			"createdby", ".createdby", "createdBy", ".createdBy",
-			"dups", ".dups":
+			"createdby", ".createdby", "createdBy", ".createdBy":
 			token.Type = TokenFieldAccessor
 
 		case ".confirm", ".empty", ".exit",

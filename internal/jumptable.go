@@ -6,7 +6,7 @@ package internal
 // efficiently dispatch to handlers without a switch or hash table. Whenever
 // chunk.go gets a new OpCode or the order is changed, run go generate again to
 // rebuild this table.
-var jumpTable = [40]dispatchFn{
+var jumpTable = [43]dispatchFn{
 	opNoop,
 	opLoadGoroutineDump,
 	opLoadFieldAccessor,
@@ -15,6 +15,7 @@ var jumpTable = [40]dispatchFn{
 	opAssignment,
 	opPushBool,
 	opPushDump,
+	opDup,
 	opAddGoroutine,
 	opNextGoroutine,
 	opTempDump,
@@ -36,8 +37,10 @@ var jumpTable = [40]dispatchFn{
 	opFuncLoad,
 	opFuncSave,
 	opFuncShowDump,
-	opFuncJSON,
+	opFuncToJSON,
+	opFuncToDot,
 	opFuncUnion,
+	opFuncGraph,
 	opCommandChangeDir,
 	opCommandEmpty,
 	opCommandGetWorkingDir,

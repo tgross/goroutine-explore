@@ -77,3 +77,31 @@ func mockStack(depth int) string {
 	}
 	return out
 }
+
+func mockDumpForGraph() *GoroutineDump {
+	gd := NewGoroutineDump()
+	for i := 1; i < 30; i++ {
+		gd.Add(mockMinGoroutine(fmt.Sprintf("goroutine %d [running]:", i)))
+	}
+
+	// 1->3->5->8->13->21
+	gd.byID(3).CreatedBy = 1
+	gd.byID(5).CreatedBy = 3
+	gd.byID(8).CreatedBy = 5
+	gd.byID(13).CreatedBy = 8
+	gd.byID(21).CreatedBy = 13
+
+	// 1->2->4->6->10->12->14
+	gd.byID(2).CreatedBy = 1
+	gd.byID(4).CreatedBy = 2
+	gd.byID(6).CreatedBy = 4
+	gd.byID(10).CreatedBy = 6
+	gd.byID(12).CreatedBy = 10
+	gd.byID(14).CreatedBy = 12
+
+	// 7->15->27
+	gd.byID(15).CreatedBy = 7
+	gd.byID(27).CreatedBy = 15
+
+	return gd
+}

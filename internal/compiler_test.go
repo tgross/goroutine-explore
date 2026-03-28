@@ -300,6 +300,36 @@ func TestCompiler_ChainedWhere(t *testing.T) {
 	)
 }
 
+func TestCompiler_InGraph(t *testing.T) {
+	src := `g1 = g.graph(.duration > 10)`
+	body := strings.NewReader(src)
+
+	tokenizer := NewTokenizer()
+	tokenizer.Reset(t.Context(), body)
+	compiler := NewCompiler()
+	chunk, err := compiler.Compile(tokenizer)
+	must.NoError(t, err)
+
+	fmt.Println(chunk.disassemble(0))
+	must.Eq(t, []Op{
+		encode(OpCodeLoadGoroutineDump, 1), // 00 load g
+		encode(OpCodeDup, 0),               // 01 dup g on stack
+		encode(OpCodeTempDump, 0),          // 02 setup scratch register
+		encode(OpCodeNextGoroutine, 10),    // 03 addr when done
+		encode(OpCodeLoadFieldAccessor, 2), // 04 load .duration
+		encode(OpCodeLoadNumber, 3),        // 05 load 10
+		encode(OpCodeGreater, 0),           // 06 compare push bool to stack
+		encode(OpCodeJumpIfFalse, 3),       // 07 addr if false
+		encode(OpCodeAddGoroutine, 0),      // 08 keep
+		encode(OpCodeJumpTo, 3),            // 09 unconditional jump to addr
+		encode(OpCodePushDump, 0),          // 10 push temp dump to stack
+		encode(OpCodeFuncGraph, 0),         // 11 generate graph and push to stack
+		encode(OpCodeAssignment, 0),        // 12 assign to g1
+	},
+		chunk.ops,
+	)
+}
+
 func TestCompiler_Paths(t *testing.T) {
 	testCases := []struct {
 		name       string

@@ -343,6 +343,8 @@ on a single `where`.
 | `as`        | dump, new variable name | dump    |
 | `delete`    | dump, filter expression | dump    |
 | `diff`      | dump, dump              | 3 dumps |
+| `dot`       | dump                    | dump    |
+| `graph`     | dump, dump              | dump    |
 | `intersect` | dump, dump              | dump    |
 | `json`      | dump                    | dump    |
 | `load`      | string path             | dump    |
@@ -444,10 +446,17 @@ shown if `show.dedup none`.
 
 ### Filter expressions
 
-The `where` and `delete` functions return a dump where goroutines have been kept
-or removed based on the outcome of a conditional filter expression. For example,
-to filter a dump down to goroutines that have been in `select` for more than 10
-minutes:
+The `where`, `delete`, and `graph` functions return a dump where goroutines have
+been kept or removed based on the outcome of a conditional filter expression.
+
+The `where` function includes goroutines that match the filter. The `delete`
+function excludes goroutines that match the filter. The `graph` function
+includes goroutines that match the filter (similar to `where`), but also all
+goroutines that are ancestors or descendants of those goroutines, by following
+the graph implied by the "created by" lines of their traces.
+
+For example, to filter a dump down to goroutines that have been in `select` for
+more than 10 minutes:
 
 ```
 >> g2 = g1.where(.state == "select" and .duration > 10)
@@ -596,10 +605,26 @@ You can use the `load` and `json` function together to turn a goroutine dump
 file into JSON for processing with other tools like [`jq`][].
 
 ```
-$ goroutine-explore -e 'load("testdata/goroutines.txt").json()' | jq .
+$ goroutine-explore -e 'load("goroutine-dump.txt").json()' | jq .
+```
+
+### dot
+
+The `dot` function takes a goroutine dump and outputs a dot-syntax directed
+graph of all the goroutines in the dump. This is primarily useful for writing to
+a file and then using [graphviz][] tools like `dot` to turn it into an image.
+
+```sh
+$ goroutine-explore \
+    -e 'load("goroutine-dump.txt").where(id > 200 and id < 300).dot()' \
+    > ./graph.dot
+$ dot -Tsvg ./graph.dot > ./graph.svg
+$ xdg-open ./graph.svg
+
 ```
 
 [linuxerwang/goroutine-inspect]: https://github.com/linuxerwang/goroutine-inspect
 [`liner`]: https://github.com/peterh/liner?tab=readme-ov-file#line-editing
 [`pprof`]: https://pkg.go.dev/runtime/pprof#Profile
 [`jq`]: https://jqlang.org/
+[graphviz]: https://graphviz.org/

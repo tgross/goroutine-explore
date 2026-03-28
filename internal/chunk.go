@@ -88,6 +88,7 @@ const (
 	OpCodeAssignment
 	OpCodePushBool
 	OpCodePushDump
+	OpCodeDup
 
 	// filter iteration
 	OpCodeAddGoroutine
@@ -117,8 +118,10 @@ const (
 	OpCodeFuncLoad
 	OpCodeFuncSave
 	OpCodeFuncShowDump
-	OpCodeFuncJSON
+	OpCodeFuncToJSON
+	OpCodeFuncToDot
 	OpCodeFuncUnion
+	OpCodeFuncGraph
 
 	// commands
 	OpCodeCommandChangeDir

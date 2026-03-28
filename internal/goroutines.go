@@ -27,7 +27,7 @@ type Diff struct {
 type GoroutineDump struct {
 	goroutines []*Goroutine
 
-	// index is a duplicated sorted list of the goroutines in the dump
+	// index is a de-duplicated sorted list of the goroutines in the dump
 	index []*Goroutine
 
 	// duplicates is a map of hash to duplicate IDs for that same hash,
@@ -165,6 +165,15 @@ func safeLimit(size, limit, offset int) int {
 		return size - offset
 	}
 	return min(limit, size-offset)
+}
+
+func (gd *GoroutineDump) byID(id int) *Goroutine {
+	for _, g := range gd.goroutines {
+		if g.ID == id {
+			return g
+		}
+	}
+	return nil
 }
 
 func (gd *GoroutineDump) Summary(w *Writer, name string) {
