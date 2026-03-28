@@ -480,19 +480,6 @@ expressions can contain any of the following:
   literal to match and the right side is a string field like `.trace` or
   `.state`.
 
-Filter expressions can also use the following helper functions.
-
-| Function   | Args                             | Returns |
-|------------|----------------------------------|---------|
-| `lower`    | string or field accessor         | string  |
-| `upper`    | string or field accessor         | string  |
-
-Example:
-
-```
->> g2 = g1.where(lower(.trace) contains "handlestream")
-```
-
 #### Properties of a Goroutine Dump Item
 
 Each dump item has 5 properties which can be used in conditionals:
@@ -501,7 +488,6 @@ Each dump item has 5 properties which can be used in conditionals:
 |--------------|--------|-----------------------------------------------------|
 | `.id`        | number | The goroutine ID.                                   |
 | `.createdby` | number | The goroutine ID of the parent goroutine            |
-| `.dups`      | number | The number of duplicate traces.                     |
 | `.duration`  | number | The waiting duration (in minutes) of a goroutine.   |
 | `.lines`     | number | The number of lines of the goroutine's stack trace. |
 | `.state`     | string | The running state of the goroutine.                 |
