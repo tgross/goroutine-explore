@@ -39,11 +39,16 @@ bench:
 	go test -v -benchmem -bench '^Benchmark' -run '^$$' ./...
 
 .PHONY: check
-check:
-	go vet ./...
-	golangci-lint run ./...
+check: tidy lint
+
+.PHONY: tidy
+tidy:
 	go mod tidy
 	./tools/check-notices.sh
+
+.PHONY: lint
+lint:
+	golangci-lint run ./...
 
 .PHONY: clean
 clean:
