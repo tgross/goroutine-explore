@@ -37,6 +37,8 @@ created by google.golang.org/grpc/transport.newHTTP2Server
   * [Intersect](#intersect)
   * [JSON](#json)
   * [dot](#dot)
+* [Contributing](#contributing)
+* [FAQ](#faq)
 
 ## Quick Start
 
@@ -655,8 +657,62 @@ $ xdg-open ./graph.svg
 
 ```
 
-[linuxerwang/goroutine-inspect]: https://github.com/linuxerwang/goroutine-inspect
+## Contributing
+
+If you have a small bug fix or documentation fix, please make a pull request!
+Bug reports are also helpful contributions!
+
+Generally speaking I'm not going to take on large new features for
+`goroutine-explore` unless they feel compellingly useful or especially fun to
+work on. If you'd like to suggest or contribute a feature, please open an issue
+for discussion before implementing it or opening a PR.
+
+Pull requests and issues that are substantially machine generated rather than
+human authored will not be accepted and will be closed outright. Please do not
+use LLMs to generate bug reports or in discussions (with the sole exception of
+using them for translation if you cannot communicate in English). I want to talk
+to you, not a machine.
+
+Please follow the [Code of Conduct][] when contributing to this project.
+
+## FAQ
+
+* **How does this project relate to goroutine-inspect?** This project started as
+  a fork of [linuxerwang/goroutine-inspect][] where I fixed some bugs and small
+  papercuts. But I wanted to make a much larger set of changes like an entirely
+  new expression language, and this involved a near total rewrite. Rather than
+  keeping the name and creating potential confusion between the two projects, I
+  changed the name of the new project to `goroutine-explore`. The remaining code
+  that belongs to `goroutine-inspect` is properly attributed in the repository
+  and the [NOTICES][] file.
+
+* **Where can I download a binary?** I'm not going to provide pre-built
+  binaries. I currently only run Linux, and I don't want to have to deal with
+  code signing for macOS and Windows. This tool is only useful for Go
+  developers, who I expect can easily install via `go install`.
+
+* **Can I package a binary for my distribution?** Of course, feel free! Just
+  keep in mind that the license requires attribution for distribution. Also,
+  your distribution's policies are your problem to solve, not mine. If you patch
+  `goroutine-explore` in any way before distributing, please ensure your users
+  know to contact you first for bug reports.
+
+* **What's the security model?** You must _never_ use `goroutine-explore` to run
+  untrusted expressions, because expressions can overwrite arbitrary files owned
+  by the user with the `save` function. For example, you should never use
+  untrusted data as the input to the `--expression` parameter. However, it
+  should be safe to `load` arbitrary files as goroutine dumps without those
+  files being able to do anything worse than return an error or hang or crash
+  `goroutine-explore`. It should be impossible for a loaded file to force
+  unexpected instructions in the bytecode VM, in particular running the `save`
+  function when not requested by the user. Please report any such behavior as a
+  bug.
+
+
 [`liner`]: https://github.com/peterh/liner?tab=readme-ov-file#line-editing
 [`pprof`]: https://pkg.go.dev/runtime/pprof#Profile
 [`jq`]: https://jqlang.org/
 [graphviz]: https://graphviz.org/
+[Code of Conduct]: ./.github/CODE_OF_CONDUCT.md
+[NOTICES]: ./NOTICES.md
+[linuxerwang/goroutine-inspect]: https://github.com/linuxerwang/goroutine-inspect
