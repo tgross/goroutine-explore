@@ -215,9 +215,9 @@ func TestVM_SetFunctions(t *testing.T) {
 			},
 			expectFn: func(t *testing.T, g *GoroutineDump) {
 				must.Eq(t, 3, g.Len())
-				must.Eq(t, 3, g.Next().ID)
 				must.Eq(t, 1, g.Next().ID)
 				must.Eq(t, 2, g.Next().ID)
+				must.Eq(t, 3, g.Next().ID)
 			},
 		},
 
@@ -254,9 +254,9 @@ func TestVM_SetFunctions(t *testing.T) {
 			},
 			expectFn: func(t *testing.T, g *GoroutineDump) {
 				must.Eq(t, 3, g.Len())
-				must.Eq(t, 3, g.Next().ID)
 				must.Eq(t, 1, g.Next().ID)
 				must.Eq(t, 2, g.Next().ID)
+				must.Eq(t, 3, g.Next().ID)
 			},
 		},
 
@@ -293,9 +293,9 @@ func TestVM_SetFunctions(t *testing.T) {
 			},
 			expectFn: func(t *testing.T, g *GoroutineDump) {
 				must.Eq(t, 3, g.Len())
-				must.Eq(t, 3, g.Next().ID)
 				must.Eq(t, 1, g.Next().ID)
 				must.Eq(t, 2, g.Next().ID)
+				must.Eq(t, 3, g.Next().ID)
 			},
 		},
 

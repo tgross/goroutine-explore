@@ -107,9 +107,9 @@ func TestEvaluatorE2E(t *testing.T) {
 				g2.where(.state == "runnable"))`,
 			expect: func(t *testing.T, dump *GoroutineDump) {
 				must.Eq(t, 3, dump.Len())
-				must.Eq(t, 20, dump.Next().ID)
 				must.Eq(t, 1, dump.Next().ID)
 				must.Eq(t, 3, dump.Next().ID)
+				must.Eq(t, 20, dump.Next().ID)
 			},
 		},
 		{

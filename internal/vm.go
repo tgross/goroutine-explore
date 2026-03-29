@@ -470,6 +470,7 @@ func opFuncUnion(vm *VM, _ OpCode, _ uint) error {
 		g.Add(rg)
 	}
 
+	g.Sort()
 	vm.pushDump(g)
 	return nil
 }

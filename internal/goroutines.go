@@ -67,8 +67,9 @@ func (gd *GoroutineDump) Sort() {
 	})
 }
 
-// Index creates an lookup table for duplicates. It assumes the dump is already
-// sorted.
+// Index creates an lookup table for duplicates. It assumes the dump is
+// sorted. Because dumps are intended to be immutable, it'll check/set the
+// isIndexed flag so that we only do this expensive work once.
 func (gd *GoroutineDump) Index() {
 	if gd.isIndexed {
 		return
@@ -197,7 +198,8 @@ func (gd *GoroutineDump) Summary(w *Writer, name string) {
 	fmt.Fprintln(w, "")
 }
 
-// Save saves the goroutine dump to the given file.
+// Save saves the goroutine dump to the given file. Assumes the dump is already
+// sorted.
 func (gd GoroutineDump) Save(fn string) error {
 	f, err := os.Create(fn)
 	if err != nil {

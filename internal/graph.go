@@ -22,6 +22,8 @@ func opFuncGraph(vm *VM, _ OpCode, _ uint) error {
 	return nil
 }
 
+// inGraphOf finds all parents and descendants of the goroutines in the
+// predicate dump. The dump it returns is sorted and indexed.
 func inGraphOf(sourceDump *GoroutineDump, predicate *GoroutineDump) *GoroutineDump {
 	result := NewGoroutineDump()
 	for _, g := range predicate.goroutines {
