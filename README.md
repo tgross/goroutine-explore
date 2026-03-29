@@ -2,16 +2,48 @@
 
 An interactive tool for analyzing Golang goroutine dumps.
 
-_Note: this is a fork of [linuxerwang/goroutine-inspect][] and is undergoing
-significant rewrite to have a new expression language and more flexible
-goroutine dump ingest. Expect frequent breaking behavior changes until 1.0.0._
+```
+>> load("goroutine-dump.txt").where(.state == "select" \
+        and .duration > 10 \
+        and .trace contains "keepalive").show()
+
+goroutine 72 [select, 25 minutes]: 5 times: [72, 54755, 76757, 299, 201]
+google.golang.org/grpc/transport.(*http2Server).keepalive(0xc4202f0420)
+        google.golang.org/grpc/transport/http2_server.go:919 +0x488
+created by google.golang.org/grpc/transport.newHTTP2Server
+        google.golang.org/grpc/transport/http2_server.go:226 +0x97c
+```
+
+* [Quick Start](#quick-start)
+  * [Install or Build](#install-or-build)
+  * [The Shell](#the-shell)
+* [Commands](#commands)
+* [Types](#types)
+  * [Variables](#variables)
+  * [Pragma](#pragma)
+* [Expressions](#expressions)
+  * [Show a summary](#show-a-summary)
+  * [Assignment](#assignment)
+  * [Pipelines](#pipelines)
+  * [Functions](#functions)
+  * [Assign mid-pipeline](#assign-mid-pipeline)
+  * [Load a goroutine dump from file](#load-a-goroutine-dump-from-file)
+  * [Save a goroutine dump to a file](#save-a-goroutine-dump-to-a-file)
+  * [Show the goroutines of a dump](#show-the-goroutines-of-a-dump)
+  * [Filter expressions](#filter-expressions)
+    * [Properties of a Goroutine Dump Item](#properties-of-a-goroutine-dump-item)
+  * [Diff](#diff)
+  * [Union](#union)
+  * [Intersect](#intersect)
+  * [JSON](#json)
+  * [dot](#dot)
 
 ## Quick Start
 
 Run `goroutine-explore` in your terminal to start a shell, and load a goroutine
 dump from a file.
 
-```sh
+```
 >> g1 = load("goroutine-dump.txt")
 # of goroutines: 2217
 
@@ -614,7 +646,7 @@ The `dot` function takes a goroutine dump and outputs a dot-syntax directed
 graph of all the goroutines in the dump. This is primarily useful for writing to
 a file and then using [graphviz][] tools like `dot` to turn it into an image.
 
-```sh
+```
 $ goroutine-explore \
     -e 'load("goroutine-dump.txt").where(id > 200 and id < 300).dot()' \
     > ./graph.dot
