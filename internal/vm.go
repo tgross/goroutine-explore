@@ -97,8 +97,6 @@ func (vm *VM) Run(ctx context.Context) error {
 
 	}
 
-	// TODO: would be nice to account for calls to show() so that summaries
-	// match the show() value, or just leave the summary off in that case
 	if vm.didShow {
 		return nil
 	}

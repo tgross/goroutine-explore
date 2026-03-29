@@ -168,10 +168,6 @@ func (s *Tokenizer) next() (Token, error) {
 			return token, fmt.Errorf("invalid identifier")
 		}
 
-		// TODO: right now this is a gross mix of single-purpose keyword tokens
-		// and coarse-grained function/command tokens. As the compiler gets
-		// refined we should clean this up and move towards one direction or the
-		// other
 		switch token.Lexeme {
 		case "and":
 			token.Type = TokenKeywordAnd
