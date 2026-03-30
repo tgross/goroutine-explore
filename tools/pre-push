@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+fail () {
+  echo "pre-push hook: $@" >&2
+  echo "    --no-verify to bypass this hook" >&2
+  exit 1
+}
+
+if ! git rev-parse --show-toplevel > /dev/null; then
+  fail "this hook must be run from a worktree."
+fi
+
+# do not push directly to trunk
+while read local_ref local_sha remote_ref remote_sha
+do
+    if [ "$remote_ref" = "refs/heads/trunk" ]; then
+        fail "refusing to push directly to trunk"
+    fi
+done
