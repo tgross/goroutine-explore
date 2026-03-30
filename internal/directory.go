@@ -9,11 +9,23 @@ package internal
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"sort"
 )
 
 func opCommandListDir(vm *VM, _ OpCode, _ uint) error {
 	w := vm.wOut
+
+	if vm.pragma.ListFormat != "" {
+		cmd := exec.Command("ls", vm.pragma.ListFormat)
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			return err
+		}
+		fmt.Fprintln(w, string(out))
+		return nil
+	}
+
 	wd, err := os.Getwd()
 	if err != nil {
 		return err
