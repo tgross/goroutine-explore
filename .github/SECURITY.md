@@ -15,5 +15,5 @@ unexpected instructions in the bytecode VM, in particular running the `save`
 function when not requested by the user.
 
 This repository does not use Dependabot updates, as the dependency tree is very
-small and consists of fairly stable libraries. The repository with Dependabot
-alerts so that any critical vulnerabilities are flagged.
+small and consists of fairly stable libraries. The repository is configured with
+Dependabot alerts so that any critical vulnerabilities are flagged.

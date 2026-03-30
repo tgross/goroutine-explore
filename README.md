@@ -578,7 +578,7 @@ containing goroutines that only appear in the right side.
 ### Union
 
 The `union` function takes two goroutine dumps and returns a goroutine dump that
-combines them. Goroutines with the same ID in both dumps will be de-duplicated
+combines them. Goroutines with the same ID in both dumps will be deduplicated
 if they are identical. If they are not identical, this expression will return an
 error.
 
@@ -614,7 +614,7 @@ the same ID in both dumps will not be included if they are not identical.
 
 The `json` function takes a goroutine dump and outputs a pretty-printed JSON
 array of all the goroutines in the dump. Unlike the `show` function, no
-de-duplication of goroutines happens.
+deduplication of goroutines happens.
 
 ```
 >> g2 = g1.where(.state == "select" and .duration > 10)
