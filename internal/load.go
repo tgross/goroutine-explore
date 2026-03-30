@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"unicode"
 )
 
 var (
@@ -45,6 +46,15 @@ func loadFrom(r io.Reader, startPattern *regexp.Regexp) (*GoroutineDump, error) 
 	scanner := bufio.NewScanner(r)
 	for scanner.Scan() {
 		line := scanner.Text()
+
+		// ensure there are no control characters from an untrusted dump
+		line = strings.Map(func(r rune) rune {
+			if unicode.IsControl(r) {
+				return -1
+			}
+			return r
+		}, line)
+
 		switch {
 		case startPattern.MatchString(line):
 			// Freeze any previous goroutine to tolerate dumps without line
