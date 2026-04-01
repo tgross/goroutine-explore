@@ -49,7 +49,7 @@ func loadFrom(r io.Reader, startPattern *regexp.Regexp) (*GoroutineDump, error) 
 
 		// ensure there are no control characters from an untrusted dump
 		line = strings.Map(func(r rune) rune {
-			if unicode.IsControl(r) {
+			if unicode.IsControl(r) && r != '\t' {
 				return -1
 			}
 			return r
