@@ -8,11 +8,11 @@ GOBIN = $(shell go env GOBIN)
 GOBIN := $(if $(GOBIN),$(GOBIN),"$(shell go env GOPATH)/bin")
 
 .PHONY: build
-build: build/goroutine-explore
+build: bin/goroutine-explore
 
-build/goroutine-explore: gen $(GO_SRC)
+bin/goroutine-explore: gen $(GO_SRC)
 	@mkdir -p ./build
-	go build -trimpath -o build/goroutine-explore .
+	go build -trimpath -o bin/goroutine-explore .
 
 .PHONY: gen
 gen:
@@ -23,12 +23,12 @@ install:
 	go install -trimpath .
 
 .PHONY: dev
-dev: build/goroutine-explore
-	ln -sf $(shell pwd)/build/goroutine-explore $(GOBIN)/goroutine-explore
+dev: bin/goroutine-explore
+	ln -sf $(shell pwd)/bin/goroutine-explore $(GOBIN)/goroutine-explore
 
 .PHONY: run
 run: build
-	./build/goroutine-explore
+	./bin/goroutine-explore
 
 .PHONY: test
 test:
