@@ -6,8 +6,8 @@ package internal
 import (
 	"bufio"
 	"bytes"
-	"encoding/base64"
 	"fmt"
+	"hash/fnv"
 	"math/rand"
 	"strings"
 )
@@ -21,8 +21,9 @@ func mockMinGoroutine(header string) *Goroutine {
 		panic(fmt.Sprintf("invalid header %q: %v", header, err))
 	}
 	// fake a hash because there are no lines
-	g.hash = base64.StdEncoding.EncodeToString(
-		[]byte(header))
+	hasher := fnv.New64()
+	hasher.Write([]byte(header))
+	g.hash = hasher.Sum64()
 	return g
 }
 

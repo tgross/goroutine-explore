@@ -5,10 +5,9 @@ package internal
 
 import (
 	"bytes"
-	"crypto/sha256"
-	"encoding/base64"
 	"fmt"
 	"hash"
+	"hash/fnv"
 	"maps"
 	"os"
 	"regexp"
@@ -32,7 +31,7 @@ type GoroutineDump struct {
 
 	// duplicates is a map of hash to duplicate IDs for that same hash,
 	// excluding the goroutine that's in the index
-	duplicates map[string][]int
+	duplicates map[uint64][]int
 
 	// isIndexed is a flag that we set to avoid reindexing a dump
 	// repeatedly. Dump contents should be immutable once returned from the VM
@@ -47,7 +46,7 @@ func NewGoroutineDump() *GoroutineDump {
 	gd := &GoroutineDump{
 		goroutines: []*Goroutine{},
 		index:      []*Goroutine{},
-		duplicates: map[string][]int{},
+		duplicates: map[uint64][]int{},
 	}
 	return gd
 }
@@ -76,7 +75,7 @@ func (gd *GoroutineDump) Index() {
 	}
 	gd.isIndexed = true
 	gd.index = []*Goroutine{}
-	gd.duplicates = map[string][]int{}
+	gd.duplicates = map[uint64][]int{}
 
 	for _, g := range gd.goroutines {
 		if dupe, ok := gd.duplicates[g.hash]; ok {
@@ -104,7 +103,7 @@ func (gd *GoroutineDump) Copy() *GoroutineDump {
 	return &GoroutineDump{
 		goroutines: slices.Clone(gd.goroutines),
 		index:      []*Goroutine{},
-		duplicates: map[string][]int{},
+		duplicates: map[uint64][]int{},
 	}
 }
 
@@ -227,8 +226,8 @@ type Goroutine struct {
 
 	buf      *bytes.Buffer // a copy of the original text from the dump
 	isFrozen bool          // once a goroutine is frozen, we never add to it again
-	hash     string        // set from location specs of all lines in the stack
-	hasher   hash.Hash
+	hash     uint64        // set from location specs of all lines in the stack
+	hasher   hash.Hash64
 }
 
 var durationPattern = regexp.MustCompile(`^\d+ minutes$`)
@@ -266,7 +265,7 @@ func NewGoroutine(header string) (*Goroutine, error) {
 		buf:        &bytes.Buffer{},
 		Duration:   duration,
 		State:      state,
-		hasher:     sha256.New(),
+		hasher:     fnv.New64(),
 		duplicates: []int{},
 	}, nil
 }
@@ -275,7 +274,7 @@ func (g *Goroutine) Debug() string {
 	if g == nil {
 		return "<nil>"
 	}
-	return fmt.Sprintf("%s (%s)", g.header, g.hash[:20])
+	return fmt.Sprintf("%s (%d)", g.header, g.hash)
 }
 
 // AddLine appends a line to the goroutine info.
@@ -306,8 +305,7 @@ func (g *Goroutine) Freeze() {
 		g.isFrozen = true
 		g.Trace = g.buf.String()
 		g.buf = nil
-		g.hash = base64.StdEncoding.EncodeToString(
-			[]byte(g.hasher.Sum(nil)))
+		g.hash = g.hasher.Sum64()
 	}
 }
 
