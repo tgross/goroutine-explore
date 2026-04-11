@@ -17,6 +17,7 @@ created by google.golang.org/grpc/transport.newHTTP2Server
 * [Quick Start](#quick-start)
   * [Install or Build](#install-or-build)
   * [The Shell](#the-shell)
+  * [The CLI](#the-cli)
 * [Commands](#commands)
 * [Types](#types)
   * [Variables](#variables)
@@ -111,6 +112,17 @@ You can write two kinds of instructions in the shell: commands and
 expressions. Both instructions are executed when you press `<enter>`, unless the
 line ends in a pipeline character `|` or backslash `\` to indicate that the
 instruction will extend to multiple lines.
+
+### The CLI
+
+You can run `goroutine-explore` with the `-e`/`-expression` option to run an
+expression without starting the REPL shell. When using this option,
+`goroutine-explore` will load a goroutine dump from stdin and treat it as the
+left hand side of a pipe expression.
+
+```bash
+$ cat goroutine-dump.txt | goroutine-explore -e 'show()'
+```
 
 ## Commands
 
@@ -425,14 +437,6 @@ you'll want to assign the result to a variable so it can be reused.
        runnable: 38
      semacquire: 85
       chan send: 4
-```
-
-When using the `-e`/`-expression` option instead of the REPL,
-`goroutine-explore` will load a goroutine dump from stdin and treat it as the
-left hand side of a pipe expression.
-
-```bash
-$ cat goroutine-dump.txt | goroutine-explore -e 'show()'
 ```
 
 ### Save a goroutine dump to a file
