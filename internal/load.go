@@ -21,6 +21,12 @@ var (
 )
 
 func load(fn string) (*GoroutineDump, error) {
+	// special case for when -e is used without a tty for stdin
+	if fn == "STDIN" {
+		reader := bufio.NewReader(os.Stdin)
+		return loadFrom(reader, startLinePattern)
+	}
+
 	fn = strings.Trim(fn, "\"")
 
 	if strings.HasPrefix(fn, "~") {

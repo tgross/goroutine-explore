@@ -427,6 +427,14 @@ you'll want to assign the result to a variable so it can be reused.
       chan send: 4
 ```
 
+When using the `-e`/`-expression` option instead of the REPL,
+`goroutine-explore` will load a goroutine dump from stdin and treat it as the
+left hand side of a pipe expression.
+
+```bash
+$ cat goroutine-dump.txt | goroutine-explore -e 'show()'
+```
+
 ### Save a goroutine dump to a file
 
 The `save` function takes a dump and a file path, and saves the dump in text
@@ -545,7 +553,7 @@ a dump containing goroutines that only appear in the left side, a dump
 containing goroutines that appear in both the left and right side, and a dump
 containing goroutines that only appear in the right side.
 
-```bash
+```
 >> l, c, r = diff(g1, g2)
 >> l
 # of goroutines: 574
@@ -640,7 +648,7 @@ deduplication of goroutines happens.
 You can use the `load` and `json` function together to turn a goroutine dump
 file into JSON for processing with other tools like [`jq`][].
 
-```
+```bash
 $ goroutine-explore -e 'load("goroutine-dump.txt").json()' | jq .
 ```
 
@@ -650,7 +658,7 @@ The `dot` function takes a goroutine dump and outputs a dot-syntax directed
 graph of all the goroutines in the dump. This is primarily useful for writing to
 a file and then using [graphviz][] tools like `dot` to turn it into an image.
 
-```
+```bash
 $ goroutine-explore \
     -e 'load("goroutine-dump.txt").where(id > 200 and id < 300).dot()' \
     > ./graph.dot

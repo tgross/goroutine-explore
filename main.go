@@ -65,6 +65,9 @@ like -pragma show.color=false`)
 		}
 	}
 	if expr != "" {
+		if !isatty.IsTerminal(os.Stdin.Fd()) {
+			expr = `load("STDIN") | ` + expr
+		}
 		os.Exit(evalOnce(e, expr))
 	}
 
