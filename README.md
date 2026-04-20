@@ -708,9 +708,9 @@ unmaintained, it will be archived. Please don't open issues to ask things like
 ### AI Policy
 
 Pull requests and issues that are substantially machine generated rather than
-human authored will not be accepted and will be closed outright. Because such
-generated code cannot be copyrighted, I may decide to reimplement such PRs from
-scratch _without attribution._ So don't do it!
+human authored will not be accepted. Any pull request to this project will ask
+you to confirm that you are the author and that you are contributing your
+changes under the project's license.
 
 Please do not use LLMs to generate bug reports or in discussions (with the sole
 exception of using them for translation if you cannot communicate in English). I
