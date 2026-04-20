@@ -92,9 +92,16 @@ func (vm *VM) Run(ctx context.Context) error {
 
 		err = jumpTable[instruction](vm, instruction, operand)
 		if err != nil {
+			if vm.pragma.DebugDisassemble != PragmaDebugDisassembleNone {
+				vm.debug()
+			}
 			return err
 		}
 
+	}
+
+	if vm.pragma.DebugDisassemble == PragmaDebugDisassembleOnReturn {
+		vm.debug()
 	}
 
 	if vm.didShow {
@@ -855,6 +862,8 @@ func opCommandGetPragma(vm *VM, _ OpCode, _ uint) error {
 		fmt.Fprintf(vm.wOut, "%s\n", vm.pragma.ShowDedup)
 	case "vars.display":
 		fmt.Fprintf(vm.wOut, "%s\n", vm.pragma.VarsDisplay)
+	case "debug.disassemble":
+		fmt.Fprintf(vm.wOut, "%s\n", vm.pragma.DebugDisassemble)
 	default:
 		return fmt.Errorf("%w pragma.%s", ErrNoSuchPragma, setting)
 	}
@@ -889,6 +898,8 @@ func opCommandSetPragma(vm *VM, _ OpCode, _ uint) error {
 		err = popAndSet(vm, &vm.pragma.ShowDedup)
 	case "vars.display":
 		err = popAndSet(vm, &vm.pragma.VarsDisplay)
+	case "debug.disassemble":
+		err = popAndSet(vm, &vm.pragma.DebugDisassemble)
 	default:
 		return fmt.Errorf("%w pragma.%s", ErrNoSuchPragma, setting)
 	}

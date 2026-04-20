@@ -204,7 +204,7 @@ func (s *Tokenizer) next() (Token, error) {
 			".limits", ".steps", ".stack",
 			".ls", ".format",
 			".color", ".count", ".dedup",
-			".vars", ".display":
+			".vars", ".display", ".debug", ".disassemble":
 			token.Type = TokenFieldAccessor
 		}
 		if token.Type != TokenFieldAccessor &&

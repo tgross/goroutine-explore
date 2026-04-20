@@ -635,6 +635,14 @@ func (p *Compiler) parsePragma(_ Token) error {
 			return compileErr(valTok,
 				`invalid pragma value: expected one of "ids", "number", or "none"`)
 		}
+	case "debug.disassemble":
+		switch valTok.Lexeme {
+		case PragmaDebugDisassembleNone, PragmaDebugDisassembleOnError, PragmaDebugDisassembleOnReturn:
+			err = p.parseString(valTok)
+		default:
+			return compileErr(valTok,
+				`invalid pragma value: expected one of "none", "error", or "return"`)
+		}
 	case "vars.display":
 		switch valTok.Lexeme {
 		case PragmaDisplayCount, PragmaDisplayNone, PragmaDisplaySummary:

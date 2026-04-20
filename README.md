@@ -212,6 +212,13 @@ show.dedup = "ids"
 
 The available pragmas are as follows:
 
+* `pragma.debug.disassemble` (default value: `none`): If set to `error`, emit a
+  debug representation of the byte code and the virtual machine state whenever
+  it returns an error after your expression is successfully compiled. If set to
+  `return`, emit the debug representation after every expression, even on
+  success. This pragma is generally used for development of `goroutine-explore`
+  but may also be useful if you're reporting a bug.
+
 * `pragma.empty.confirm` (default value: `true`): If set to `false`, disable the
   confirmation prompt on the `empty` command.
 

@@ -5,28 +5,30 @@ package internal
 
 // Pragma represents all the VM's configuration values.
 type Pragma struct {
-	EmptyConfirm bool
-	ExitConfirm  bool
-	ListFormat   string
-	ShowColor    bool
-	ShowCount    int
-	ShowDedup    string
-	VarsDisplay  string
-	Gas          int
-	StackSize    int
+	EmptyConfirm     bool
+	ExitConfirm      bool
+	ListFormat       string
+	ShowColor        bool
+	ShowCount        int
+	ShowDedup        string
+	VarsDisplay      string
+	Gas              int
+	StackSize        int
+	DebugDisassemble string
 }
 
 func NewPragma() *Pragma {
 	return &Pragma{
-		EmptyConfirm: true,
-		ExitConfirm:  true,
-		ListFormat:   "",
-		ShowColor:    true,
-		ShowCount:    0,
-		ShowDedup:    PragmaDedupIDs,
-		VarsDisplay:  PragmaDisplayCount,
-		Gas:          defaultGas,
-		StackSize:    defaultStackLimit,
+		EmptyConfirm:     true,
+		ExitConfirm:      true,
+		ListFormat:       "",
+		ShowColor:        true,
+		ShowCount:        0,
+		ShowDedup:        PragmaDedupIDs,
+		VarsDisplay:      PragmaDisplayCount,
+		Gas:              defaultGas,
+		StackSize:        defaultStackLimit,
+		DebugDisassemble: defaultDebugDisassemble,
 	}
 }
 
@@ -47,4 +49,13 @@ const (
 	PragmaDedupIDs    = "ids"
 	PragmaDedupNumber = "number"
 	PragmaDedupNone   = "none"
+)
+
+type PragmaDebugDisassem string
+
+const (
+	PragmaDebugDisassembleNone     = "none"
+	PragmaDebugDisassembleOnError  = "error"
+	PragmaDebugDisassembleOnReturn = "return"
+	defaultDebugDisassemble        = PragmaDebugDisassembleNone
 )
