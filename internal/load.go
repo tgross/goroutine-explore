@@ -81,7 +81,10 @@ func loadFrom(r io.Reader, startPattern *regexp.Regexp) (*GoroutineDump, error) 
 			}
 			goroutine = nil
 		case goroutine != nil:
-			goroutine.AddLine(line)
+			err := goroutine.AddLine(line)
+			if err != nil {
+				return nil, err
+			}
 		}
 	}
 

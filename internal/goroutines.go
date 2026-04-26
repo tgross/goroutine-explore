@@ -278,7 +278,7 @@ func (g *Goroutine) Debug() string {
 }
 
 // AddLine appends a line to the goroutine info.
-func (g *Goroutine) AddLine(l string) {
+func (g *Goroutine) AddLine(l string) error {
 	if !g.isFrozen {
 		g.LineCount++
 		g.buf.WriteString(l)
@@ -286,8 +286,11 @@ func (g *Goroutine) AddLine(l string) {
 
 		createdByMatches := createdByPattern.FindStringSubmatch(l)
 		if len(createdByMatches) == 2 {
-			createdBy, _ := strconv.ParseInt(createdByMatches[1], 10, 64)
-			g.CreatedBy = int(createdBy)
+			createdBy, err := strconv.Atoi(createdByMatches[1])
+			if err != nil {
+				return err
+			}
+			g.CreatedBy = createdBy
 		} else if strings.HasPrefix(l, "\t") || strings.HasPrefix(l, " ") {
 			// sigquit dumps include fp, sp, and pc for each line, so we only
 			// want the location spec to add to the hash
@@ -297,6 +300,7 @@ func (g *Goroutine) AddLine(l string) {
 			fmt.Fprint(g.hasher, fl)
 		}
 	}
+	return nil
 }
 
 // Freeze freezes the goroutine info.

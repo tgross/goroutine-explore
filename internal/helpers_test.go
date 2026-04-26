@@ -46,7 +46,7 @@ func mockGoroutine(id int, state string, stacks ...string) *Goroutine {
 
 	for scanner.Scan() {
 		line := scanner.Text()
-		goroutine.AddLine(line)
+		_ = goroutine.AddLine(line)
 	}
 	goroutine.Freeze()
 	return goroutine
