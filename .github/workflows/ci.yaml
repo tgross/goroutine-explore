@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - 'trunk'
+
+permissions: read-all
+
 jobs:
   run-checks:
     runs-on: ubuntu-24.04
