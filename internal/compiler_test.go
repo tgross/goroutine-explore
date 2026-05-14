@@ -20,33 +20,52 @@ func TestCompiler_SimplePipeline(t *testing.T) {
 	tokenizer := NewTokenizer()
 	tokenizer.Reset(t.Context(), body)
 	compiler := NewCompiler()
-	chunk, err := compiler.Compile(tokenizer)
+	code, err := compiler.Compile(tokenizer)
+	fmt.Println(code.disassemble(0, 0))
 	must.NoError(t, err)
 
-	fmt.Println(chunk.disassemble(0))
+	must.Len(t, 3, code.chunks)
+	must.Eq(t, []any{"g2", "g", ".state", "select", ".duration", 10},
+		code.constants)
+
 	must.Eq(t, []Op{
 		encode(OpCodeLoadGoroutineDump, 1), // 00 load g1
 		encode(OpCodeTempDump, 0),          // 01 scratch register
-		encode(OpCodeNextGoroutine, 9),     // 02 addr when done
-		encode(OpCodeLoadFieldAccessor, 2), // 03 load .state
-		encode(OpCodeLoadString, 3),        // 04 load "select"
-		encode(OpCodeEqual, 0),             // 05 compare push bool to stack
-		encode(OpCodeJumpIfFalse, 2),       // 06 jump to next goroutine
-		encode(OpCodeAddGoroutine, 0),      // 07 keep
-		encode(OpCodeJumpTo, 2),            // 08 jump to next goroutine
-		encode(OpCodePushDump, 0),          // 09 push to stack
-		encode(OpCodeTempDump, 0),          // 10 refresh scratch register
-		encode(OpCodeNextGoroutine, 18),    // 11 addr when done
-		encode(OpCodeLoadFieldAccessor, 4), // 12 load .duration
-		encode(OpCodeLoadNumber, 5),        // 13 load 10
-		encode(OpCodeGreater, 0),           // 14 compare push bool to stack
-		encode(OpCodeJumpIfFalse, 11),      // 15 jump to next goroutine
-		encode(OpCodeAddGoroutine, 0),      // 16 keep
-		encode(OpCodeJumpTo, 11),           // 17 jump to next goroutine
-		encode(OpCodePushDump, 0),          // 18 push to stack
-		encode(OpCodeAssignment, 0),        // 19 push to stack
+		encode(OpCodeNextGoroutine, 7),     // 02 addr when done
+		encode(OpCodeCall, 1),              // 03 call 1
+		encode(OpCodeJumpIfFalse, 2),       // 04 jump to next goroutine
+		encode(OpCodeAddGoroutine, 0),      // 05 keep
+		encode(OpCodeJumpTo, 2),            // 06 jump to next goroutine
+		encode(OpCodePushDump, 0),          // 07 push to stack
+		encode(OpCodeTempDump, 0),          // 08 reset
+		encode(OpCodeNextGoroutine, 14),    // 09 addr when done
+		encode(OpCodeCall, 2),              // 10 call 2
+		encode(OpCodeJumpIfFalse, 9),       // 11 jump to next goroutine
+		encode(OpCodeAddGoroutine, 0),      // 12 keep
+		encode(OpCodeJumpTo, 9),            // 13 jump to next goroutine
+		encode(OpCodePushDump, 0),          // 14 push to stack
+		encode(OpCodeAssignment, 0),        // 15 assign to g2
 	},
-		chunk.ops,
+		code.chunks[0].ops,
+		must.Sprintf("%s", code.disassemble(0, 0)),
+	)
+	must.Eq(t, []Op{
+		encode(OpCodeLoadFieldAccessor, 2), // 00 load .state
+		encode(OpCodeLoadString, 3),        // 01 load "select"
+		encode(OpCodeEqual, 0),             // 02 compare push bool to stack
+		encode(OpCodeReturn, 0),            // 03 return
+	},
+		code.chunks[1].ops,
+		must.Sprintf("%s", code.disassemble(1, 0)),
+	)
+	must.Eq(t, []Op{
+		encode(OpCodeLoadFieldAccessor, 4), // 00 load .duration
+		encode(OpCodeLoadNumber, 5),        // 01 load 10
+		encode(OpCodeGreater, 0),           // 02 compare push bool to stack
+		encode(OpCodeReturn, 0),            // 03 return
+	},
+		code.chunks[2].ops,
+		must.Sprintf("%s", code.disassemble(2, 0)),
 	)
 }
 
@@ -61,53 +80,75 @@ func TestCompiler_MultiPipeline(t *testing.T) {
 	tokenizer := NewTokenizer()
 	tokenizer.Reset(t.Context(), body)
 	compiler := NewCompiler()
-	chunk, err := compiler.Compile(tokenizer)
+	code, err := compiler.Compile(tokenizer)
+	fmt.Println(code.disassemble(0, 0))
 	must.NoError(t, err)
 
-	fmt.Println(chunk.disassemble(0))
-
+	must.Len(t, 4, code.chunks)
 	must.Eq(t, []any{
 		"g3", "g1", ".state", "select", ".duration", 10,
-		".trace", "keepAlive", "gRPC"}, chunk.constants)
+		".trace", "keepAlive", "gRPC"},
+		code.constants)
 
 	must.Eq(t, []Op{
 		encode(OpCodeLoadGoroutineDump, 1), // 00 load g1
 		encode(OpCodeTempDump, 0),          // 01 scratch register
-		encode(OpCodeNextGoroutine, 9),     // 02 addr when done
-		encode(OpCodeLoadFieldAccessor, 2), // 03 load .state
-		encode(OpCodeLoadString, 3),        // 04 load "select"
-		encode(OpCodeEqual, 0),             // 05 compare push bool to stack
-		encode(OpCodeJumpIfFalse, 2),       // 06 jump to next goroutine
-		encode(OpCodeAddGoroutine, 0),      // 07 keep
-		encode(OpCodeJumpTo, 2),            // 08 jump to next goroutine
-		encode(OpCodePushDump, 0),          // 09 push to stack
-		encode(OpCodeTempDump, 0),          // 10 refresh scratch register
-		encode(OpCodeNextGoroutine, 24),    // 11 addr when done
-		encode(OpCodeLoadFieldAccessor, 4), // 12 load .duration
-		encode(OpCodeLoadNumber, 5),        // 13 load 10
-		encode(OpCodeGreater, 0),           // 14 compare push bool to stack
-		encode(OpCodeJumpIfTrue, 18),       // 15 jump to next expr in "and"
-		encode(OpCodePushBool, 0),          // 16 push false
-		encode(OpCodeJumpTo, 21),           // 17 jump to end of "and"
-		encode(OpCodeLoadFieldAccessor, 6), // 18 load .trace
-		encode(OpCodeLoadString, 7),        // 19 load "keepAlive"
-		encode(OpCodeContains, 0),          // 20 compare push bool to stack
-		encode(OpCodeJumpIfFalse, 11),      // 21 jump to next goroutine
-		encode(OpCodeAddGoroutine, 0),      // 22 keep
-		encode(OpCodeJumpTo, 11),           // 23 jump to next goroutine
-		encode(OpCodePushDump, 0),          // 24 push to stack
-		encode(OpCodeTempDump, 0),          // 25 refresh scratch register
-		encode(OpCodeNextGoroutine, 33),    // 26 addr when done
-		encode(OpCodeLoadFieldAccessor, 6), // 27 load .trace
-		encode(OpCodeLoadString, 8),        // 28 load "gRPC"
-		encode(OpCodeContains, 0),          // 29 compare push bool to stack
-		encode(OpCodeJumpIfTrue, 26),       // 30 jump to next goroutine
-		encode(OpCodeAddGoroutine, 0),      // 31 keep
-		encode(OpCodeJumpTo, 26),           // 32 jump to next goroutine
-		encode(OpCodePushDump, 0),          // 33 push to stack
-		encode(OpCodeAssignment, 0),        // 34 push to stack
+		encode(OpCodeNextGoroutine, 7),     // 02 addr when done
+		encode(OpCodeCall, 1),              // 03 call 1
+		encode(OpCodeJumpIfFalse, 2),       // 04 jump to next goroutine
+		encode(OpCodeAddGoroutine, 0),      // 05 keep
+		encode(OpCodeJumpTo, 2),            // 06 jump to next goroutine
+		encode(OpCodePushDump, 0),          // 07 push to stack
+		encode(OpCodeTempDump, 0),          // 08 refresh scratch register
+		encode(OpCodeNextGoroutine, 14),    // 09 addr when done
+		encode(OpCodeCall, 2),              // 10 call 3
+		encode(OpCodeJumpIfFalse, 9),       // 11 jump to next goroutine
+		encode(OpCodeAddGoroutine, 0),      // 12 keep
+		encode(OpCodeJumpTo, 9),            // 13 jump to next goroutine
+		encode(OpCodePushDump, 0),          // 14 push to stack
+		encode(OpCodeTempDump, 0),          // 15 refresh scratch register
+		encode(OpCodeNextGoroutine, 21),    // 16 addr when done
+		encode(OpCodeCall, 3),              // 17 call 3
+		encode(OpCodeJumpIfTrue, 16),       // 18 jump to next goroutine
+		encode(OpCodeAddGoroutine, 0),      // 19 keep
+		encode(OpCodeJumpTo, 16),           // 20 jump to next goroutine
+		encode(OpCodePushDump, 0),          // 21 push to stack
+		encode(OpCodeAssignment, 0),        // 22 assign to g3
 	},
-		chunk.ops,
+		code.chunks[0].ops,
+	)
+
+	must.Eq(t, []Op{
+		encode(OpCodeLoadFieldAccessor, 2), // 00 load .state
+		encode(OpCodeLoadString, 3),        // 01 load "select"
+		encode(OpCodeEqual, 0),             // 02 compare push bool to stack
+		encode(OpCodeReturn, 0),            // 03 return
+	},
+		code.chunks[1].ops,
+	)
+
+	must.Eq(t, []Op{
+		encode(OpCodeLoadFieldAccessor, 4), // 00 load .duration
+		encode(OpCodeLoadNumber, 5),        // 01 load 10
+		encode(OpCodeGreater, 0),           // 02 compare push bool to stack
+		encode(OpCodeJumpIfTrue, 6),        // 03 jump to next expr in "and"
+		encode(OpCodePushBool, 0),          // 04 push false
+		encode(OpCodeJumpTo, 9),            // 05 jump to end of "and"
+		encode(OpCodeLoadFieldAccessor, 6), // 06 load .trace
+		encode(OpCodeLoadString, 7),        // 07 load "keepAlive"
+		encode(OpCodeContains, 0),          // 08 compare push bool to stack
+		encode(OpCodeReturn, 0),            // 09 return
+	},
+		code.chunks[2].ops,
+	)
+
+	must.Eq(t, []Op{
+		encode(OpCodeLoadFieldAccessor, 6), // 00 load .trace
+		encode(OpCodeLoadString, 8),        // 01 load "gRPC"
+		encode(OpCodeContains, 0),          // 02 compare push bool to stack
+		encode(OpCodeReturn, 0),            // 03 return
+	},
+		code.chunks[3].ops,
 	)
 }
 
@@ -118,24 +159,31 @@ func TestCompiler_SimpleWhere(t *testing.T) {
 	tokenizer := NewTokenizer()
 	tokenizer.Reset(t.Context(), body)
 	compiler := NewCompiler()
-	chunk, err := compiler.Compile(tokenizer)
+	code, err := compiler.Compile(tokenizer)
 	must.NoError(t, err)
 
-	fmt.Println(chunk.disassemble(0))
+	fmt.Println(code.disassemble(0, 0))
+	must.Eq(t, []any{"g1", "g", ".duration", 10}, code.constants)
 	must.Eq(t, []Op{
 		encode(OpCodeLoadGoroutineDump, 1), // 00 load g
 		encode(OpCodeTempDump, 0),          // 01 setup scratch register
-		encode(OpCodeNextGoroutine, 9),     // 02 addr when done
-		encode(OpCodeLoadFieldAccessor, 2), // 03 load .duration
-		encode(OpCodeLoadNumber, 3),        // 04 load 10
-		encode(OpCodeGreater, 0),           // 05 compare push bool to stack
-		encode(OpCodeJumpIfFalse, 2),       // 06 addr if false
-		encode(OpCodeAddGoroutine, 0),      // 07 keep
-		encode(OpCodeJumpTo, 2),            // 08 unconditional jump to addr
-		encode(OpCodePushDump, 0),          // 09 push temp dump to stack
-		encode(OpCodeAssignment, 0),        // 10 assign to g1
+		encode(OpCodeNextGoroutine, 7),     // 02 addr when done
+		encode(OpCodeCall, 1),              // 03 call 1
+		encode(OpCodeJumpIfFalse, 2),       // 04 addr if false
+		encode(OpCodeAddGoroutine, 0),      // 05 keep
+		encode(OpCodeJumpTo, 2),            // 06 unconditional jump to addr
+		encode(OpCodePushDump, 0),          // 07 push temp dump to stack
+		encode(OpCodeAssignment, 0),        // 08 assign to g1
 	},
-		chunk.ops,
+		code.chunks[0].ops,
+	)
+	must.Eq(t, []Op{
+		encode(OpCodeLoadFieldAccessor, 2), // 00 load .duration
+		encode(OpCodeLoadNumber, 3),        // 01 load 10
+		encode(OpCodeGreater, 0),           // 02 compare push bool to stack
+		encode(OpCodeReturn, 0),            // 04 return
+	},
+		code.chunks[1].ops,
 	)
 }
 
@@ -148,7 +196,7 @@ func TestCompiler_JumpPatch(t *testing.T) {
 	compiler.emitByte(OpCodeNoop)
 	compiler.patchJump(addr, 0)
 
-	fmt.Println(compiler.chunk.disassemble(0))
+	fmt.Println(compiler.code.disassemble(0, 0))
 	jumpOp, jumpAddr := compiler.chunk.ops[0].decode()
 	must.Eq(t, OpCodeJumpIfTrue, jumpOp)
 	must.Eq(t, 3, jumpAddr)
@@ -162,29 +210,38 @@ func TestCompiler_CompoundWhere(t *testing.T) {
 	tokenizer := NewTokenizer()
 	tokenizer.Reset(t.Context(), body)
 	compiler := NewCompiler()
-	chunk, err := compiler.Compile(tokenizer)
+	code, err := compiler.Compile(tokenizer)
+	fmt.Println(code.disassemble(0, 0))
 	must.NoError(t, err)
 
-	fmt.Println(chunk.disassemble(0))
+	must.Len(t, 2, code.chunks)
+	must.Eq(t, []any{"g", ".duration", 10, ".state", "select"}, code.constants)
 	must.Eq(t, []Op{
 		encode(OpCodeLoadGoroutineDump, 0), // 00 load g
 		encode(OpCodeTempDump, 0),          // 01 scratch register
-		encode(OpCodeNextGoroutine, 15),    // 02 next w/ addr to jump when done
-		encode(OpCodeLoadFieldAccessor, 1), // 03 load .duration
-		encode(OpCodeLoadNumber, 2),        // 04 load 2
-		encode(OpCodeGreater, 0),           // 05 compare push bool to stack
-		encode(OpCodeJumpIfTrue, 9),        // 06 jump to next expr in "and"
-		encode(OpCodePushBool, 0),          // 07 push false
-		encode(OpCodeJumpTo, 12),           // 08 jump to end of "and"
-		encode(OpCodeLoadFieldAccessor, 3), // 09 load .state
-		encode(OpCodeLoadString, 4),        // 10 load "select"
-		encode(OpCodeEqual, 0),             // 11 compare push bool to stack
-		encode(OpCodeJumpIfFalse, 2),       // 12 skip + jump to next goroutine
-		encode(OpCodeAddGoroutine, 0),      // 13 keep
-		encode(OpCodeJumpTo, 2),            // 14 jump to next goroutine
-		encode(OpCodePushDump, 0),          // 15 push to stack
+		encode(OpCodeNextGoroutine, 7),     // 02 next w/ addr to jump when done
+		encode(OpCodeCall, 1),              // 03 call 1
+		encode(OpCodeJumpIfFalse, 2),       // 04 skip + jump to next goroutine
+		encode(OpCodeAddGoroutine, 0),      // 05 keep
+		encode(OpCodeJumpTo, 2),            // 06 jump to next goroutine
+		encode(OpCodePushDump, 0),          // 07 push to stack
 	},
-		chunk.ops,
+		code.chunks[0].ops,
+	)
+
+	must.Eq(t, []Op{
+		encode(OpCodeLoadFieldAccessor, 1), // 00 load .duration
+		encode(OpCodeLoadNumber, 2),        // 01 load 10
+		encode(OpCodeGreater, 0),           // 02 compare push bool to stack
+		encode(OpCodeJumpIfTrue, 6),        // 03 jump to next expr in "and"
+		encode(OpCodePushBool, 0),          // 04 push false
+		encode(OpCodeJumpTo, 9),            // 05 jump to end of "and"
+		encode(OpCodeLoadFieldAccessor, 3), // 06 load .state
+		encode(OpCodeLoadString, 4),        // 07 load "select"
+		encode(OpCodeEqual, 0),             // 08 compare push bool to stack
+		encode(OpCodeReturn, 0),            // 09 return
+	},
+		code.chunks[1].ops,
 	)
 }
 
@@ -196,40 +253,47 @@ func TestCompiler_ParentheticalWhere(t *testing.T) {
 	tokenizer := NewTokenizer()
 	tokenizer.Reset(t.Context(), body)
 	compiler := NewCompiler()
-	chunk, err := compiler.Compile(tokenizer)
-	fmt.Println(chunk.disassemble(0))
+	code, err := compiler.Compile(tokenizer)
+	fmt.Println(code.disassemble(0, 0))
 	must.NoError(t, err)
 
+	must.Len(t, 2, code.chunks)
 	must.Eq(t, []any{
-		"g", ".duration", 10,
-		".state", "select", "running"}, chunk.constants)
+		"g", ".duration", 10, ".state", "select", "running"},
+		code.constants)
 
 	must.Eq(t, []Op{
 		encode(OpCodeLoadGoroutineDump, 0), // 00 load g
 		encode(OpCodeTempDump, 0),          // 01 scratch register
-		encode(OpCodeNextGoroutine, 21),    // 02 addr to jump to when done
-		encode(OpCodeLoadFieldAccessor, 1), // 03 load .duration
-		encode(OpCodeLoadNumber, 2),        // 04 load 10
-		encode(OpCodeGreater, 0),           // 05 compare push bool to stack
-		encode(OpCodeJumpIfTrue, 9),        // 06 jump to next expr in "and"
-		encode(OpCodePushBool, 0),          // 07 push false
-		encode(OpCodeJumpTo, 12),           // 08 jump to end of "and"
-		encode(OpCodeLoadFieldAccessor, 3), // 09 load .state
-		encode(OpCodeLoadString, 4),        // 10 load "select"
-		encode(OpCodeEqual, 0),             // 11 compare push bool to stack
-		encode(OpCodeJumpIfFalse, 15),      // 12 jump to next expr in "or"
-		encode(OpCodePushBool, 1),          // 13 push true
-		encode(OpCodeJumpTo, 18),           // 14 jump to end of "or"
-		encode(OpCodeLoadFieldAccessor, 3), // 15 load .state
-		encode(OpCodeLoadString, 5),        // 16 load "running"
-		encode(OpCodeEqual, 0),             // 17 compare push bool to stack
-		encode(OpCodeJumpIfFalse, 2),       // 18 skip + goto next goroutine
-		encode(OpCodeAddGoroutine, 0),      // 19 keep this goroutine
-		encode(OpCodeJumpTo, 2),            // 20 unconditional jump
-		encode(OpCodePushDump, 0),          // 21 push to stack
+		encode(OpCodeNextGoroutine, 7),     // 02 addr to jump to when done
+		encode(OpCodeCall, 1),              // 03 call 1
+		encode(OpCodeJumpIfFalse, 2),       // 04 skip + goto next goroutine
+		encode(OpCodeAddGoroutine, 0),      // 05 keep this goroutine
+		encode(OpCodeJumpTo, 2),            // 06 unconditional jump
+		encode(OpCodePushDump, 0),          // 07 push to stack
 	},
-		chunk.ops,
+		code.chunks[0].ops,
 	)
+
+	must.Eq(t, []Op{
+		encode(OpCodeLoadFieldAccessor, 1), // 00 load .duration
+		encode(OpCodeLoadNumber, 2),        // 01 load 10
+		encode(OpCodeGreater, 0),           // 02 compare push bool to stack
+		encode(OpCodeJumpIfTrue, 6),        // 03 jump to next expr in "and"
+		encode(OpCodePushBool, 0),          // 04 push false
+		encode(OpCodeJumpTo, 9),            // 05 jump to end of "and"
+		encode(OpCodeLoadFieldAccessor, 3), // 06 load .state
+		encode(OpCodeLoadString, 4),        // 07 load "select"
+		encode(OpCodeEqual, 0),             // 08 compare push bool to stack
+		encode(OpCodeJumpIfFalse, 12),      // 09 jump to next expr in "or"
+		encode(OpCodePushBool, 1),          // 10 push true
+		encode(OpCodeJumpTo, 15),           // 11 jump to end of "or"
+		encode(OpCodeLoadFieldAccessor, 3), // 12 load .state
+		encode(OpCodeLoadString, 5),        // 13 load "running"
+		encode(OpCodeEqual, 0),             // 14 compare push bool to stack
+		encode(OpCodeReturn, 0),            // 15 return
+
+	}, code.chunks[1].ops)
 }
 
 func TestCompiler_NestedExpressions(t *testing.T) {
@@ -239,29 +303,38 @@ func TestCompiler_NestedExpressions(t *testing.T) {
 	tokenizer := NewTokenizer()
 	tokenizer.Reset(t.Context(), body)
 	compiler := NewCompiler()
-	chunk, err := compiler.Compile(tokenizer)
-	fmt.Println(chunk.disassemble(0))
+	code, err := compiler.Compile(tokenizer)
+	fmt.Println(code.disassemble(0, 0))
 	must.NoError(t, err)
 
-	must.Eq(t, []any{"g1", "g2", ".duration", 10, 0}, chunk.constants)
-
+	must.Len(t, 2, code.chunks)
+	must.Eq(t, []any{"g1", "g2", ".duration", 10, 0}, code.constants)
 	must.Eq(t, []Op{
 		encode(OpCodeLoadGoroutineDump, 0), // 00 load g1
 		encode(OpCodeLoadGoroutineDump, 1), // 01 load g2
 		encode(OpCodeTempDump, 0),          // 02 setup scratch register
-		encode(OpCodeNextGoroutine, 10),    // 03 addr when done
-		encode(OpCodeLoadFieldAccessor, 2), // 04 load .duration
-		encode(OpCodeLoadNumber, 3),        // 05 load 10
-		encode(OpCodeGreater, 0),           // 06 compare push bool to stack
-		encode(OpCodeJumpIfFalse, 3),       // 07 addr if false
-		encode(OpCodeAddGoroutine, 0),      // 08 keep
-		encode(OpCodeJumpTo, 3),            // 09 unconditional jump to addr
-		encode(OpCodePushDump, 0),          // 10 push temp dump to stack
-		encode(OpCodeFuncUnion, 0),         // 11 union
-		encode(OpCodeLoadNumber, 4),        // 12 load 0
-		encode(OpCodeLoadNumber, 4),        // 13 load 0
-		encode(OpCodeFuncShowDump, 0),      // 14 show
-	}, chunk.ops)
+		encode(OpCodeNextGoroutine, 8),     // 03 addr when done
+		encode(OpCodeCall, 1),              // 04 call 1
+		encode(OpCodeJumpIfFalse, 3),       // 05 addr if false
+		encode(OpCodeAddGoroutine, 0),      // 06 keep
+		encode(OpCodeJumpTo, 3),            // 07 unconditional jump to addr
+		encode(OpCodePushDump, 0),          // 08 push temp dump to stack
+		encode(OpCodeFuncUnion, 0),         // 09 union
+		encode(OpCodeLoadNumber, 4),        // 10 load 0
+		encode(OpCodeLoadNumber, 4),        // 11 load 0
+		encode(OpCodeFuncShowDump, 0),      // 12 show
+	},
+		code.chunks[0].ops,
+	)
+
+	must.Eq(t, []Op{
+		encode(OpCodeLoadFieldAccessor, 2), // 00 load .duration
+		encode(OpCodeLoadNumber, 3),        // 01 load 10
+		encode(OpCodeGreater, 0),           // 02 compare push bool to stack
+		encode(OpCodeReturn, 0),            // 03 return
+	},
+		code.chunks[1].ops,
+	)
 }
 
 func TestCompiler_ChainedWhere(t *testing.T) {
@@ -271,32 +344,49 @@ func TestCompiler_ChainedWhere(t *testing.T) {
 	tokenizer := NewTokenizer()
 	tokenizer.Reset(t.Context(), body)
 	compiler := NewCompiler()
-	chunk, err := compiler.Compile(tokenizer)
+	code, err := compiler.Compile(tokenizer)
+	fmt.Println(code.disassemble(0, 0))
 	must.NoError(t, err)
 
-	fmt.Println(chunk.disassemble(0))
+	must.Len(t, 3, code.chunks)
+	must.Eq(t, []any{"g", ".duration", 10, ".state", "select"}, code.constants)
+
 	must.Eq(t, []Op{
 		encode(OpCodeLoadGoroutineDump, 0), // 00 load g
 		encode(OpCodeTempDump, 0),          // 01 scratch register
-		encode(OpCodeNextGoroutine, 9),     // 02 next w/ addr to jump when done
-		encode(OpCodeLoadFieldAccessor, 1), // 03 load .duration
-		encode(OpCodeLoadNumber, 2),        // 04 load 10
-		encode(OpCodeGreater, 0),           // 05 compare push bool to stack
-		encode(OpCodeJumpIfFalse, 2),       // 06 jump to next goroutine
-		encode(OpCodeAddGoroutine, 0),      // 07 keep
-		encode(OpCodeJumpTo, 2),            // 08 jump to next goroutine
-		encode(OpCodePushDump, 0),          // 09 push to stack
-		encode(OpCodeTempDump, 0),          // 10 scratch register
-		encode(OpCodeNextGoroutine, 18),    // 11 next w/ addr to jump when done
-		encode(OpCodeLoadFieldAccessor, 3), // 12 load .state
-		encode(OpCodeLoadString, 4),        // 13 load "select"
-		encode(OpCodeEqual, 0),             // 14 compare push bool to stack
-		encode(OpCodeJumpIfFalse, 11),      // 15 jump to next goroutine
-		encode(OpCodeAddGoroutine, 0),      // 16 keep
-		encode(OpCodeJumpTo, 11),           // 17 jump to next goroutine
-		encode(OpCodePushDump, 0),          // 18 push to stack
+		encode(OpCodeNextGoroutine, 7),     // 02 next w/ addr to jump when done
+		encode(OpCodeCall, 1),              // 03 call 1
+		encode(OpCodeJumpIfFalse, 2),       // 04 jump to next goroutine
+		encode(OpCodeAddGoroutine, 0),      // 05 keep
+		encode(OpCodeJumpTo, 2),            // 06 jump to next goroutine
+		encode(OpCodePushDump, 0),          // 07 push to stack
+		encode(OpCodeTempDump, 0),          // 08 scratch register
+		encode(OpCodeNextGoroutine, 14),    // 09 next w/ addr to jump when done
+		encode(OpCodeCall, 2),              // 10 call 2
+		encode(OpCodeJumpIfFalse, 9),       // 11 jump to next goroutine
+		encode(OpCodeAddGoroutine, 0),      // 12 keep
+		encode(OpCodeJumpTo, 9),            // 13 jump to next goroutine
+		encode(OpCodePushDump, 0),          // 14 push to stack
 	},
-		chunk.ops,
+		code.chunks[0].ops,
+	)
+
+	must.Eq(t, []Op{
+		encode(OpCodeLoadFieldAccessor, 1), // 00 load .duration
+		encode(OpCodeLoadNumber, 2),        // 01 load 10
+		encode(OpCodeGreater, 0),           // 02 compare push bool to stack
+		encode(OpCodeReturn, 0),            // 03 return
+	},
+		code.chunks[1].ops,
+	)
+
+	must.Eq(t, []Op{
+		encode(OpCodeLoadFieldAccessor, 3), // 00 load .state
+		encode(OpCodeLoadString, 4),        // 01 load "select"
+		encode(OpCodeEqual, 0),             // 02 compare push bool to stack
+		encode(OpCodeReturn, 0),            // 03 return
+	},
+		code.chunks[2].ops,
 	)
 }
 
@@ -307,26 +397,36 @@ func TestCompiler_InGraph(t *testing.T) {
 	tokenizer := NewTokenizer()
 	tokenizer.Reset(t.Context(), body)
 	compiler := NewCompiler()
-	chunk, err := compiler.Compile(tokenizer)
+	code, err := compiler.Compile(tokenizer)
+	fmt.Println(code.disassemble(0, 0))
 	must.NoError(t, err)
 
-	fmt.Println(chunk.disassemble(0))
+	must.Len(t, 2, code.chunks)
+	must.Eq(t, []any{"g1", "g", ".duration", 10}, code.constants)
+
 	must.Eq(t, []Op{
 		encode(OpCodeLoadGoroutineDump, 1), // 00 load g
 		encode(OpCodeDup, 0),               // 01 dup g on stack
 		encode(OpCodeTempDump, 0),          // 02 setup scratch register
-		encode(OpCodeNextGoroutine, 10),    // 03 addr when done
-		encode(OpCodeLoadFieldAccessor, 2), // 04 load .duration
-		encode(OpCodeLoadNumber, 3),        // 05 load 10
-		encode(OpCodeGreater, 0),           // 06 compare push bool to stack
-		encode(OpCodeJumpIfFalse, 3),       // 07 addr if false
-		encode(OpCodeAddGoroutine, 0),      // 08 keep
-		encode(OpCodeJumpTo, 3),            // 09 unconditional jump to addr
-		encode(OpCodePushDump, 0),          // 10 push temp dump to stack
-		encode(OpCodeFuncGraph, 0),         // 11 generate graph and push to stack
-		encode(OpCodeAssignment, 0),        // 12 assign to g1
+		encode(OpCodeNextGoroutine, 8),     // 03 addr when done
+		encode(OpCodeCall, 1),              // 04 call 1
+		encode(OpCodeJumpIfFalse, 3),       // 05 addr if false
+		encode(OpCodeAddGoroutine, 0),      // 06 keep
+		encode(OpCodeJumpTo, 3),            // 07 unconditional jump to addr
+		encode(OpCodePushDump, 0),          // 08 push temp dump to stack
+		encode(OpCodeFuncGraph, 0),         // 09 generate graph and push to stack
+		encode(OpCodeAssignment, 0),        // 10 assign to g1
 	},
-		chunk.ops,
+		code.chunks[0].ops,
+	)
+
+	must.Eq(t, []Op{
+		encode(OpCodeLoadFieldAccessor, 2), // 00 load .duration
+		encode(OpCodeLoadNumber, 3),        // 01 load 10
+		encode(OpCodeGreater, 0),           // 02 compare push bool to stack
+		encode(OpCodeReturn, 0),            // 03 return
+	},
+		code.chunks[1].ops,
 	)
 }
 
@@ -377,7 +477,7 @@ func TestCompiler_Paths(t *testing.T) {
 			tokenizer := NewTokenizer()
 			tokenizer.Reset(t.Context(), body)
 			compiler := NewCompiler()
-			chunk, err := compiler.Compile(tokenizer)
+			code, err := compiler.Compile(tokenizer)
 			if tc.expectErr != "" {
 				must.ErrorContains(t, err, tc.expectErr)
 				return
@@ -385,10 +485,11 @@ func TestCompiler_Paths(t *testing.T) {
 
 			must.NoError(t, err)
 
-			fmt.Println(chunk.disassemble(0))
+			chunk := code.chunks[0]
+			fmt.Println(code.disassemble(0, 0))
 			must.Eq(t, tc.expect, chunk.ops)
 			must.Eq(t, tc.expectPath,
-				chunk.constants[0].(string)) //nolint:errcheck
+				code.constants[0].(string)) //nolint:errcheck
 		})
 	}
 }
@@ -401,21 +502,21 @@ func TestCompiler_DiffMultiAssign(t *testing.T) {
 	tokenizer := NewTokenizer()
 	tokenizer.Reset(t.Context(), body)
 	compiler := NewCompiler()
-	chunk, err := compiler.Compile(tokenizer)
+	code, err := compiler.Compile(tokenizer)
 	must.NoError(t, err)
 
-	fmt.Println(chunk.disassemble(0))
+	fmt.Println(code.disassemble(0, 0))
 
 	must.Eq(t, []any{
 		"g3", "g4", "g5", "g1", "g2", MultiAssignment{0, 1, 2}},
-		chunk.constants)
+		code.constants)
 
 	must.Eq(t, []Op{
 		encode(OpCodeLoadGoroutineDump, 3), // 00 load g1
 		encode(OpCodeLoadGoroutineDump, 4), // 01 load g2
 		encode(OpCodeFuncDiff, 0),          // 02 diff func
 		encode(OpCodeAssignment, 5),        // 03 multi-assign g3, g4, g5
-	}, chunk.ops)
+	}, code.chunks[0].ops)
 }
 
 func TestCompiler_NoAssign(t *testing.T) {
@@ -426,17 +527,17 @@ func TestCompiler_NoAssign(t *testing.T) {
 	tokenizer := NewTokenizer()
 	tokenizer.Reset(t.Context(), body)
 	compiler := NewCompiler()
-	chunk, err := compiler.Compile(tokenizer)
+	code, err := compiler.Compile(tokenizer)
 	must.NoError(t, err)
 
-	fmt.Println(chunk.disassemble(0))
+	fmt.Println(code.disassemble(0, 0))
 
-	must.Eq(t, []any{"g1", "g2"}, chunk.constants)
+	must.Eq(t, []any{"g1", "g2"}, code.constants)
 
 	must.Eq(t, []Op{
 		encode(OpCodeLoadGoroutineDump, 0), // 00 load g1
 		encode(OpCodeLoadGoroutineDump, 1), // 01 load g2
-	}, chunk.ops)
+	}, code.chunks[0].ops)
 }
 
 func TestCompiler_Show(t *testing.T) {
@@ -478,19 +579,20 @@ func TestCompiler_Show(t *testing.T) {
 			tokenizer := NewTokenizer()
 			tokenizer.Reset(t.Context(), body)
 			compiler := NewCompiler()
-			chunk, err := compiler.Compile(tokenizer)
+			code, err := compiler.Compile(tokenizer)
 			must.NoError(t, err)
 
-			fmt.Println(chunk.disassemble(0))
+			fmt.Println(code.disassemble(0, 0))
+			chunk := code.chunks[0]
 			must.Len(t, 4, chunk.ops)
 
 			_, operand := chunk.ops[1].decode()
 			must.Eq(t, tc.expectLimit,
-				chunk.constants[operand].(int)) //nolint:errcheck
+				code.constants[operand].(int)) //nolint:errcheck
 
 			_, operand = chunk.ops[2].decode()
 			must.Eq(t, tc.expectOffset,
-				chunk.constants[operand].(int)) //nolint:errcheck
+				code.constants[operand].(int)) //nolint:errcheck
 		})
 	}
 
@@ -544,14 +646,15 @@ func TestCompiler_Pragma(t *testing.T) {
 			tokenizer := NewTokenizer()
 			tokenizer.Reset(t.Context(), body)
 			compiler := NewCompiler()
-			chunk, err := compiler.Compile(tokenizer)
+			code, err := compiler.Compile(tokenizer)
 			must.NoError(t, err)
 
-			fmt.Println(chunk.disassemble(0))
+			chunk := code.chunks[0]
+			fmt.Println(code.disassemble(0, 0))
 
 			_, operand := chunk.ops[1].decode()
 			must.Eq(t, tc.expectSetting,
-				chunk.constants[operand].(string)) //nolint:errcheck
+				code.constants[operand].(string)) //nolint:errcheck
 
 			if tc.expectValue == Op(OpCodeNoop) {
 				must.Len(t, 2, chunk.ops)

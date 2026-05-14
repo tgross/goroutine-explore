@@ -34,27 +34,33 @@ func TestVM_SimpleWhere(t *testing.T) {
 
 	testCases := []struct {
 		name      string
-		ops       []Op
+		chunks    []*Chunk
 		constants []any
 		g1Fn      func(*GoroutineDump)
 		expectFn  func(*testing.T, *GoroutineDump)
 	}{
-		{
-			name: "numeric comparison",
-			ops: []Op{ // source: `g2 = g1.where(duration > 10)`
-				encode(OpCodeLoadGoroutineDump, 1), // load g1
-				encode(OpCodeTempDump, 0),          // start
-				encode(OpCodeNextGoroutine, 9),     // addr when done
-				encode(OpCodeLoadFieldAccessor, 2), // load .duration
-				encode(OpCodeLoadNumber, 3),        // load 10
-				encode(OpCodeGreater, 0),           // compare
-				encode(OpCodeJumpIfFalse, 2),       // addr if false
-				encode(OpCodeAddGoroutine, 0),      // keep
-				encode(OpCodeJumpTo, 2),            // unconditional jump to addr
-				encode(OpCodePushDump, 0),          // push temp dump to stack
-				encode(OpCodeAssignment, 0),        // assign g2
-			},
+		{ // source: `g2 = g1.where(duration > 10)`
+			name:      "numeric comparison",
 			constants: []any{"g2", "g1", ".duration", 10},
+			chunks: []*Chunk{
+				{ops: []Op{
+					encode(OpCodeLoadGoroutineDump, 1), // load g1
+					encode(OpCodeTempDump, 0),          // start
+					encode(OpCodeNextGoroutine, 7),     // addr when done
+					encode(OpCodeCall, 1),
+					encode(OpCodeJumpIfFalse, 2),  // addr if false
+					encode(OpCodeAddGoroutine, 0), // keep
+					encode(OpCodeJumpTo, 2),       // unconditional jump to addr
+					encode(OpCodePushDump, 0),     // push temp dump to stack
+					encode(OpCodeAssignment, 0),   // assign g2
+				}},
+				{ops: []Op{
+					encode(OpCodeLoadFieldAccessor, 2), // load .duration
+					encode(OpCodeLoadNumber, 3),        // load 10
+					encode(OpCodeGreater, 0),           // compare
+					encode(OpCodeReturn, 0),
+				}},
+			},
 			g1Fn: func(g1 *GoroutineDump) {
 				g1.Add(mockMinGoroutine(`goroutine 1 [running]:`))
 				g1.Add(mockMinGoroutine(`goroutine 2 [select, 20 minutes]:`))
@@ -65,22 +71,28 @@ func TestVM_SimpleWhere(t *testing.T) {
 				must.Eq(t, 2, g2.Next().ID)
 			},
 		},
-		{
-			name: "not-equal comparison",
-			ops: []Op{ // source: `g2 = g1.where(.state != "running")`
-				encode(OpCodeLoadGoroutineDump, 1), // load g1
-				encode(OpCodeTempDump, 0),          // start
-				encode(OpCodeNextGoroutine, 9),     // addr when done
-				encode(OpCodeLoadFieldAccessor, 2), // load .state
-				encode(OpCodeLoadString, 3),        // load "running"
-				encode(OpCodeNotEqual, 0),          // compare
-				encode(OpCodeJumpIfFalse, 2),       // addr if false
-				encode(OpCodeAddGoroutine, 0),      // keep
-				encode(OpCodeJumpTo, 2),            // unconditional jump to addr
-				encode(OpCodePushDump, 0),          // push temp dump to stack
-				encode(OpCodeAssignment, 0),        // assign g2
-			},
+		{ // source: `g2 = g1.where(.state != "running")`
+			name:      "not-equal comparison",
 			constants: []any{"g2", "g1", ".state", "running"},
+			chunks: []*Chunk{
+				{ops: []Op{
+					encode(OpCodeLoadGoroutineDump, 1), // load g1
+					encode(OpCodeTempDump, 0),          // start
+					encode(OpCodeNextGoroutine, 7),     // addr when done
+					encode(OpCodeCall, 1),              // call 1
+					encode(OpCodeJumpIfFalse, 2),       // addr if false
+					encode(OpCodeAddGoroutine, 0),      // keep
+					encode(OpCodeJumpTo, 2),            // unconditional jump to addr
+					encode(OpCodePushDump, 0),          // push temp dump to stack
+					encode(OpCodeAssignment, 0),        // assign g2
+				}},
+				{ops: []Op{
+					encode(OpCodeLoadFieldAccessor, 2), // load .state
+					encode(OpCodeLoadString, 3),        // load "running"
+					encode(OpCodeNotEqual, 0),          // compare
+					encode(OpCodeReturn, 0),            // return
+				}},
+			},
 			g1Fn: func(g1 *GoroutineDump) {
 				g1.Add(mockMinGoroutine(`goroutine 1 [select, 20 minutes]:`))
 				g1.Add(mockMinGoroutine(`goroutine 2 [running]:`))
@@ -92,22 +104,28 @@ func TestVM_SimpleWhere(t *testing.T) {
 				must.Eq(t, 3, g2.Next().ID)
 			},
 		},
-		{
-			name: "contains comparison",
-			ops: []Op{ // source: `g2 = g1.where(.trace contains "sdnotifying")`
-				encode(OpCodeLoadGoroutineDump, 1), // load g1
-				encode(OpCodeTempDump, 0),          // start
-				encode(OpCodeNextGoroutine, 9),     // addr when done
-				encode(OpCodeLoadFieldAccessor, 2), // load .trace
-				encode(OpCodeLoadString, 3),        // load "running"
-				encode(OpCodeContains, 0),          // compare
-				encode(OpCodeJumpIfFalse, 2),       // addr if false
-				encode(OpCodeAddGoroutine, 0),      // keep
-				encode(OpCodeJumpTo, 2),            // unconditional jump to addr
-				encode(OpCodePushDump, 0),          // push temp dump to stack
-				encode(OpCodeAssignment, 0),        // assign g2
-			},
+		{ // source: `g2 = g1.where(.trace contains "sdnotifying")`
+			name:      "contains comparison",
 			constants: []any{"g2", "g1", ".trace", "sdnotifying"},
+			chunks: []*Chunk{
+				{ops: []Op{
+					encode(OpCodeLoadGoroutineDump, 1), // load g1
+					encode(OpCodeTempDump, 0),          // start
+					encode(OpCodeNextGoroutine, 7),     // addr when done
+					encode(OpCodeCall, 1),              // call 1
+					encode(OpCodeJumpIfFalse, 2),       // addr if false
+					encode(OpCodeAddGoroutine, 0),      // keep
+					encode(OpCodeJumpTo, 2),            // unconditional jump to addr
+					encode(OpCodePushDump, 0),          // push temp dump to stack
+					encode(OpCodeAssignment, 0),        // assign g2
+				}},
+				{ops: []Op{
+					encode(OpCodeLoadFieldAccessor, 2), // load .trace
+					encode(OpCodeLoadString, 3),        // load "running"
+					encode(OpCodeContains, 0),          // compare
+					encode(OpCodeReturn, 0),            // return
+				}},
+			},
 			g1Fn: func(g1 *GoroutineDump) {
 				g1.Add(mockGoroutine(1, "running"))
 				g1.Add(mockGoroutine(2, "select, 1 minutes", `main.main()
@@ -122,22 +140,29 @@ func TestVM_SimpleWhere(t *testing.T) {
 				must.Eq(t, 2, g2.Next().ID)
 			},
 		},
-		{
-			name: "regex comparison",
-			ops: []Op{ // source: `g2 = g1.where(.trace ~= "sdn.*")`
-				encode(OpCodeLoadGoroutineDump, 1), // load g1
-				encode(OpCodeTempDump, 0),          // start
-				encode(OpCodeNextGoroutine, 9),     // addr when done
-				encode(OpCodeLoadFieldAccessor, 2), // load .trace
-				encode(OpCodeLoadString, 3),        // load pattern
-				encode(OpCodeRegexMatches, 0),      // compare
-				encode(OpCodeJumpIfFalse, 2),       // addr if false
-				encode(OpCodeAddGoroutine, 0),      // keep
-				encode(OpCodeJumpTo, 2),            // unconditional jump to addr
-				encode(OpCodePushDump, 0),          // push temp dump to stack
-				encode(OpCodeAssignment, 0),        // assign g2
-			},
+		{ // source: `g2 = g1.where(.trace ~= "sdn.*")`
+			name:      "regex comparison",
 			constants: []any{"g2", "g1", ".trace", "sdn.*"},
+
+			chunks: []*Chunk{
+				{ops: []Op{
+					encode(OpCodeLoadGoroutineDump, 1), // load g1
+					encode(OpCodeTempDump, 0),          // start
+					encode(OpCodeNextGoroutine, 7),     // addr when done
+					encode(OpCodeCall, 1),              // call 1
+					encode(OpCodeJumpIfFalse, 2),       // addr if false
+					encode(OpCodeAddGoroutine, 0),      // keep
+					encode(OpCodeJumpTo, 2),            // unconditional jump to addr
+					encode(OpCodePushDump, 0),          // push temp dump to stack
+					encode(OpCodeAssignment, 0),        // assign g2
+				}},
+				{ops: []Op{
+					encode(OpCodeLoadFieldAccessor, 2), // load .trace
+					encode(OpCodeLoadString, 3),        // load pattern
+					encode(OpCodeRegexMatches, 0),      // compare
+					encode(OpCodeReturn, 0),            // return
+				}},
+			},
 			g1Fn: func(g1 *GoroutineDump) {
 				g1.Add(mockGoroutine(1, "running"))
 				g1.Add(mockGoroutine(2, "select, 1 minutes", `main.main()
@@ -156,12 +181,9 @@ func TestVM_SimpleWhere(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			chunk := &Chunk{
-				ops:       tc.ops,
-				constants: tc.constants,
-			}
 			vm := NewVM(&Config{WorkDir: t.TempDir()})
-			vm.Reset(chunk)
+			code := &Code{chunks: tc.chunks, constants: tc.constants}
+			vm.Reset(code)
 
 			g1 := NewGoroutineDump()
 			tc.g1Fn(g1)
@@ -187,21 +209,22 @@ func TestVM_SetFunctions(t *testing.T) {
 
 	testCases := []struct {
 		name      string
-		ops       []Op
+		chunks    []*Chunk
 		constants []any
 		g1Fn      func() *GoroutineDump
 		g2Fn      func() *GoroutineDump
 		expectFn  func(*testing.T, *GoroutineDump)
 	}{
-		{
-			// source: `g1.union(g2)`
-			name: "simple union",
-			ops: []Op{
-				encode(OpCodeLoadGoroutineDump, 0), // 00 load g1
-				encode(OpCodeLoadGoroutineDump, 1), // 01 load g2
-				encode(OpCodeFuncUnion, 0),         // 02 union
-			},
+		{ // source: `g1.union(g2)`
+			name:      "simple union",
 			constants: []any{"g1", "g2"},
+			chunks: []*Chunk{{
+				ops: []Op{
+					encode(OpCodeLoadGoroutineDump, 0), // 00 load g1
+					encode(OpCodeLoadGoroutineDump, 1), // 01 load g2
+					encode(OpCodeFuncUnion, 0),         // 02 union
+				},
+			}},
 			g1Fn: func() *GoroutineDump {
 				g1 := NewGoroutineDump()
 				g1.Add(mockMinGoroutine(`goroutine 1 [select, 20 minutes]:`))
@@ -221,24 +244,29 @@ func TestVM_SetFunctions(t *testing.T) {
 			},
 		},
 
-		{
-			// source: `g1.union(g2.where(.duration > 10))`
-			name: "union nested on right",
-			ops: []Op{
-				encode(OpCodeLoadGoroutineDump, 0), // 00 load g1
-				encode(OpCodeLoadGoroutineDump, 1), // 01 load g2
-				encode(OpCodeTempDump, 0),          // 02 setup scratch register
-				encode(OpCodeNextGoroutine, 10),    // 03 addr when done
-				encode(OpCodeLoadFieldAccessor, 2), // 04 load .duration
-				encode(OpCodeLoadNumber, 3),        // 05 load 10
-				encode(OpCodeGreater, 0),           // 06 compare push bool
-				encode(OpCodeJumpIfFalse, 3),       // 07 addr if false
-				encode(OpCodeAddGoroutine, 0),      // 08 keep
-				encode(OpCodeJumpTo, 3),            // 09 unconditional jump
-				encode(OpCodePushDump, 0),          // 10 push temp dump to stack
-				encode(OpCodeFuncUnion, 0),         // 11 union
-			},
+		{ // source: `g1.union(g2.where(.duration > 10))`
+			name:      "union nested on right",
 			constants: []any{"g1", "g2", ".duration", 10},
+			chunks: []*Chunk{
+				{ops: []Op{
+					encode(OpCodeLoadGoroutineDump, 0), // 00 load g1
+					encode(OpCodeLoadGoroutineDump, 1), // 01 load g2
+					encode(OpCodeTempDump, 0),          // 02 setup scratch register
+					encode(OpCodeNextGoroutine, 8),     // 03 addr when done
+					encode(OpCodeCall, 1),              // 04 call
+					encode(OpCodeJumpIfFalse, 3),       // 05 addr if false
+					encode(OpCodeAddGoroutine, 0),      // 06 keep
+					encode(OpCodeJumpTo, 3),            // 07 unconditional jump
+					encode(OpCodePushDump, 0),          // 08 push temp dump to stack
+					encode(OpCodeFuncUnion, 0),         // 09 union
+				}},
+				{ops: []Op{
+					encode(OpCodeLoadFieldAccessor, 2), // 00 load .duration
+					encode(OpCodeLoadNumber, 3),        // 01 load 10
+					encode(OpCodeGreater, 0),           // 02 compare push bool
+					encode(OpCodeReturn, 0),            // 03 return
+				}},
+			},
 			g1Fn: func() *GoroutineDump {
 				g1 := NewGoroutineDump()
 				g1.Add(mockMinGoroutine(`goroutine 1 [select, 20 minutes]:`))
@@ -260,24 +288,29 @@ func TestVM_SetFunctions(t *testing.T) {
 			},
 		},
 
-		{
-			// source: `union(g1.where(.duration > 10), g2)`
-			name: "union nested on left",
-			ops: []Op{
-				encode(OpCodeLoadGoroutineDump, 0), // 00 load g1
-				encode(OpCodeTempDump, 0),          // 01 setup scratch register
-				encode(OpCodeNextGoroutine, 9),     // 02 addr when done
-				encode(OpCodeLoadFieldAccessor, 2), // 03 load .duration
-				encode(OpCodeLoadNumber, 3),        // 04 load 10
-				encode(OpCodeGreater, 0),           // 05 compare push bool
-				encode(OpCodeJumpIfFalse, 2),       // 06 addr if false
-				encode(OpCodeAddGoroutine, 0),      // 07 keep
-				encode(OpCodeJumpTo, 2),            // 08 unconditional jump
-				encode(OpCodePushDump, 0),          // 09 push temp dump to stack
-				encode(OpCodeLoadGoroutineDump, 1), // 10 load g2
-				encode(OpCodeFuncUnion, 0),         // 11 union
-			},
+		{ // source: `union(g1.where(.duration > 10), g2)`
+			name:      "union nested on left",
 			constants: []any{"g1", "g2", ".duration", 10},
+			chunks: []*Chunk{
+				{ops: []Op{
+					encode(OpCodeLoadGoroutineDump, 0), // 00 load g1
+					encode(OpCodeTempDump, 0),          // 01 setup scratch register
+					encode(OpCodeNextGoroutine, 7),     // 02 addr when done
+					encode(OpCodeCall, 1),              // 03 call 1
+					encode(OpCodeJumpIfFalse, 2),       // 06 addr if false
+					encode(OpCodeAddGoroutine, 0),      // 07 keep
+					encode(OpCodeJumpTo, 2),            // 08 unconditional jump
+					encode(OpCodePushDump, 0),          // 09 push temp dump to stack
+					encode(OpCodeLoadGoroutineDump, 1), // 10 load g2
+					encode(OpCodeFuncUnion, 0),         // 11 union
+				}},
+				{ops: []Op{
+					encode(OpCodeLoadFieldAccessor, 2), // 00 load .duration
+					encode(OpCodeLoadNumber, 3),        // 01 load 10
+					encode(OpCodeGreater, 0),           // 02 compare push bool
+					encode(OpCodeReturn, 0),            // 03 return
+				}},
+			},
 			g1Fn: func() *GoroutineDump {
 				g1 := NewGoroutineDump()
 				g1.Add(mockMinGoroutine(`goroutine 2 [IO wait, 20 minutes]:`))
@@ -299,15 +332,16 @@ func TestVM_SetFunctions(t *testing.T) {
 			},
 		},
 
-		{
-			// source: `g1.intersect(g2)`
-			name: "simple intersect",
-			ops: []Op{
-				encode(OpCodeLoadGoroutineDump, 0), // 00 load g1
-				encode(OpCodeLoadGoroutineDump, 1), // 01 load g2
-				encode(OpCodeFuncIntersect, 0),     // 02 union
-			},
+		{ // source: `g1.intersect(g2)`
+			name:      "simple intersect",
 			constants: []any{"g1", "g2"},
+			chunks: []*Chunk{
+				{ops: []Op{
+					encode(OpCodeLoadGoroutineDump, 0), // 00 load g1
+					encode(OpCodeLoadGoroutineDump, 1), // 01 load g2
+					encode(OpCodeFuncIntersect, 0),     // 02 union
+				}},
+			},
 			g1Fn: func() *GoroutineDump {
 				g1 := NewGoroutineDump()
 				g1.Add(mockMinGoroutine(`goroutine 1 [select, 20 minutes]:`))
@@ -329,12 +363,9 @@ func TestVM_SetFunctions(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			chunk := &Chunk{
-				ops:       tc.ops,
-				constants: tc.constants,
-			}
 			vm := NewVM(&Config{WorkDir: t.TempDir()})
-			vm.Reset(chunk)
+			code := &Code{chunks: tc.chunks, constants: tc.constants}
+			vm.Reset(code)
 
 			vm.env = map[string]Value{
 				"g1": {Tag: TagDump, Data: tc.g1Fn()},
@@ -358,18 +389,18 @@ func TestVM_SetFunctions(t *testing.T) {
 func TestVM_MultiAssignDiff(t *testing.T) {
 
 	// source: `g3, g4, g5 = g1.diff(g2)`
-	chunk := &Chunk{
+	constants := []any{
+		"g3", "g4", "g5", MultiAssignment{0, 1, 2}, "g1", "g2"}
+	chunks := []*Chunk{{
 		ops: []Op{
 			encode(OpCodeLoadGoroutineDump, 4), // load g1
 			encode(OpCodeLoadGoroutineDump, 5), // load g2
 			encode(OpCodeFuncDiff, 0),          // diff
 			encode(OpCodeAssignment, 3),        // assign to g3, g4, g5
-		},
-		constants: []any{
-			"g3", "g4", "g5", MultiAssignment{0, 1, 2}, "g1", "g2"},
-	}
+		}}}
 	vm := NewVM(&Config{WorkDir: t.TempDir()})
-	vm.Reset(chunk)
+	code := &Code{chunks: chunks, constants: constants}
+	vm.Reset(code)
 
 	g1 := NewGoroutineDump()
 	g1.Add(mockMinGoroutine(`goroutine 1 [select, 20 minutes]:`))
@@ -411,12 +442,14 @@ func TestVM_ShowFunctions(t *testing.T) {
 	vm.env = map[string]Value{"g1": {Tag: TagDump, Data: g1}}
 
 	testCases := []struct {
-		name   string
-		chunk  *Chunk
-		expect string
+		name      string
+		constants []any
+		chunk     *Chunk
+		expect    string
 	}{
 		{ // source: `g1 | show(3, 1)`
-			name: "show function",
+			name:      "show function",
+			constants: []any{"g1", 1, 3},
 			chunk: &Chunk{
 				ops: []Op{
 					encode(OpCodeLoadGoroutineDump, 0), // load g1
@@ -424,7 +457,6 @@ func TestVM_ShowFunctions(t *testing.T) {
 					encode(OpCodeLoadNumber, 2),        // load 3 (limit)
 					encode(OpCodeFuncShowDump, 0),      // show
 				},
-				constants: []any{"g1", 1, 3},
 			},
 			expect: `goroutine 2 [running]:
 
@@ -433,13 +465,13 @@ goroutine 3 [IO wait, 10 minutes]:
 `,
 		},
 		{ // source: `g1 | json()`
-			name: "json function",
+			name:      "json function",
+			constants: []any{"g1", 1, 3},
 			chunk: &Chunk{
 				ops: []Op{
 					encode(OpCodeLoadGoroutineDump, 0), // load g1
 					encode(OpCodeFuncToJSON, 0),        // show
 				},
-				constants: []any{"g1", 1, 3},
 			},
 			expect: `[
   {
@@ -472,7 +504,11 @@ goroutine 3 [IO wait, 10 minutes]:
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			vm.Reset(tc.chunk)
+			code := &Code{
+				chunks:    []*Chunk{tc.chunk},
+				constants: tc.constants,
+			}
+			vm.Reset(code)
 			recorder.Reset()
 			err := vm.Run(t.Context())
 			must.NoError(t, err)
@@ -483,13 +519,13 @@ goroutine 3 [IO wait, 10 minutes]:
 
 func TestVM_CommandVars(t *testing.T) {
 	// source: `vars`
-	chunk := &Chunk{
+	code := &Code{chunks: []*Chunk{{
 		ops: []Op{encode(OpCodeCommandVars, 0)},
-	}
+	}}}
 	vm := NewVM(&Config{WorkDir: t.TempDir()})
 	recorder := new(bytes.Buffer)
 	vm.wOut = NewWriter(recorder)
-	vm.Reset(chunk)
+	vm.Reset(code)
 
 	g1 := NewGoroutineDump()
 	g1.Add(mockMinGoroutine(`goroutine 1 [select, 20 minutes]:`))
@@ -512,7 +548,7 @@ g2: 2
 `, recorder.String())
 
 	vm.pragma.VarsDisplay = PragmaDisplaySummary
-	vm.Reset(chunk)
+	vm.Reset(code)
 	recorder.Reset()
 	err = vm.Run(t.Context())
 	must.EqError(t, err, ErrCommandOk.Error())
@@ -576,12 +612,13 @@ func TestVM_CommandPragma(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			chunk := &Chunk{
-				ops:       tc.ops,
+			code := &Code{
 				constants: tc.constants,
-			}
+				chunks: []*Chunk{{
+					ops: tc.ops,
+				}}}
 			vm := NewVM(&Config{WorkDir: t.TempDir()})
-			vm.Reset(chunk)
+			vm.Reset(code)
 			err := vm.Run(t.Context())
 			vm.debug()
 			must.EqError(t, err, ErrCommandOk.Error())
@@ -597,34 +634,38 @@ func TestVM_Graph(t *testing.T) {
 	predicate.Add(gd.byID(6))
 	predicate.Add(gd.byID(12))
 
-	// source: `g1 = g.graph(id == 6 or id == 12)`
-	chunk := &Chunk{
-		ops: []Op{
+	constants := []any{"g1", "g", ".id", 6, 12}
+	chunks := []*Chunk{ // source: `g1 = g.graph(id == 6 or id == 12)`
+		{ops: []Op{
 			encode(OpCodeLoadGoroutineDump, 1), // 00 load g
 			encode(OpCodeDup, 0),               // 01 dupe on stack
 			encode(OpCodeTempDump, 0),          // 02 temp dump to reg
-			encode(OpCodeNextGoroutine, 16),    // 03 next goroutine
-			encode(OpCodeLoadFieldAccessor, 2), // 04 load .id
-			encode(OpCodeLoadNumber, 3),        // 05 load 6
-			encode(OpCodeEqual, 0),             // 06 compare, push bool to stack
-			encode(OpCodeJumpIfFalse, 10),      // 07 jump to next condition
-			encode(OpCodePushBool, 1),          // 08 push true to stack
-			encode(OpCodeJumpTo, 13),           // 09 jump past next condition
-			encode(OpCodeLoadFieldAccessor, 2), // 10 load .id
-			encode(OpCodeLoadNumber, 4),        // 11 load 12
-			encode(OpCodeEqual, 0),             // 12 compare, push bool to stack
-			encode(OpCodeJumpIfFalse, 3),       // 13 next goroutine
-			encode(OpCodeAddGoroutine, 0),      // 14 add goroutine
-			encode(OpCodeJumpTo, 3),            // 15 next goroutine
-			encode(OpCodePushDump, 0),          // 16 push
-			encode(OpCodeFuncGraph, 0),         // 18 pop 2 dumps and graph
-			encode(OpCodeAssignment, 0),        // 18 assign result to g1
-		},
-		constants: []any{"g1", "g", ".id", 6, 12},
+			encode(OpCodeNextGoroutine, 8),     // 03 next goroutine
+			encode(OpCodeCall, 1),              // 04 call 1
+			encode(OpCodeJumpIfFalse, 3),       // 05 next goroutine
+			encode(OpCodeAddGoroutine, 0),      // 06 add goroutine
+			encode(OpCodeJumpTo, 3),            // 07 next goroutine
+			encode(OpCodePushDump, 0),          // 08 push
+			encode(OpCodeFuncGraph, 0),         // 09 pop 2 dumps and graph
+			encode(OpCodeAssignment, 0),        // 10 assign result to g1
+		}},
+		{ops: []Op{
+			encode(OpCodeLoadFieldAccessor, 2), // 00 load .id
+			encode(OpCodeLoadNumber, 3),        // 01 load 6
+			encode(OpCodeEqual, 0),             // 02 compare, push bool to stack
+			encode(OpCodeJumpIfFalse, 6),       // 03 jump to next condition
+			encode(OpCodePushBool, 1),          // 04 push true to stack
+			encode(OpCodeJumpTo, 9),            // 05 jump past next condition
+			encode(OpCodeLoadFieldAccessor, 2), // 06 load .id
+			encode(OpCodeLoadNumber, 4),        // 07 load 12
+			encode(OpCodeEqual, 0),             // 08 compare, push bool to stack
+			encode(OpCodeReturn, 0),            // 09 return
+		}},
 	}
 
+	code := &Code{chunks: chunks, constants: constants}
 	vm := NewVM(&Config{WorkDir: t.TempDir()})
-	vm.Reset(chunk)
+	vm.Reset(code)
 	vm.env = map[string]Value{
 		"g": {Tag: TagDump, Data: gd},
 	}

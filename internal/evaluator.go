@@ -68,7 +68,7 @@ func (e *Evaluator) Completions() []string {
 func (e *Evaluator) Eval(ctx context.Context, src string) error {
 	body := strings.NewReader(src)
 	e.tokenizer.Reset(ctx, body)
-	chunk, err := e.compiler.Compile(e.tokenizer)
+	code, err := e.compiler.Compile(e.tokenizer)
 	if err != nil {
 		if errors.Is(err, context.Canceled) {
 			return nil
@@ -106,7 +106,7 @@ func (e *Evaluator) Eval(ctx context.Context, src string) error {
 
 	// capture the previous environment so we can roll it back
 	oldEnv := maps.Clone(e.vm.env)
-	e.vm.Reset(chunk)
+	e.vm.Reset(code)
 	err = e.vm.Run(ctx)
 	if err != nil {
 		switch {

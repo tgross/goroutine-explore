@@ -18,9 +18,10 @@ import (
 )
 
 type VM struct {
-	chunk *Chunk
-	ip    int // instruction pointer in chunk
-	stack []Value
+	code   *Code
+	stack  []Value
+	frames []*frame
+	frame  *frame
 
 	// gas is how many instructions can be retired before halting (prevents
 	// infinite loops)
@@ -55,13 +56,24 @@ func NewVM(cfg *Config) *VM {
 	}
 }
 
-func (vm *VM) Reset(chunk *Chunk) {
-	vm.ip = -1
-	vm.chunk = chunk
+func (vm *VM) Reset(code *Code) {
+	vm.code = code
+	vm.frame = &frame{
+		ip:         -1,
+		returnAddr: 0,
+		chunk:      code.chunks[0],
+	}
+	vm.frames = []*frame{vm.frame}
 	vm.stack = make([]Value, 0, vm.pragma.StackSize)
 	vm.gas = defaultGas
 	vm.regexCache = make(map[string]*regexp.Regexp)
 	vm.didShow = false
+}
+
+type frame struct {
+	ip         int    // instruction pointer in chunk
+	returnAddr int    // instruction pointer in previous chunk
+	chunk      *Chunk // code for this frame
 }
 
 //go:generate go run ../tools/jumptable chunk.go jumptable.go
@@ -154,11 +166,11 @@ func (vm *VM) Run(ctx context.Context) error {
 }
 
 func (vm *VM) nextOp() (Op, error) {
-	vm.ip++
-	if vm.ip >= len(vm.chunk.ops) {
+	vm.frame.ip++
+	if vm.frame.ip >= len(vm.frame.chunk.ops) {
 		return 0, ErrEOF
 	}
-	op := vm.chunk.ops[vm.ip]
+	op := vm.frame.chunk.ops[vm.frame.ip]
 	return op, nil
 }
 
@@ -224,8 +236,7 @@ func popExpect[T any](vm *VM, tag Tag) (T, error) {
 }
 
 func (vm *VM) debug() {
-	fmt.Printf("chunk (ip=%d)\n", vm.ip)
-	fmt.Println(vm.chunk.disassemble(vm.ip))
+	fmt.Println(vm.code.disassemble(len(vm.frames)-1, vm.frame.ip))
 
 	fmt.Printf("env\n")
 	for k, v := range vm.env {
@@ -417,10 +428,10 @@ func opLoadString(vm *VM, _ OpCode, index uint) error {
 }
 
 func (vm *VM) fetchConstant(index uint) (any, error) {
-	if index > uint(len(vm.chunk.constants)) || len(vm.chunk.constants) == 0 {
+	if index > uint(len(vm.code.constants)) || len(vm.code.constants) == 0 {
 		return nil, ErrExpectedConstantValueByte
 	}
-	con := vm.chunk.constants[index]
+	con := vm.code.constants[index]
 	return con, nil
 }
 
@@ -577,6 +588,11 @@ func opLoadFieldAccessor(vm *VM, _ OpCode, index uint) error {
 	return nil
 }
 
+func opResetDump(vm *VM, _ OpCode, _ uint) error {
+	vm.regDumpDst.StartIter()
+	return nil
+}
+
 func opAddGoroutine(vm *VM, _ OpCode, _ uint) error {
 	vm.regDumpDst.Add(vm.regGoroutine)
 	return nil
@@ -631,14 +647,14 @@ func opNextGoroutine(vm *VM, _ OpCode, addr uint) error {
 	}
 
 	if dump.Len() == 0 {
-		vm.ip = int(addr) - 1
+		vm.frame.ip = int(addr) - 1
 		vm.regGoroutine = nil
 		_, _ = vm.pop() // we're done: pop the dump off the stack
 		return nil
 	}
 	g := dump.Next()
 	if g == nil {
-		vm.ip = int(addr) - 1
+		vm.frame.ip = int(addr) - 1
 		vm.regGoroutine = nil
 		_, _ = vm.pop() // we're done: pop the dump off the stack
 		return nil
@@ -762,13 +778,32 @@ func opConditionalJump(vm *VM, instruction OpCode, addr uint) error {
 		return fmt.Errorf("%w conditional jump", err)
 	}
 	if val == (instruction == OpCodeJumpIfTrue) {
-		vm.ip = int(addr) - 1
+		vm.frame.ip = int(addr) - 1
 	}
 	return nil
 }
 
 func opJumpTo(vm *VM, _ OpCode, addr uint) error {
-	vm.ip = int(addr) - 1
+	vm.frame.ip = int(addr) - 1
+	return nil
+}
+
+func opCall(vm *VM, _ OpCode, chunkIndex uint) error {
+	frame := &frame{
+		ip:         -1,
+		returnAddr: vm.frame.ip,
+		chunk:      vm.code.chunks[chunkIndex],
+	}
+	vm.frames = append(vm.frames, frame)
+	vm.frame = frame
+	return nil
+}
+
+func opReturn(vm *VM, _ OpCode, _ uint) error {
+	ip := vm.frame.returnAddr
+	vm.frames = vm.frames[:len(vm.frames)-1]
+	vm.frame = vm.frames[len(vm.frames)-1]
+	vm.frame.ip = ip
 	return nil
 }
 

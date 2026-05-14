@@ -5,52 +5,71 @@ package internal
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 )
 
-type Chunk struct {
-	ops       []Op
+type Code struct {
+	chunks    []*Chunk
 	constants []any
 }
 
-func NewChunk() *Chunk {
-	return &Chunk{
-		ops:       []Op{},
+func NewCode() *Code {
+	return &Code{
+		chunks:    []*Chunk{NewChunk()},
 		constants: []any{},
 	}
 }
 
-func (c *Chunk) disassemble(ip int) string {
+func (co *Code) disassemble(index, ip int) string {
 	var b strings.Builder
 	b.WriteString(".text\n")
-	for instIndex, op := range c.ops {
-		ipPrefix := "  "
-		if instIndex == ip {
-			ipPrefix = "* "
-		}
-		comment := "\t"
-		code, idx := op.decode()
-		switch code {
-		case OpCodeAssignment, OpCodeLoadFieldAccessor,
-			OpCodeLoadNumber, OpCodeLoadString, OpCodeLoadGoroutineDump:
-			if idx <= uint(len(c.constants)) {
-				if len(c.constants) > int(idx) {
-					val := c.constants[idx]
-					comment = fmt.Sprintf("\t// %v", val)
+
+	for cindex, c := range co.chunks {
+		b.WriteString("(chunk ")
+		b.WriteString(strconv.Itoa(cindex))
+		b.WriteString(")\n")
+
+		for instIndex, op := range c.ops {
+			ipPrefix := "  "
+			if instIndex == ip && cindex == index {
+				ipPrefix = "* "
+			}
+			comment := "\t"
+			code, idx := op.decode()
+			switch code {
+			case OpCodeAssignment, OpCodeLoadFieldAccessor,
+				OpCodeLoadNumber, OpCodeLoadString, OpCodeLoadGoroutineDump:
+				if idx <= uint(len(co.constants)) {
+					if len(co.constants) > int(idx) {
+						val := co.constants[idx]
+						comment = fmt.Sprintf("\t// %v", val)
+					}
 				}
 			}
+			fmt.Fprintf(&b, "%s[%02d] %s%s\n", ipPrefix, instIndex, op, comment)
 		}
-		b.WriteString(fmt.Sprintf("%s[%02d] %s%s\n", ipPrefix, instIndex, op, comment))
 	}
+
 	b.WriteString(".data\n")
-	if len(c.constants) == 0 {
+	if len(co.constants) == 0 {
 		b.WriteString("  <none>\n")
 	}
-	for i, con := range c.constants {
-		b.WriteString(fmt.Sprintf("  [%02d] %v\n", i, con))
+	for i, con := range co.constants {
+		fmt.Fprintf(&b, "  [%02d] %v\n", i, con)
 	}
 
 	return b.String()
+}
+
+type Chunk struct {
+	ops []Op
+}
+
+func NewChunk() *Chunk {
+	return &Chunk{
+		ops: []Op{},
+	}
 }
 
 var opCodeMask = Op(0xffff000000000000)
@@ -94,6 +113,7 @@ const (
 	OpCodeAddGoroutine
 	OpCodeNextGoroutine
 	OpCodeTempDump
+	OpCodeResetDump
 
 	// comparisons
 	OpCodeContains
@@ -111,6 +131,8 @@ const (
 	OpCodeJumpIfFalse // opConditionalJump
 	OpCodeJumpIfTrue  // opConditionalJump
 	OpCodeJumpTo
+	OpCodeCall
+	OpCodeReturn
 
 	// functions
 	OpCodeFuncDiff

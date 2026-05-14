@@ -38,7 +38,8 @@ var ErrInvalidArg = errors.New("invalid argument")
 type Compiler struct {
 	// internal state which is reset for each Compile call
 	tokenizer *Tokenizer
-	chunk     *Chunk
+	code      *Code  // all chunks + constants
+	chunk     *Chunk // currently written chunk in code
 
 	// grammar consisting of parselet functions and precedence tables
 	prefixParseFns      map[TokenType]parseFn
@@ -73,6 +74,7 @@ func NewCompiler() *Compiler {
 		prefixPrecedenceTab: make(map[TokenType]int),
 		infixParseFns:       make(map[TokenType]parseFn),
 		infixPrecedenceTab:  make(map[TokenType]int),
+		code:                NewCode(),
 	}
 
 	setupPrefix := func(tok TokenType, prec int, parselet parseFn) {
@@ -115,10 +117,11 @@ func NewCompiler() *Compiler {
 	return p
 }
 
-func (p *Compiler) Compile(tokenizer *Tokenizer) (*Chunk, error) {
-	p.chunk = NewChunk()
+func (p *Compiler) Compile(tokenizer *Tokenizer) (*Code, error) {
+	p.code = NewCode()
+	p.chunk = p.code.chunks[0]
 	p.tokenizer = tokenizer
-	return p.chunk, p.parseExpr(0)
+	return p.code, p.parseExpr(0)
 }
 
 func (p *Compiler) parseExpr(precedence int) error {
@@ -559,7 +562,7 @@ func (p *Compiler) parseFilter(tok Token) error {
 	p.emitByte(OpCodeTempDump)
 	addr := p.emitBytes(OpCodeNextGoroutine, OpCodePatchPlaceholder)
 
-	err := p.parseExpr(BindingFunc)
+	err := p.parsePredicate()
 	if err != nil && !errors.Is(err, ErrEOF) {
 		return err
 	}
@@ -581,6 +584,21 @@ func (p *Compiler) parseFilter(tok Token) error {
 	p.emitByte(OpCodePushDump)
 	p.patchJump(addr, 0)
 
+	return nil
+}
+
+func (p *Compiler) parsePredicate() error {
+	p.chunk = NewChunk()
+	p.code.chunks = append(p.code.chunks, p.chunk)
+	chunkIndex := len(p.code.chunks) - 1
+
+	err := p.parseExpr(BindingFunc)
+	if err != nil && !errors.Is(err, ErrEOF) {
+		return err
+	}
+	p.emitByte(OpCodeReturn)
+	p.chunk = p.code.chunks[0]
+	p.emitBytes(OpCodeCall, uint(chunkIndex))
 	return nil
 }
 
@@ -740,11 +758,11 @@ func (p *Compiler) emitLoadConst(op OpCode, x any) int {
 }
 
 func (p *Compiler) createConst(x any) int {
-	idx := slices.Index(p.chunk.constants, x)
+	idx := slices.Index(p.code.constants, x)
 	if idx > -1 {
 		return idx
 	}
 
-	p.chunk.constants = append(p.chunk.constants, x)
-	return len(p.chunk.constants) - 1
+	p.code.constants = append(p.code.constants, x)
+	return len(p.code.constants) - 1
 }
