@@ -31,20 +31,15 @@ func TestCompiler_SimplePipeline(t *testing.T) {
 	must.Eq(t, []Op{
 		encode(OpCodeLoadGoroutineDump, 1), // 00 load g1
 		encode(OpCodeTempDump, 0),          // 01 scratch register
-		encode(OpCodeNextGoroutine, 7),     // 02 addr when done
+		encode(OpCodeNextGoroutine, 9),     // 02 addr when done
 		encode(OpCodeCall, 1),              // 03 call 1
 		encode(OpCodeJumpIfFalse, 2),       // 04 jump to next goroutine
-		encode(OpCodeAddGoroutine, 0),      // 05 keep
-		encode(OpCodeJumpTo, 2),            // 06 jump to next goroutine
-		encode(OpCodePushDump, 0),          // 07 push to stack
-		encode(OpCodeTempDump, 0),          // 08 reset
-		encode(OpCodeNextGoroutine, 14),    // 09 addr when done
-		encode(OpCodeCall, 2),              // 10 call 2
-		encode(OpCodeJumpIfFalse, 9),       // 11 jump to next goroutine
-		encode(OpCodeAddGoroutine, 0),      // 12 keep
-		encode(OpCodeJumpTo, 9),            // 13 jump to next goroutine
-		encode(OpCodePushDump, 0),          // 14 push to stack
-		encode(OpCodeAssignment, 0),        // 15 assign to g2
+		encode(OpCodeCall, 2),              // 05 call 2
+		encode(OpCodeJumpIfFalse, 2),       // 06 jump to next goroutine
+		encode(OpCodeAddGoroutine, 0),      // 07 keep
+		encode(OpCodeJumpTo, 2),            // 08 jump to next goroutine
+		encode(OpCodePushDump, 0),          // 09 push to stack
+		encode(OpCodeAssignment, 0),        // 10 assign to g2
 	},
 		code.chunks[0].ops,
 		must.Sprintf("%s", code.disassemble(0, 0)),
@@ -93,27 +88,17 @@ func TestCompiler_MultiPipeline(t *testing.T) {
 	must.Eq(t, []Op{
 		encode(OpCodeLoadGoroutineDump, 1), // 00 load g1
 		encode(OpCodeTempDump, 0),          // 01 scratch register
-		encode(OpCodeNextGoroutine, 7),     // 02 addr when done
+		encode(OpCodeNextGoroutine, 11),    // 02 addr when done
 		encode(OpCodeCall, 1),              // 03 call 1
 		encode(OpCodeJumpIfFalse, 2),       // 04 jump to next goroutine
-		encode(OpCodeAddGoroutine, 0),      // 05 keep
-		encode(OpCodeJumpTo, 2),            // 06 jump to next goroutine
-		encode(OpCodePushDump, 0),          // 07 push to stack
-		encode(OpCodeTempDump, 0),          // 08 refresh scratch register
-		encode(OpCodeNextGoroutine, 14),    // 09 addr when done
-		encode(OpCodeCall, 2),              // 10 call 3
-		encode(OpCodeJumpIfFalse, 9),       // 11 jump to next goroutine
-		encode(OpCodeAddGoroutine, 0),      // 12 keep
-		encode(OpCodeJumpTo, 9),            // 13 jump to next goroutine
-		encode(OpCodePushDump, 0),          // 14 push to stack
-		encode(OpCodeTempDump, 0),          // 15 refresh scratch register
-		encode(OpCodeNextGoroutine, 21),    // 16 addr when done
-		encode(OpCodeCall, 3),              // 17 call 3
-		encode(OpCodeJumpIfTrue, 16),       // 18 jump to next goroutine
-		encode(OpCodeAddGoroutine, 0),      // 19 keep
-		encode(OpCodeJumpTo, 16),           // 20 jump to next goroutine
-		encode(OpCodePushDump, 0),          // 21 push to stack
-		encode(OpCodeAssignment, 0),        // 22 assign to g3
+		encode(OpCodeCall, 2),              // 05 call 3
+		encode(OpCodeJumpIfFalse, 2),       // 06 jump to next goroutine
+		encode(OpCodeCall, 3),              // 07 call 3
+		encode(OpCodeJumpIfTrue, 2),        // 08 jump to next goroutine
+		encode(OpCodeAddGoroutine, 0),      // 09 add goroutine
+		encode(OpCodeJumpTo, 2),            // 10 next goroutine
+		encode(OpCodePushDump, 0),          // 11 push to stack
+		encode(OpCodeAssignment, 0),        // 12 assign to g3
 	},
 		code.chunks[0].ops,
 	)
@@ -354,19 +339,14 @@ func TestCompiler_ChainedWhere(t *testing.T) {
 	must.Eq(t, []Op{
 		encode(OpCodeLoadGoroutineDump, 0), // 00 load g
 		encode(OpCodeTempDump, 0),          // 01 scratch register
-		encode(OpCodeNextGoroutine, 7),     // 02 next w/ addr to jump when done
+		encode(OpCodeNextGoroutine, 9),     // 02 next w/ addr to jump when done
 		encode(OpCodeCall, 1),              // 03 call 1
 		encode(OpCodeJumpIfFalse, 2),       // 04 jump to next goroutine
-		encode(OpCodeAddGoroutine, 0),      // 05 keep
-		encode(OpCodeJumpTo, 2),            // 06 jump to next goroutine
-		encode(OpCodePushDump, 0),          // 07 push to stack
-		encode(OpCodeTempDump, 0),          // 08 scratch register
-		encode(OpCodeNextGoroutine, 14),    // 09 next w/ addr to jump when done
-		encode(OpCodeCall, 2),              // 10 call 2
-		encode(OpCodeJumpIfFalse, 9),       // 11 jump to next goroutine
-		encode(OpCodeAddGoroutine, 0),      // 12 keep
-		encode(OpCodeJumpTo, 9),            // 13 jump to next goroutine
-		encode(OpCodePushDump, 0),          // 14 push to stack
+		encode(OpCodeCall, 2),              // 05 call 2
+		encode(OpCodeJumpIfFalse, 2),       // 06 jump to next goroutine
+		encode(OpCodeAddGoroutine, 0),      // 07 keep
+		encode(OpCodeJumpTo, 2),            // 08 jump to next goroutine
+		encode(OpCodePushDump, 0),          // 09 push to stack
 	},
 		code.chunks[0].ops,
 	)
@@ -712,4 +692,52 @@ func TestCompiler_Errors(t *testing.T) {
 		must.Eq(t, tc.expectLexeme, cerr.tok.Lexeme)
 		must.Eq(t, tc.expectPos, cerr.tok.Pos.Column)
 	}
+}
+
+func TestCompiler_PatchOut(t *testing.T) {
+
+	start := uint(3)
+	by := uint(4)
+
+	chunk := &Chunk{
+		ops: []Op{
+			encode(OpCodeNoop, 0),          // 00
+			encode(OpCodeNoop, 1),          // 01
+			encode(OpCodeNoop, 2),          // 02
+			encode(OpCodeNoop, 3),          // 03 start of window
+			encode(OpCodeNoop, 4),          // 04
+			encode(OpCodeJumpTo, 1),        // 05 jump within window to before start
+			encode(OpCodeNoop, 6),          // 06 end of window
+			encode(OpCodeNoop, 7),          // 07
+			encode(OpCodeNextGoroutine, 4), // 08 jump to within window
+			encode(OpCodeJumpIfFalse, 1),   // 09 jump to before start
+			encode(OpCodeJumpIfTrue, 11),   // 10 jump to after window
+			encode(OpCodeNoop, 12),         // 11
+		},
+	}
+	compiler := NewCompiler()
+	err := compiler.patchOut(chunk, start, by)
+	must.EqError(t, err, "patch out found address inside patched window (op=04 addr=4)")
+	must.Len(t, 12, chunk.ops)
+	must.Eq(t, encode(OpCodeNoop, 4), chunk.ops[4])
+
+	// remove offending op
+	chunk.ops[8] = encode(OpCodeNoop, 8)
+	err = compiler.patchOut(chunk, start, by)
+	must.NoError(t, err)
+
+	code := NewCode()
+	code.chunks = append(code.chunks, chunk)
+	fmt.Println(code.disassemble(0, 0))
+
+	must.Eq(t, []Op{
+		encode(OpCodeNoop, 0),        // 00
+		encode(OpCodeNoop, 1),        // 01
+		encode(OpCodeNoop, 2),        // 02
+		encode(OpCodeNoop, 7),        // 03 (was 07)
+		encode(OpCodeNoop, 8),        // 04 (was 08)
+		encode(OpCodeJumpIfFalse, 1), // 05 (was 09) jump to before start
+		encode(OpCodeJumpIfTrue, 7),  // 06 (was 10) jump to after window
+		encode(OpCodeNoop, 12),       // 07 (was 11)
+	}, chunk.ops)
 }

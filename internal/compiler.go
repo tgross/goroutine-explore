@@ -121,7 +121,14 @@ func (p *Compiler) Compile(tokenizer *Tokenizer) (*Code, error) {
 	p.code = NewCode()
 	p.chunk = p.code.chunks[0]
 	p.tokenizer = tokenizer
-	return p.code, p.parseExpr(0)
+
+	err := p.parseExpr(0)
+	if err != nil {
+		return p.code, err
+	}
+
+	p.optimizePredicates()
+	return p.code, nil
 }
 
 func (p *Compiler) parseExpr(precedence int) error {
@@ -765,4 +772,123 @@ func (p *Compiler) createConst(x any) int {
 
 	p.code.constants = append(p.code.constants, x)
 	return len(p.code.constants) - 1
+}
+
+// optimizedPredicates finds adjacent where/delete filter expressions and
+// compacts their loops together so that we call the predicate chunks for each
+// goroutine without having to loop again. This significantly improves
+// performance for larger goroutine dumps when the initial filter in a chain is
+// "weak" and doesn't filter many values.
+func (p *Compiler) optimizePredicates() {
+
+	for origIndex := 0; origIndex < len(p.chunk.ops); origIndex++ {
+		_, _, ok := nextFilterExpr(p.chunk, origIndex)
+		if !ok {
+			continue
+		}
+
+		start, newIndex := uint(origIndex), uint(origIndex)
+		nextAddr := start + 1 // address we'll patch for OpCodeNextGoroutine
+		toPatchOut := uint(0)
+		var found bool
+
+	OUTER:
+		for {
+			origIndex += 7 // advance past previous filter
+			callOp, jumpOp, ok := nextFilterExpr(p.chunk, origIndex)
+			if !ok {
+				break OUTER
+			}
+			if !found && ok {
+				newIndex += 4
+			}
+			found = true
+
+			jumpCode, _ := jumpOp.decode()
+			p.chunk.ops[newIndex] = callOp
+
+			p.chunk.ops[newIndex+1] = encode(jumpCode, nextAddr)
+			newIndex += 2
+			toPatchOut += 5
+		}
+
+		if found {
+			p.chunk.ops[newIndex] = encode(OpCodeAddGoroutine, 0)
+			p.chunk.ops[newIndex+1] = encode(OpCodeJumpTo, nextAddr)
+			p.chunk.ops[newIndex+2] = encode(OpCodePushDump, 0)
+			p.chunk.ops[start+1] = encode(OpCodeNextGoroutine, newIndex+2)
+			newIndex += 3
+
+			// we've removed instructions which we could replace with nops but
+			// that makes finding the next opportunity to look for a window to
+			// optimize harder, so patch them out and shift the remaining ops
+			// instead
+			_ = p.patchOut(p.chunk, newIndex, toPatchOut)
+		}
+	}
+}
+
+var filterOps = []OpCode{
+	OpCodeTempDump,
+	OpCodeNextGoroutine,
+	OpCodeCall,
+	OpCodeNoop, // hole for conditional jump
+	OpCodeAddGoroutine,
+	OpCodeJumpTo,
+	OpCodePushDump,
+}
+
+func nextFilterExpr(chunk *Chunk, i int) (callOp, jumpOp Op, ok bool) {
+	if len(chunk.ops) < i+7 {
+		return // not enough ops for another filter expression
+	}
+
+	code00, _ := chunk.ops[i].decode()   // temp dump
+	code01, _ := chunk.ops[i+1].decode() // next goroutine
+	code02, _ := chunk.ops[i+2].decode() // call
+	// skip i+3 which is the jump
+	code04, _ := chunk.ops[i+4].decode() // add goroutine
+	code05, _ := chunk.ops[i+5].decode() // jump back to next
+	code06, _ := chunk.ops[i+6].decode() // push
+	if !slices.Equal(filterOps,
+		[]OpCode{
+			code00,
+			code01,
+			code02,
+			OpCodeNoop,
+			code04,
+			code05,
+			code06,
+		}) {
+		return
+	}
+	callOp = chunk.ops[i+2]
+	jumpOp = chunk.ops[i+3]
+	ok = true
+	return
+}
+
+func (p *Compiler) patchOut(chunk *Chunk, first, by uint) error {
+	ops := slices.Clone(chunk.ops[:first])
+	tail := slices.Clone(chunk.ops[first+by:])
+	ops = append(ops, tail...)
+
+	for i := first; i < uint(len(ops)); i++ {
+		op := ops[i]
+		code, addr := op.decode()
+		switch code {
+		case OpCodeJumpIfFalse, OpCodeJumpTo, OpCodeJumpIfTrue, OpCodeNextGoroutine:
+			if addr >= first && addr < first+by {
+				return fmt.Errorf("patch out found address inside patched window (op=%02d addr=%d)", i, addr)
+			}
+			if addr >= uint(first) {
+				addr -= uint(by)
+				ops[i] = encode(code, addr)
+			}
+		default:
+			ops[i] = encode(code, addr)
+		}
+	}
+	chunk.ops = ops
+	return nil
 }
