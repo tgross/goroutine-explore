@@ -388,10 +388,12 @@ identical values.
 >> g2 = g1.where(.state == "select").where(.duration > 1)
 ```
 
-Note the compiler currently does not optimize pipelined or chained `where`
-expressions so if you have a very large goroutine dump to process, you'll get
-better performance if you turn chained `where` calls into a compound expressions
-on a single `where`.
+The compiler optimizes pipelined or chained `where` and `delete` expressions
+into a single loop, so if you have a very large goroutine dump to process it
+will not iterate it multiple times unnecessarily. That said, if you're planning
+on repeatedly querying the results of a `where` on a large set of goroutines,
+you may find you can improve performance by assigning that value to a variable
+so that subsequent queries are working on the smaller set.
 
 | Name        | Arguments               | Output  |
 |-------------|-------------------------|---------|
