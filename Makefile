@@ -11,7 +11,7 @@ GOBIN := $(if $(GOBIN),$(GOBIN),"$(shell go env GOPATH)/bin")
 build: bin/goroutine-explore
 
 bin/goroutine-explore: gen $(GO_SRC)
-	@mkdir -p ./build
+	@mkdir -p ./bin
 	go build -trimpath -o bin/goroutine-explore .
 
 .PHONY: gen
@@ -52,4 +52,4 @@ lint:
 
 .PHONY: clean
 clean:
-	rm -rf ./build
+	rm -rf ./bin
