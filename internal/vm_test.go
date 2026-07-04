@@ -466,10 +466,11 @@ goroutine 3 [IO wait, 10 minutes]:
 		},
 		{ // source: `g1 | json()`
 			name:      "json function",
-			constants: []any{"g1", 1, 3},
+			constants: []any{"g1", ""},
 			chunk: &Chunk{
 				ops: []Op{
 					encode(OpCodeLoadGoroutineDump, 0), // load g1
+					encode(OpCodeLoadString, 1),        // load empty string
 					encode(OpCodeFuncToJSON, 0),        // show
 				},
 			},
@@ -498,7 +499,8 @@ goroutine 3 [IO wait, 10 minutes]:
     "trace": "",
     "lines": 1
   }
-]`,
+]
+`,
 		},
 	}
 

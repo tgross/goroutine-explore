@@ -437,8 +437,8 @@ var signatures = map[string]struct {
 	"as":        {OpCodeAssignment, []argType{identifier}, 1},
 	"show": {OpCodeFuncShowDump, []argType{
 		numeric | optional, numeric | optional}, 0},
-	"json": {OpCodeFuncToJSON, nil, 0},
-	"dot":  {OpCodeFuncToDot, nil, 0},
+	"json": {OpCodeFuncToJSON, []argType{str | optional}, 0},
+	"dot":  {OpCodeFuncToDot, []argType{str | optional}, 0},
 
 	// these have more complex handling so we don't have a single OpCode
 	"where":  {OpCodeNoop, []argType{predicate}, 1},
@@ -469,7 +469,11 @@ func (p *Compiler) parseFunctionArgs(fun Token) error {
 				return compileErr(next, "%w", err)
 			}
 			if next.Type == TokenRightParen {
-				// get default from pragma
+				// arg will be the zero value, potentially set via pragma
+				if arg&str == str {
+					p.emitLoadConst(OpCodeLoadString, "")
+					continue
+				}
 				p.emitLoadConst(OpCodeLoadNumber, 0)
 				continue
 			}

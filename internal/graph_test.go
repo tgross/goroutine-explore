@@ -30,6 +30,7 @@ func Test_FuncToDot(t *testing.T) {
 	recorder := new(bytes.Buffer)
 	vm.wOut = NewWriter(recorder)
 	vm.pushDump(gd)
+	vm.push(Value{Tag: TagString, Data: ""})
 	must.NoError(t, opFuncToDot(vm, OpCodeNoop, 0))
 
 	expect := `digraph G {

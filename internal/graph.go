@@ -4,6 +4,7 @@
 package internal
 
 import (
+	"bytes"
 	"fmt"
 	"strings"
 )
@@ -78,14 +79,20 @@ type edge struct {
 }
 
 func opFuncToDot(vm *VM, _ OpCode, _ uint) error {
+	path, err := vm.popString()
+	if err != nil {
+		return err
+	}
 	dump, err := vm.peekDump()
 	if err != nil {
 		return err
 	}
 
+	w := bytes.NewBuffer([]byte{})
+
 	// header
-	_, _ = vm.wOut.Write([]byte("digraph G {\nrankdir=\"LR\"\n"))
-	_, _ = vm.wOut.Write([]byte("node[shape=record style=filled color=\"lightgreen\"]\n"))
+	_, _ = w.Write([]byte("digraph G {\nrankdir=\"LR\"\n"))
+	_, _ = w.Write([]byte("node[shape=record style=filled color=\"lightgreen\"]\n"))
 
 	// a given goroutine's parent may not exist in the dump, so in order to show
 	// these with differently styled nodes, we need to track all the nodes we've
@@ -111,7 +118,7 @@ func opFuncToDot(vm *VM, _ OpCode, _ uint) error {
 		trace = strings.ReplaceAll(trace, "\t", `.\ \ \ `)
 		trace = strings.ReplaceAll(trace, "\n", `\l`)
 
-		fmt.Fprintf(vm.wOut,
+		fmt.Fprintf(w,
 			"%d [label=\"{{<id>%d |%s|%d min}|%s}\"]\n",
 			g.ID, g.ID, g.State, g.Duration, trace)
 
@@ -124,23 +131,28 @@ func opFuncToDot(vm *VM, _ OpCode, _ uint) error {
 	}
 
 	// write all the unknown nodes
-	fmt.Fprintln(vm.wOut, "node[shape=oval color=lightgray]")
+	fmt.Fprintln(w, "node[shape=oval color=lightgray]")
 	for g := range unknownIDs {
-		fmt.Fprintf(vm.wOut, "%d [label=\"%d\"]\n", g, g)
+		fmt.Fprintf(w, "%d [label=\"%d\"]\n", g, g)
 	}
 
 	// write all the edges
 	for _, e := range edges {
 		_, unknownFrom := unknownIDs[e.from]
 		if unknownFrom {
-			fmt.Fprintf(vm.wOut, "%d -> %d:id\n", e.from, e.to)
+			fmt.Fprintf(w, "%d -> %d:id\n", e.from, e.to)
 		} else {
-			fmt.Fprintf(vm.wOut, "%d:id -> %d:id\n", e.from, e.to)
+			fmt.Fprintf(w, "%d:id -> %d:id\n", e.from, e.to)
 		}
 	}
 
 	// trailer
-	fmt.Fprintln(vm.wOut, "}")
+	fmt.Fprint(w, "}")
+
 	vm.didShow = true
-	return nil
+	fmt.Fprintln(vm.wOut, w.String())
+	if path == "" {
+		return nil
+	}
+	return writeToFile(path, w.Bytes())
 }

@@ -8,13 +8,16 @@ import "fmt"
 func opCommandHelp(vm *VM, _ OpCode, index uint) error {
 	var topic string
 	con, err := vm.fetchConstant(index)
-	if err != nil { // no topic was passed
-		topic = "all"
+	if err != nil {
+		return fmt.Errorf("%w: expected help topic or empty", ErrInvalidArg)
 	} else {
 		var ok bool
 		topic, ok = con.(string)
 		if !ok {
 			return fmt.Errorf("help topics must be strings")
+		}
+		if topic == "" {
+			topic = "all"
 		}
 	}
 	msg, ok := helpText[topic]

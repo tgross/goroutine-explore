@@ -109,3 +109,23 @@ func (w *Writer) writeImpl(p []byte) (int, error) {
 	}
 	return n, nil
 }
+
+// writeToFile writes the entire buffer provided to the file path, taking care
+// of short reads.
+func writeToFile(path string, buf []byte) error {
+	path = expandPath(path)
+	f, err := os.Create(path)
+	if err != nil {
+		return err
+	}
+	fw := NewWriter(f)
+	_, err = fw.Write(buf)
+	if err != nil {
+		return err
+	}
+	_, err = fw.Write([]byte("\n"))
+	if err != nil {
+		return err
+	}
+	return f.Sync()
+}

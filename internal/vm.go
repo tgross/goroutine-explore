@@ -1047,6 +1047,10 @@ func opFuncShowDump(vm *VM, _ OpCode, _ uint) error {
 }
 
 func opFuncToJSON(vm *VM, _ OpCode, _ uint) error {
+	path, err := vm.popString()
+	if err != nil {
+		return err
+	}
 	dump, err := vm.peekDump()
 	if err != nil {
 		return err
@@ -1055,7 +1059,11 @@ func opFuncToJSON(vm *VM, _ OpCode, _ uint) error {
 	if err != nil {
 		return err
 	}
-	_, _ = vm.wOut.Write(buf)
+
 	vm.didShow = true
-	return nil
+	fmt.Fprintln(vm.wOut, string(buf))
+	if path == "" {
+		return nil
+	}
+	return writeToFile(path, buf)
 }

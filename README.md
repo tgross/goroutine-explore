@@ -400,13 +400,13 @@ so that subsequent queries are working on the smaller set.
 | `as`        | dump, new variable name | dump    |
 | `delete`    | dump, filter expression | dump    |
 | `diff`      | dump, dump              | 3 dumps |
-| `dot`       | dump                    | dump    |
+| `dot`       | dump, [string path]     | dump    |
 | `graph`     | dump, dump              | dump    |
 | `intersect` | dump, dump              | dump    |
-| `json`      | dump                    | dump    |
+| `json`      | dump, [string path]     | dump    |
 | `load`      | string path             | dump    |
 | `save`      | dump, string path       | dump    |
-| `show`      | dump [limit, offset]    | dump    |
+| `show`      | dump, [limit, offset]   | dump    |
 | `union`     | dump, dump              | dump    |
 | `where`     | dump, filter expression | dump    |
 
@@ -665,6 +665,13 @@ file into JSON for processing with other tools like [`jq`][].
 $ goroutine-explore -e 'load("goroutine-dump.txt").json()' | jq .
 ```
 
+The `json` function takes an optional path parameter to write a copy of the JSON
+to disk, in addition to printing it to the shell.
+
+```
+>> g.json("./dump.json")
+```
+
 ### dot
 
 The `dot` function takes a goroutine dump and outputs a dot-syntax directed
@@ -678,6 +685,13 @@ $ goroutine-explore \
 $ dot -Tsvg ./graph.dot > ./graph.svg
 $ xdg-open ./graph.svg
 
+```
+
+The `dot` function takes an optional path parameter to write a copy of the graph
+to disk, in addition to printing it to the shell.
+
+```
+>> g.dot("./dump.dot")
 ```
 
 ## Contributing

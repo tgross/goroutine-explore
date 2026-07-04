@@ -20,27 +20,32 @@ var (
 	startLinePattern = regexp.MustCompile(`^goroutine\s+(\d+)\s+.*\[(.*)\]:$`)
 )
 
-func load(fn string) (*GoroutineDump, error) {
+func load(path string) (*GoroutineDump, error) {
 	// special case for when -e is used without a tty for stdin
-	if fn == "STDIN" {
+	if path == "STDIN" {
 		reader := bufio.NewReader(os.Stdin)
 		return loadFrom(reader, startLinePattern)
 	}
 
-	fn = strings.Trim(fn, "\"")
+	path = expandPath(path)
 
-	if strings.HasPrefix(fn, "~") {
-		home, _ := os.UserHomeDir()
-		fn = filepath.Join(home, fn[1:])
-	}
-	fn = os.ExpandEnv(fn)
-
-	f, err := os.Open(fn)
+	f, err := os.Open(path)
 	if err != nil {
 		return nil, err
 	}
 	defer f.Close()
 	return loadFrom(f, startLinePattern)
+}
+
+// expandPath handles homedir and environment variable expansion on a path
+func expandPath(path string) string {
+	path = strings.Trim(path, `"`)
+	if strings.HasPrefix(path, "~") {
+		home, _ := os.UserHomeDir()
+		path = filepath.Join(home, path[1:])
+	}
+	path = os.ExpandEnv(path)
+	return path
 }
 
 func loadFrom(r io.Reader, startPattern *regexp.Regexp) (*GoroutineDump, error) {
