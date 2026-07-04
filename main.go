@@ -116,8 +116,6 @@ func repl(e *internal.Evaluator) int {
 		_ = lines.Close()
 	}()
 
-	previousCtrlC := false
-
 	for {
 		err := replOnce(e, lines)
 		if err != nil {
@@ -136,16 +134,11 @@ func repl(e *internal.Evaluator) int {
 			case errors.Is(err, internal.ErrNoSuchOpCode):
 				return 129
 			case errors.Is(err, liner.ErrPromptAborted):
-				if previousCtrlC {
-					return 0 // 2 Ctrl-C in a row quits
-				}
-				previousCtrlC = true
 				continue // Ctrl-C
 			case errors.Is(err, io.EOF):
 				return 0 // Ctrl-D quits
 			}
 		}
-		previousCtrlC = false
 	}
 }
 
