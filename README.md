@@ -152,7 +152,9 @@ pipeline or filter expression.
 * `exit`: Exits the shell, with confirmation (y/N). You can bypass confirmation
   by exiting via `Ctrl-D` or by setting `pragma.exit.confirm false`.
 
-* `help`: Show a summary of available commands and functions.
+* `help`: Show a summary of available commands and functions. Calling `help`
+  without arguments shows a list of help topics. You can call help with a topic
+  (ex. `help(pragmas)` to get help on a particular topic.
 
 * `ls`: List all files in the working directory.
 

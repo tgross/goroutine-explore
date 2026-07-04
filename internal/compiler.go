@@ -409,7 +409,7 @@ func (p *Compiler) parseCommand(cmd Token) error {
 	return p.parseFunctionArgs(cmd)
 }
 
-type argType byte
+type argType uint16
 
 const (
 	optional argType = 1 << iota
@@ -420,6 +420,7 @@ const (
 	identifier
 	field
 	pragma
+	helptopic
 )
 
 // signatures are the type signature of every function, not including the
@@ -451,7 +452,7 @@ var signatures = map[string]struct {
 	"empty": {OpCodeCommandEmpty, nil, 0},
 	"exit":  {OpCodeCommandQuit, nil, 0},
 	"quit":  {OpCodeCommandQuit, nil, 0},
-	"help":  {OpCodeCommandHelp, []argType{str | optional}, 0},
+	"help":  {OpCodeCommandHelp, []argType{helptopic | optional}, 0},
 	"pwd":   {OpCodeCommandGetWorkingDir, nil, 0},
 	"vars":  {OpCodeCommandVars, nil, 0},
 }
@@ -470,10 +471,11 @@ func (p *Compiler) parseFunctionArgs(fun Token) error {
 			}
 			if next.Type == TokenRightParen {
 				// arg will be the zero value, potentially set via pragma
-				if arg&str == str {
+				if arg&str == str || arg&helptopic == helptopic {
 					p.emitLoadConst(OpCodeLoadString, "")
 					continue
 				}
+
 				p.emitLoadConst(OpCodeLoadNumber, 0)
 				continue
 			}
@@ -517,6 +519,12 @@ func (p *Compiler) parseFunctionArgs(fun Token) error {
 			if err != nil {
 				return fmt.Errorf("%w for %s: %w", ErrInvalidArg, fun.Lexeme, err)
 			}
+		case arg&helptopic == helptopic:
+			tok, err := p.consume(TokenIdentifier)
+			if err != nil {
+				return fmt.Errorf("%w for %s: %w", ErrInvalidArg, fun.Lexeme, err)
+			}
+			p.emitLoadConst(OpCodeLoadString, tok.Lexeme)
 		case arg&predicate == predicate:
 			err := p.parseFilter(fun)
 			if err != nil {
