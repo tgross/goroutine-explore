@@ -54,29 +54,29 @@ func mockGoroutine(id int, state string, stacks ...string) *Goroutine {
 
 // mockStack generates a random fake stack trace
 func mockStack(depth int) string {
-	out := ""
+	out := strings.Builder{}
 	names := []string{
 		"net", "http", "Reader", "server", "poll", "Manager",
 		"block", "sync", "Splines", "Worker", "poke"}
 	meta := []string{"foo", "bar", "baz", "quux"}
 
 	for range depth {
-		out += fmt.Sprintf("%s/%s.(*%s).%s.%s()\n",
+		out.WriteString(fmt.Sprintf("%s/%s.(*%s).%s.%s()\n",
 			names[rand.Intn(len(names))],
 			names[rand.Intn(len(names))],
 			names[rand.Intn(len(names))],
 			names[rand.Intn(len(names))],
 			names[rand.Intn(len(names))],
-		)
-		out += fmt.Sprintf("\t/src/%s/%s/%s/%s.go:%d\n",
+		))
+		out.WriteString(fmt.Sprintf("\t/src/%s/%s/%s/%s.go:%d\n",
 			meta[rand.Intn(len(meta))],
 			meta[rand.Intn(len(meta))],
 			meta[rand.Intn(len(meta))],
 			names[rand.Intn(len(names))],
 			rand.Intn(300),
-		)
+		))
 	}
-	return out
+	return out.String()
 }
 
 func mockDumpForGraph() *GoroutineDump {

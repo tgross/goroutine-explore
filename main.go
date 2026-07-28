@@ -195,23 +195,28 @@ func nextSrc(lines *liner.State) (string, error) {
 func Version() string {
 	info, _ := debug.ReadBuildInfo()
 	version := info.Main.Version
-	out := "goroutine-explore " + version
+
+	b := strings.Builder{}
+	b.WriteString("goroutine-explore ")
+	b.WriteString(version)
 
 	for _, setting := range info.Settings {
 		if setting.Key == "vcs.revision" {
-			out += " (" + setting.Value + ")"
+			b.WriteString(" (")
+			b.WriteString(setting.Value)
+			b.WriteString(")")
 			break
 		}
 	}
 
-	out += `
+	b.WriteString(`
 
 Copyright (c) 2021-2026 The goroutine-explore authors
 Licensed Blue Oak Model License 1.0.0
 
 This software contains open source dependencies.
 See NOTICES.md in https://github.com/tgross/goroutine-explore
-for copyright information.`
+for copyright information.`)
 
-	return out
+	return b.String()
 }
