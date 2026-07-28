@@ -893,8 +893,8 @@ func (p *Compiler) patchOut(chunk *Chunk, first, by uint) error {
 			if addr >= first && addr < first+by {
 				return fmt.Errorf("patch out found address inside patched window (op=%02d addr=%d)", i, addr)
 			}
-			if addr >= uint(first) {
-				addr -= uint(by)
+			if addr >= first {
+				addr -= by
 				ops[i] = encode(code, addr)
 			}
 		default:
