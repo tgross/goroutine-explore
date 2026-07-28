@@ -13,6 +13,7 @@ import (
 )
 
 func TestTokenizer_SmokeTest(t *testing.T) {
+	t.Parallel()
 
 	src := `g.where(.duration > 10 and .state == "select")
               | union(g1) | as(g2) | show()`
@@ -60,6 +61,7 @@ func TestTokenizer_SmokeTest(t *testing.T) {
 }
 
 func TestTokenizer_CommandArgs(t *testing.T) {
+	t.Parallel()
 	testCases := []struct {
 		src    string
 		expect []Token
@@ -115,6 +117,7 @@ func TestTokenizer_CommandArgs(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run("", func(t *testing.T) {
+			t.Parallel()
 			body := strings.NewReader(tc.src)
 			tokenizer := NewTokenizer()
 			tokenizer.Reset(t.Context(), body)

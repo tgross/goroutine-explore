@@ -24,6 +24,7 @@ func (w *testShortWriter) Write(p []byte) (int, error) {
 }
 
 func TestWriter(t *testing.T) {
+	t.Parallel()
 	recorder := &testShortWriter{w: new(bytes.Buffer)}
 	w := NewWriter(recorder)
 	_, err := fmt.Fprintf(w, "0123456789")

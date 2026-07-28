@@ -11,6 +11,7 @@ import (
 )
 
 func Test_inGraphOf(t *testing.T) {
+	t.Parallel()
 	gd := mockDumpForGraph()
 	predicate := NewGoroutineDump()
 	predicate.Add(gd.byID(6))
@@ -21,6 +22,7 @@ func Test_inGraphOf(t *testing.T) {
 }
 
 func Test_FuncToDot(t *testing.T) {
+	t.Parallel()
 	gd := mockDumpForGraph()
 	predicate := NewGoroutineDump()
 	predicate.Add(gd.byID(6))

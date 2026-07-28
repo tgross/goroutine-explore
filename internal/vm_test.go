@@ -11,6 +11,7 @@ import (
 )
 
 func TestVM_BasicStackOps(t *testing.T) {
+	t.Parallel()
 	vm := NewVM(&Config{WorkDir: t.TempDir()})
 
 	vm.push(Value{Tag: TagNumber, Data: 1})
@@ -31,6 +32,7 @@ func TestVM_BasicStackOps(t *testing.T) {
 }
 
 func TestVM_SimpleWhere(t *testing.T) {
+	t.Parallel()
 
 	testCases := []struct {
 		name      string
@@ -67,6 +69,7 @@ func TestVM_SimpleWhere(t *testing.T) {
 				g1.Add(mockMinGoroutine(`goroutine 3 [IO wait, 5 minutes]:`))
 			},
 			expectFn: func(t *testing.T, g2 *GoroutineDump) {
+				t.Helper()
 				must.Eq(t, 1, g2.Len())
 				must.Eq(t, 2, g2.Next().ID)
 			},
@@ -99,6 +102,7 @@ func TestVM_SimpleWhere(t *testing.T) {
 				g1.Add(mockMinGoroutine(`goroutine 3 [IO wait, 5 minutes]:`))
 			},
 			expectFn: func(t *testing.T, g2 *GoroutineDump) {
+				t.Helper()
 				must.Eq(t, 2, g2.Len())
 				must.Eq(t, 1, g2.Next().ID)
 				must.Eq(t, 3, g2.Next().ID)
@@ -136,6 +140,7 @@ func TestVM_SimpleWhere(t *testing.T) {
 				`))
 			},
 			expectFn: func(t *testing.T, g2 *GoroutineDump) {
+				t.Helper()
 				must.Eq(t, 1, g2.Len())
 				must.Eq(t, 2, g2.Next().ID)
 			},
@@ -173,6 +178,7 @@ func TestVM_SimpleWhere(t *testing.T) {
 				`))
 			},
 			expectFn: func(t *testing.T, g2 *GoroutineDump) {
+				t.Helper()
 				must.Eq(t, 1, g2.Len())
 				must.Eq(t, 2, g2.Next().ID)
 			},
@@ -181,6 +187,7 @@ func TestVM_SimpleWhere(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			vm := NewVM(&Config{WorkDir: t.TempDir()})
 			code := &Code{chunks: tc.chunks, constants: tc.constants}
 			vm.Reset(code)
@@ -206,6 +213,7 @@ func TestVM_SimpleWhere(t *testing.T) {
 }
 
 func TestVM_SetFunctions(t *testing.T) {
+	t.Parallel()
 
 	testCases := []struct {
 		name      string
@@ -237,6 +245,7 @@ func TestVM_SetFunctions(t *testing.T) {
 				return g2
 			},
 			expectFn: func(t *testing.T, g *GoroutineDump) {
+				t.Helper()
 				must.Eq(t, 3, g.Len())
 				must.Eq(t, 1, g.Next().ID)
 				must.Eq(t, 2, g.Next().ID)
@@ -281,6 +290,7 @@ func TestVM_SetFunctions(t *testing.T) {
 				return g2
 			},
 			expectFn: func(t *testing.T, g *GoroutineDump) {
+				t.Helper()
 				must.Eq(t, 3, g.Len())
 				must.Eq(t, 1, g.Next().ID)
 				must.Eq(t, 2, g.Next().ID)
@@ -325,6 +335,7 @@ func TestVM_SetFunctions(t *testing.T) {
 				return g2
 			},
 			expectFn: func(t *testing.T, g *GoroutineDump) {
+				t.Helper()
 				must.Eq(t, 3, g.Len())
 				must.Eq(t, 1, g.Next().ID)
 				must.Eq(t, 2, g.Next().ID)
@@ -355,6 +366,7 @@ func TestVM_SetFunctions(t *testing.T) {
 				return g2
 			},
 			expectFn: func(t *testing.T, g *GoroutineDump) {
+				t.Helper()
 				must.Eq(t, 1, g.Len())
 				must.Eq(t, 1, g.Next().ID)
 			},
@@ -363,6 +375,7 @@ func TestVM_SetFunctions(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			vm := NewVM(&Config{WorkDir: t.TempDir()})
 			code := &Code{chunks: tc.chunks, constants: tc.constants}
 			vm.Reset(code)
@@ -387,6 +400,7 @@ func TestVM_SetFunctions(t *testing.T) {
 }
 
 func TestVM_MultiAssignDiff(t *testing.T) {
+	t.Parallel()
 
 	// source: `g3, g4, g5 = g1.diff(g2)`
 	constants := []any{
@@ -430,16 +444,12 @@ func TestVM_MultiAssignDiff(t *testing.T) {
 }
 
 func TestVM_ShowFunctions(t *testing.T) {
+	t.Parallel()
 
 	g1 := NewGoroutineDump()
 	g1.Add(mockMinGoroutine("goroutine 1 [select, 20 minutes]:"))
 	g1.Add(mockMinGoroutine("goroutine 2 [running]:"))
 	g1.Add(mockMinGoroutine("goroutine 3 [IO wait, 10 minutes]:"))
-
-	vm := NewVM(&Config{WorkDir: t.TempDir()})
-	recorder := new(bytes.Buffer)
-	vm.wOut = NewWriter(recorder)
-	vm.env = map[string]Value{"g1": {Tag: TagDump, Data: g1}}
 
 	testCases := []struct {
 		name      string
@@ -506,10 +516,18 @@ goroutine 3 [IO wait, 10 minutes]:
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			code := &Code{
 				chunks:    []*Chunk{tc.chunk},
 				constants: tc.constants,
 			}
+			g1 := g1.Copy()
+
+			vm := NewVM(&Config{WorkDir: t.TempDir()})
+			recorder := new(bytes.Buffer)
+			vm.wOut = NewWriter(recorder)
+			vm.env = map[string]Value{"g1": {Tag: TagDump, Data: g1}}
+
 			vm.Reset(code)
 			recorder.Reset()
 			err := vm.Run(t.Context())
@@ -520,6 +538,7 @@ goroutine 3 [IO wait, 10 minutes]:
 }
 
 func TestVM_CommandVars(t *testing.T) {
+	t.Parallel()
 	// source: `vars`
 	code := &Code{chunks: []*Chunk{{
 		ops: []Op{encode(OpCodeCommandVars, 0)},
@@ -568,6 +587,7 @@ g2: 2
 }
 
 func TestVM_CommandPragma(t *testing.T) {
+	t.Parallel()
 	testCases := []struct {
 		name      string
 		ops       []Op
@@ -583,6 +603,7 @@ func TestVM_CommandPragma(t *testing.T) {
 			},
 			constants: []any{"empty.confirm"},
 			expectFn: func(t *testing.T, p *Pragma) {
+				t.Helper()
 				must.False(t, p.EmptyConfirm)
 			},
 		},
@@ -595,6 +616,7 @@ func TestVM_CommandPragma(t *testing.T) {
 			},
 			constants: []any{100, "show.count"},
 			expectFn: func(t *testing.T, p *Pragma) {
+				t.Helper()
 				must.Eq(t, 100, p.ShowCount)
 			},
 		},
@@ -607,6 +629,7 @@ func TestVM_CommandPragma(t *testing.T) {
 			},
 			constants: []any{"summary", "vars.display"},
 			expectFn: func(t *testing.T, p *Pragma) {
+				t.Helper()
 				must.Eq(t, PragmaDisplaySummary, p.VarsDisplay)
 			},
 		},
@@ -614,6 +637,7 @@ func TestVM_CommandPragma(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			code := &Code{
 				constants: tc.constants,
 				chunks: []*Chunk{{
@@ -631,6 +655,7 @@ func TestVM_CommandPragma(t *testing.T) {
 }
 
 func TestVM_Graph(t *testing.T) {
+	t.Parallel()
 	gd := mockDumpForGraph()
 	predicate := NewGoroutineDump()
 	predicate.Add(gd.byID(6))

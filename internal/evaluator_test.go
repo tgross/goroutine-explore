@@ -16,9 +16,8 @@ import (
 // TestEvaluatorE2E is "end-to-end" tests of the evaluator, asserting expected
 // output given an environment
 func TestEvaluatorE2E(t *testing.T) {
-
+	t.Parallel()
 	tempDir := t.TempDir()
-	env := map[string]Value{}
 
 	g1 := NewGoroutineDump()
 	g1.Add(mockGoroutine(1, "chan receive, 5 minutes"))
@@ -27,9 +26,6 @@ func TestEvaluatorE2E(t *testing.T) {
 
 	g2 := NewGoroutineDump()
 	g2.Add(mockGoroutine(20, "runnable"))
-
-	env["g1"] = Value{Tag: TagDump, Data: g1}
-	env["g2"] = Value{Tag: TagDump, Data: g2}
 
 	testCases := []struct {
 		name         string
@@ -47,6 +43,7 @@ func TestEvaluatorE2E(t *testing.T) {
 			name: "simple where string comparison",
 			src:  `g1.where(.state == "select")`,
 			expect: func(t *testing.T, dump *GoroutineDump) {
+				t.Helper()
 				must.Eq(t, 1, dump.Len())
 				must.Eq(t, 3, dump.Next().ID)
 			},
@@ -56,6 +53,7 @@ func TestEvaluatorE2E(t *testing.T) {
 			src: `g1.where(
 				 .state == "select")`,
 			expect: func(t *testing.T, dump *GoroutineDump) {
+				t.Helper()
 				must.Eq(t, 1, dump.Len())
 				must.Eq(t, 3, dump.Next().ID)
 			},
@@ -64,6 +62,7 @@ func TestEvaluatorE2E(t *testing.T) {
 			name: "simple where numeric comparison",
 			src:  `g1.where(.duration > 0)`,
 			expect: func(t *testing.T, dump *GoroutineDump) {
+				t.Helper()
 				must.Eq(t, 2, dump.Len())
 				must.Eq(t, 1, dump.Next().ID)
 				must.Eq(t, 3, dump.Next().ID)
@@ -73,6 +72,7 @@ func TestEvaluatorE2E(t *testing.T) {
 			name: "simple where with binding",
 			src:  `g3 = g1.where(.state == "select")`,
 			expect: func(t *testing.T, dump *GoroutineDump) {
+				t.Helper()
 				must.Eq(t, 1, dump.Len())
 				must.Eq(t, 3, dump.Next().ID)
 			},
@@ -81,6 +81,7 @@ func TestEvaluatorE2E(t *testing.T) {
 			name: "compound where",
 			src:  `g1.where(.duration > 0 and .state == "select")`,
 			expect: func(t *testing.T, dump *GoroutineDump) {
+				t.Helper()
 				must.Eq(t, 1, dump.Len())
 				must.Eq(t, 3, dump.Next().ID)
 			},
@@ -91,6 +92,7 @@ func TestEvaluatorE2E(t *testing.T) {
 				g1.where(.duration > 0),
 				g1.delete(.state == "select"))`,
 			expectDiff: func(t *testing.T, diff *Diff) {
+				t.Helper()
 				must.Eq(t, 1, diff.Left.Len())
 				must.Eq(t, 3, diff.Left.Next().ID)
 				must.Eq(t, 2, diff.Common.Len())
@@ -106,6 +108,7 @@ func TestEvaluatorE2E(t *testing.T) {
 				g1.where(.duration > 0 and .lines > 0),
 				g2.where(.state == "runnable"))`,
 			expect: func(t *testing.T, dump *GoroutineDump) {
+				t.Helper()
 				must.Eq(t, 3, dump.Len())
 				must.Eq(t, 1, dump.Next().ID)
 				must.Eq(t, 3, dump.Next().ID)
@@ -118,6 +121,7 @@ func TestEvaluatorE2E(t *testing.T) {
 				g1.where(.duration > 0 and .lines > 0),
 				g1.where(.state == "chan receive"))`,
 			expect: func(t *testing.T, dump *GoroutineDump) {
+				t.Helper()
 				must.Eq(t, 1, dump.Len())
 				must.Eq(t, 1, dump.Next().ID)
 			},
@@ -126,6 +130,14 @@ func TestEvaluatorE2E(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			g1 := g1.Copy()
+			g2 := g2.Copy()
+
+			env := map[string]Value{}
+			env["g1"] = Value{Tag: TagDump, Data: g1}
+			env["g2"] = Value{Tag: TagDump, Data: g2}
+
 			errRecorder := new(bytes.Buffer)
 
 			e := NewEvaluator(&Config{
@@ -156,6 +168,7 @@ func TestEvaluatorE2E(t *testing.T) {
 }
 
 func TestEvaluator_PipelineEquivalence(t *testing.T) {
+	t.Parallel()
 	src0 := `g2 = g1.where(.state == "select" and .duration > 1)`
 	src1 := `g2 = g1.where(.state == "select").where(.duration > 1)`
 	src2 := `g2 = g1 | where(.state == "select") | where(.duration > 1)`

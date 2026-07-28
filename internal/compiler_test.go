@@ -13,6 +13,7 @@ import (
 )
 
 func TestCompiler_SimplePipeline(t *testing.T) {
+	t.Parallel()
 	src := `g2 = g.where(.state == "select") | where(.duration > 10)`
 
 	body := strings.NewReader(src)
@@ -65,7 +66,7 @@ func TestCompiler_SimplePipeline(t *testing.T) {
 }
 
 func TestCompiler_MultiPipeline(t *testing.T) {
-
+	t.Parallel()
 	src := `g3 = g1.where(.state == "select") |
                     where(.duration > 10 and .trace contains "keepAlive") |
                     delete(.trace contains "gRPC")`
@@ -138,6 +139,7 @@ func TestCompiler_MultiPipeline(t *testing.T) {
 }
 
 func TestCompiler_SimpleWhere(t *testing.T) {
+	t.Parallel()
 	src := `g1 = g.where(.duration > 10)`
 	body := strings.NewReader(src)
 
@@ -173,6 +175,7 @@ func TestCompiler_SimpleWhere(t *testing.T) {
 }
 
 func TestCompiler_JumpPatch(t *testing.T) {
+	t.Parallel()
 	compiler := NewCompiler()
 	compiler.chunk = NewChunk()
 	addr := compiler.emitBytes(OpCodeJumpIfTrue, 0)
@@ -189,6 +192,7 @@ func TestCompiler_JumpPatch(t *testing.T) {
 }
 
 func TestCompiler_CompoundWhere(t *testing.T) {
+	t.Parallel()
 	src := `g.where(.duration > 10 and .state == "select")`
 	body := strings.NewReader(src)
 
@@ -231,6 +235,7 @@ func TestCompiler_CompoundWhere(t *testing.T) {
 }
 
 func TestCompiler_ParentheticalWhere(t *testing.T) {
+	t.Parallel()
 	src := `g.where((.duration > 10 and .state == "select")
                     or .state == "running")`
 	body := strings.NewReader(src)
@@ -282,6 +287,7 @@ func TestCompiler_ParentheticalWhere(t *testing.T) {
 }
 
 func TestCompiler_NestedExpressions(t *testing.T) {
+	t.Parallel()
 	src := `g1.union(g2.where(.duration > 10)) | show()`
 	body := strings.NewReader(src)
 
@@ -323,6 +329,7 @@ func TestCompiler_NestedExpressions(t *testing.T) {
 }
 
 func TestCompiler_ChainedWhere(t *testing.T) {
+	t.Parallel()
 	src := `g.where(.duration > 10).where(.state == "select")`
 	body := strings.NewReader(src)
 
@@ -371,6 +378,7 @@ func TestCompiler_ChainedWhere(t *testing.T) {
 }
 
 func TestCompiler_InGraph(t *testing.T) {
+	t.Parallel()
 	src := `g1 = g.graph(.duration > 10)`
 	body := strings.NewReader(src)
 
@@ -411,6 +419,7 @@ func TestCompiler_InGraph(t *testing.T) {
 }
 
 func TestCompiler_Paths(t *testing.T) {
+	t.Parallel()
 	testCases := []struct {
 		name       string
 		src        string
@@ -453,6 +462,7 @@ func TestCompiler_Paths(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			body := strings.NewReader(tc.src)
 			tokenizer := NewTokenizer()
 			tokenizer.Reset(t.Context(), body)
@@ -475,7 +485,7 @@ func TestCompiler_Paths(t *testing.T) {
 }
 
 func TestCompiler_DiffMultiAssign(t *testing.T) {
-
+	t.Parallel()
 	src := `g3, g4, g5 = g1.diff(g2)`
 	body := strings.NewReader(src)
 
@@ -500,7 +510,7 @@ func TestCompiler_DiffMultiAssign(t *testing.T) {
 }
 
 func TestCompiler_NoAssign(t *testing.T) {
-
+	t.Parallel()
 	src := `g1, g2`
 	body := strings.NewReader(src)
 
@@ -521,6 +531,7 @@ func TestCompiler_NoAssign(t *testing.T) {
 }
 
 func TestCompiler_Show(t *testing.T) {
+	t.Parallel()
 	testCases := []struct {
 		name         string
 		src          string
@@ -555,6 +566,7 @@ func TestCompiler_Show(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			body := strings.NewReader(tc.src)
 			tokenizer := NewTokenizer()
 			tokenizer.Reset(t.Context(), body)
@@ -579,6 +591,7 @@ func TestCompiler_Show(t *testing.T) {
 }
 
 func TestCompiler_Pragma(t *testing.T) {
+	t.Parallel()
 	testCases := []struct {
 		name          string
 		src           string
@@ -622,6 +635,7 @@ func TestCompiler_Pragma(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			body := strings.NewReader(tc.src)
 			tokenizer := NewTokenizer()
 			tokenizer.Reset(t.Context(), body)
@@ -648,6 +662,7 @@ func TestCompiler_Pragma(t *testing.T) {
 }
 
 func TestCompiler_Errors(t *testing.T) {
+	t.Parallel()
 
 	tokenizer := NewTokenizer()
 	compiler := NewCompiler()
@@ -695,6 +710,7 @@ func TestCompiler_Errors(t *testing.T) {
 }
 
 func TestCompiler_PatchOut(t *testing.T) {
+	t.Parallel()
 
 	start := uint(3)
 	by := uint(4)

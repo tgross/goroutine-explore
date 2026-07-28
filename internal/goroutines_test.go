@@ -12,6 +12,7 @@ import (
 )
 
 func TestGoroutineDump_ShowOffset(t *testing.T) {
+	t.Parallel()
 	dump := NewGoroutineDump()
 
 	stack1 := mockStack(4)
@@ -42,9 +43,6 @@ func TestGoroutineDump_ShowOffset(t *testing.T) {
 		}
 		return got
 	}
-
-	recorder := new(bytes.Buffer)
-	w := NewWriter(recorder)
 
 	testCases := []struct {
 		name   string
@@ -100,7 +98,10 @@ func TestGoroutineDump_ShowOffset(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			recorder.Reset()
+			t.Parallel()
+			dump := dump.Copy()
+			recorder := new(bytes.Buffer)
+			w := NewWriter(recorder)
 			dump.Show(w, tc.pragma, tc.limit, tc.offset)
 			must.Eq(t, tc.expect, getIDs(t, recorder))
 		})
@@ -108,7 +109,7 @@ func TestGoroutineDump_ShowOffset(t *testing.T) {
 }
 
 func TestGoroutine_Indexing(t *testing.T) {
-
+	t.Parallel()
 	gd := NewGoroutineDump()
 	gd.Add(mockGoroutine(20, "IO wait"))
 

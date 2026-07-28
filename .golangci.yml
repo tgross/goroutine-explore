@@ -3,6 +3,10 @@ linters:
   enable:
     - errorlint
     - gocritic
+    - modernize
+    - paralleltest
+    - thelper
+    - unconvert
   settings:
     errcheck:
       check-type-assertions: true
