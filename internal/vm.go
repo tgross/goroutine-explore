@@ -107,7 +107,8 @@ func (vm *VM) Run(ctx context.Context) error {
 			if vm.pragma.DebugDisassemble != PragmaDebugDisassembleNone {
 				vm.debug()
 			}
-			return err
+			pos := vm.frame.chunk.locForInstruction(vm.frame.ip)
+			return ErrorWithPosition{pos, err}
 		}
 
 	}

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"text/scanner"
 )
 
 type Code struct {
@@ -63,13 +64,22 @@ func (co *Code) disassemble(index, ip int) string {
 }
 
 type Chunk struct {
-	ops []Op
+	ops  []Op
+	locs []scanner.Position
 }
 
 func NewChunk() *Chunk {
 	return &Chunk{
-		ops: []Op{},
+		ops:  []Op{},
+		locs: []scanner.Position{},
 	}
+}
+
+func (c *Chunk) locForInstruction(ip int) scanner.Position {
+	if ip >= len(c.locs) {
+		return scanner.Position{}
+	}
+	return c.locs[ip]
 }
 
 var opCodeMask = Op(0xffff000000000000)

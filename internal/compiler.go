@@ -11,24 +11,6 @@ import (
 	"strings"
 )
 
-type CompilerError struct {
-	tok   Token
-	inner error
-}
-
-func compileErr(tok Token, msg string, args ...any) CompilerError {
-	inner := fmt.Errorf(msg, args...)
-	return CompilerError{tok, inner}
-}
-
-func (e CompilerError) Unwrap() error {
-	return e.inner
-}
-
-func (e CompilerError) Error() string {
-	return e.inner.Error()
-}
-
 var ErrTooManyArgs = errors.New("too many arguments")
 var ErrMissingArgs = errors.New("expected more arguments")
 var ErrExpectedPath = errors.New("expected a path argument")
@@ -771,11 +753,13 @@ func (p *Compiler) expect(want TokenType) error {
 
 func (p *Compiler) emitByte(op OpCode) int {
 	p.chunk.ops = append(p.chunk.ops, encode(op, 0))
+	p.chunk.locs = append(p.chunk.locs, p.tokenizer.lastPos)
 	return len(p.chunk.ops) - 1
 }
 
 func (p *Compiler) emitBytes(op OpCode, val uint) int {
 	p.chunk.ops = append(p.chunk.ops, encode(op, val))
+	p.chunk.locs = append(p.chunk.locs, p.tokenizer.lastPos)
 	return len(p.chunk.ops) - 1
 }
 
@@ -912,4 +896,9 @@ func (p *Compiler) patchOut(chunk *Chunk, first, by uint) error {
 	}
 	chunk.ops = ops
 	return nil
+}
+
+func compileErr(tok Token, msg string, args ...any) ErrorWithPosition {
+	inner := fmt.Errorf(msg, args...)
+	return ErrorWithPosition{tok.Pos, inner}
 }

@@ -77,6 +77,7 @@ const (
 type Tokenizer struct {
 	scanner scanner.Scanner
 	peeked  Token
+	lastPos scanner.Position
 	ctx     context.Context
 }
 
@@ -139,7 +140,9 @@ func (s *Tokenizer) Next() (Token, error) {
 		return peeked, nil
 	}
 
-	return s.next()
+	next, err := s.next()
+	s.lastPos = next.Pos
+	return next, err
 }
 
 // next pulls the next token but without handling previous Peek calls

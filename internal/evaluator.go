@@ -11,6 +11,7 @@ import (
 	"maps"
 	"slices"
 	"strings"
+	"text/scanner"
 )
 
 type Config struct {
@@ -66,40 +67,21 @@ func (e *Evaluator) Completions() []string {
 }
 
 func (e *Evaluator) Eval(ctx context.Context, src string) error {
+	var errPos ErrorWithPosition
+
 	body := strings.NewReader(src)
 	e.tokenizer.Reset(ctx, body)
 	code, err := e.compiler.Compile(e.tokenizer)
 	if err != nil {
-		if errors.Is(err, context.Canceled) {
-			return nil
-		}
-		if cerr, ok := errors.AsType[CompilerError](err); ok {
+		switch {
+		case errors.Is(err, context.Canceled):
+			err = nil
+		case errors.As(err, &errPos):
+			errPos.Print(e.stderr, src)
+		default:
+			// unexpected / non-compiler errors won't have a position
 			fmt.Fprintln(e.stderr.red(), err.Error())
-
-			errLine := cerr.tok.Pos.Line
-			errCol := max(1, cerr.tok.Pos.Column-1)
-
-			lines := strings.Split(src, "\n")
-			for i, line := range lines {
-				fmt.Fprintln(e.stderr.yellow(), ""+line)
-				if i == errLine-1 {
-					fmt.Fprintf(e.stderr.red(),
-						"%s▲\n",
-						strings.Repeat(" ", errCol),
-					)
-					fmt.Fprintf(e.stderr.red(),
-						"%s╰%s\n",
-						strings.Repeat(" ", errCol),
-						strings.Repeat("─", max(0, len(line)-errCol-1)),
-					)
-
-				}
-			}
-			return err
 		}
-
-		// if it's not a compiler error we don't have a token position to print
-		fmt.Fprintln(e.stderr.red(), err.Error())
 		return err
 	}
 
@@ -114,8 +96,10 @@ func (e *Evaluator) Eval(ctx context.Context, src string) error {
 		case errors.Is(err, ErrCommandOk),
 			errors.Is(err, context.Canceled):
 			err = nil
+		case errors.As(err, &errPos):
+			errPos.Print(e.stderr, src)
 		default:
-			// TODO: we want this to include rich diagnostic feedback
+			// unexpected errors won't have a position
 			fmt.Fprintln(e.stderr.red(), err.Error()+"\n")
 		}
 		e.vm.env = oldEnv
@@ -123,4 +107,40 @@ func (e *Evaluator) Eval(ctx context.Context, src string) error {
 	}
 
 	return nil
+}
+
+type ErrorWithPosition struct {
+	pos   scanner.Position
+	inner error
+}
+
+func (e ErrorWithPosition) Unwrap() error {
+	return e.inner
+}
+
+func (e ErrorWithPosition) Error() string {
+	return e.inner.Error()
+}
+
+func (e ErrorWithPosition) Print(w *Writer, src string) {
+	fmt.Fprintln(w.red(), e.inner.Error())
+
+	errLine := e.pos.Line
+	errCol := max(1, e.pos.Column-1)
+
+	lines := strings.Split(src, "\n")
+	for i, line := range lines {
+		fmt.Fprintln(w.yellow(), ""+line)
+		if i == errLine-1 {
+			fmt.Fprintf(w.red(),
+				"%s▲\n",
+				strings.Repeat(" ", errCol),
+			)
+			fmt.Fprintf(w.red(),
+				"%s╰%s\n",
+				strings.Repeat(" ", errCol),
+				strings.Repeat("─", max(0, len(line)-errCol-1)),
+			)
+		}
+	}
 }

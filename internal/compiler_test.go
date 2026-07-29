@@ -178,6 +178,7 @@ func TestCompiler_JumpPatch(t *testing.T) {
 	t.Parallel()
 	compiler := NewCompiler()
 	compiler.chunk = NewChunk()
+	compiler.tokenizer = NewTokenizer()
 	addr := compiler.emitBytes(OpCodeJumpIfTrue, 0)
 	compiler.emitByte(OpCodeNoop)
 	compiler.emitByte(OpCodeNoop)
@@ -711,29 +712,28 @@ func TestCompiler_Errors(t *testing.T) {
 	compiler := NewCompiler()
 
 	testCases := []struct {
-		src          string
-		expectLexeme string
-		expectPos    int
-		expectErr    string
+		src       string
+		expectPos int
+		expectErr string
 	}{
 		{
-			`!`, `!`, 1,
+			`!`, 1, // pos at !
 			`expected expression to start with an identifier or open paren`,
 		},
 		{
-			`g = load(1)`, `1`, 10,
+			`g = load(1)`, 10, // pos at 1
 			`expected string got number`,
 		},
 		{
-			`g = load`, ``, 9,
+			`g = load`, 9, // no pos
 			`expected left paren, got error EOF`,
 		},
 		{
-			`g.where(.)`, `.`, 9,
+			`g.where(.)`, 9, // pos at .
 			`invalid identifier`,
 		},
 		{
-			"pragma.show.dedup = `foo`", `foo`, 21,
+			"pragma.show.dedup = `foo`", 21, // pos foo
 			`invalid pragma value: expected one of "ids", "number", or "none"`,
 		},
 	}
@@ -744,11 +744,10 @@ func TestCompiler_Errors(t *testing.T) {
 		_, err := compiler.Compile(tokenizer)
 		must.NotNil(t, err)
 
-		var cerr CompilerError
+		var cerr ErrorWithPosition
 		must.True(t, errors.As(err, &cerr))
 		must.EqError(t, cerr, tc.expectErr)
-		must.Eq(t, tc.expectLexeme, cerr.tok.Lexeme)
-		must.Eq(t, tc.expectPos, cerr.tok.Pos.Column)
+		must.Eq(t, tc.expectPos, cerr.pos.Column)
 	}
 }
 
