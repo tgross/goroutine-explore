@@ -15,6 +15,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"text/scanner"
 )
 
 type Diff struct {
@@ -214,12 +215,13 @@ func (gd GoroutineDump) Save(fn string) error {
 }
 
 type Goroutine struct {
-	ID        int    `json:"id"`
-	Duration  int    `json:"duration"` // In minutes, from meta in header
-	State     string `json:"state"`    // From meta in header
-	CreatedBy int    `json:"createdBy"`
-	Trace     string `json:"trace"`
-	LineCount int    `json:"lines"`
+	ID        int               `json:"id"`
+	Duration  int               `json:"duration"` // In minutes, from meta in header
+	State     string            `json:"state"`    // From meta in header
+	CreatedBy int               `json:"createdBy"`
+	Trace     string            `json:"trace"`
+	LineCount int               `json:"lines"`
+	Labels    map[string]string `json:"labels,omitempty"`
 
 	header     string
 	duplicates []int // duplicate IDs
@@ -230,33 +232,39 @@ type Goroutine struct {
 	hasher   hash.Hash64
 }
 
-var durationPattern = regexp.MustCompile(`^\d+ minutes$`)
 var createdByPattern = regexp.MustCompile(`^created by .* in goroutine (\d+)`)
 
-// NewGoroutine creates and returns a new Goroutine.
+// NewGoroutine creates and returns a new Goroutine from a header
 func NewGoroutine(header string) (*Goroutine, error) {
-	idx := strings.Index(header, "[")
-	parts := strings.Split(header[idx+1:len(header)-2], ",")
-	state := strings.TrimSpace(parts[0])
+	matches := headerPatt.FindStringSubmatch(header)
+	return NewGoroutineFromMatch(matches)
+}
 
-	duration := 0
-	if len(parts) > 1 {
-		value := strings.TrimSpace(parts[1])
-		if durationPattern.MatchString(value) {
-			if d, err := strconv.Atoi(value[:len(value)-8]); err == nil {
-				duration = d
-			}
-		}
+// NewGoroutineFromMatch creates a goroutine from the set of matches returned by
+// the headerPatt regexp
+func NewGoroutineFromMatch(parts []string) (*Goroutine, error) {
+	if len(parts) != 5 {
+		return nil, fmt.Errorf("not enough fields: %v", parts)
 	}
 
-	// TODO: this throws out the "gp=", "m=", and "mp=" fields we see on a
-	// SIGQUIT. We should have searchable fields for these as well.
-	idxParts := strings.Split(strings.TrimSpace(header[9:idx]), " ")
-	idstr := strings.TrimSpace(idxParts[0])
-	id, err := strconv.Atoi(idstr)
+	header := parts[0]
+	idStr := parts[1]
+	state := parts[2]
+	durationStr := parts[3]
+	labelsStr := parts[4]
+
+	id, err := strconv.Atoi(idStr)
 	if err != nil {
 		return nil, err
 	}
+	var duration int
+	if durationStr != "" {
+		duration, err = strconv.Atoi(durationStr)
+		if err != nil {
+			return nil, err
+		}
+	}
+	labels := parseLabels(labelsStr)
 
 	return &Goroutine{
 		ID:         id,
@@ -267,7 +275,53 @@ func NewGoroutine(header string) (*Goroutine, error) {
 		State:      state,
 		hasher:     fnv.New64(),
 		duplicates: []int{},
+		Labels:     labels,
 	}, nil
+}
+
+func parseLabels(labelStr string) map[string]string {
+	if len(labelStr) == 0 {
+		return nil
+	}
+	labels := map[string]string{}
+
+	var s scanner.Scanner
+	s.Mode = scanner.ScanIdents | scanner.ScanChars |
+		scanner.ScanInts | scanner.ScanStrings | scanner.SkipComments
+
+	s.Init(strings.NewReader(labelStr))
+
+	var k, v string
+	openKey := true
+	for {
+		tok := s.Scan()
+		switch tok {
+		case scanner.Ident:
+			txt := s.TokenText()
+			if openKey {
+				k = txt
+			} else {
+				v = txt
+			}
+			openKey = !openKey
+		case scanner.String:
+			txt := s.TokenText()
+			if openKey {
+				k = strings.Trim(txt, `"`)
+			} else {
+				v = strings.Trim(txt, `"`)
+			}
+			openKey = !openKey
+		case ',':
+			openKey = true
+			labels[k] = v
+		case scanner.EOF:
+			labels[k] = v
+			goto DONE
+		}
+	}
+DONE:
+	return labels
 }
 
 func (g *Goroutine) Debug() string {

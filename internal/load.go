@@ -17,14 +17,30 @@ import (
 )
 
 var (
-	startLinePattern = regexp.MustCompile(`^goroutine\s+(\d+)\s+.*\[(.*)\]:$`)
+	headerStartPatt  = `goroutine\s+(\d+)`
+	headerGPPatt     = `(?:\sgp=0x[a-f0-9]+)*`
+	headerMPatt      = `(?:\sm=\d+)*`
+	headerMPPatt     = `(?:\smp=0x[a-f0-9]+)*`
+	headerStatusPatt = `\s\[(.*?)(?:, (\d+) minutes*)*\]`
+	headerLabelPatt  = `(?:\s*\{(.*)\})*`
+
+	headerPatt = regexp.MustCompile(
+		`^` +
+			headerStartPatt +
+			headerGPPatt +
+			headerMPatt +
+			headerMPPatt +
+			headerStatusPatt +
+			headerLabelPatt +
+			`:$`,
+	)
 )
 
 func load(path string) (*GoroutineDump, error) {
 	// special case for when -e is used without a tty for stdin
 	if path == "STDIN" {
 		reader := bufio.NewReader(os.Stdin)
-		return loadFrom(reader, startLinePattern)
+		return loadFrom(reader, headerPatt)
 	}
 
 	path = expandPath(path)
@@ -34,7 +50,7 @@ func load(path string) (*GoroutineDump, error) {
 		return nil, err
 	}
 	defer f.Close()
-	return loadFrom(f, startLinePattern)
+	return loadFrom(f, headerPatt)
 }
 
 // expandPath handles homedir and environment variable expansion on a path
@@ -66,15 +82,15 @@ func loadFrom(r io.Reader, startPattern *regexp.Regexp) (*GoroutineDump, error) 
 			return r
 		}, line)
 
+		matches := startPattern.FindStringSubmatch(line)
 		switch {
-		case startPattern.MatchString(line):
+		case len(matches) > 0:
 			// Freeze any previous goroutine to tolerate dumps without line
 			// breaks
 			if goroutine != nil {
 				goroutine.Freeze()
 			}
-
-			goroutine, err = NewGoroutine(line)
+			goroutine, err = NewGoroutineFromMatch(matches)
 			if err != nil {
 				return nil, err
 			}

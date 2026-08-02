@@ -8,6 +8,7 @@ import (
 	"regexp"
 	"testing"
 
+	"github.com/shoenig/test"
 	"github.com/shoenig/test/must"
 )
 
@@ -29,8 +30,17 @@ func TestGoroutineDump_ShowOffset(t *testing.T) {
 		dump.Add(mockGoroutine(i, "IO wait", stack3))
 	}
 
-	// use an un-anchored pattern so we can tolerate duplicates list
-	patt := regexp.MustCompile(`^goroutine\s+(\d+)\s+.*\[(.*)\]:`)
+	// use a pattern un-anchored at the tail so we can tolerate duplicates list
+	patt := regexp.MustCompile(
+		`^` +
+			headerStartPatt +
+			headerGPPatt +
+			headerMPatt +
+			headerMPPatt +
+			headerStatusPatt +
+			headerLabelPatt +
+			`:`,
+	)
 
 	// round-trip everything we Show() back thru load()
 	getIDs := func(t *testing.T, buf *bytes.Buffer) []int {
@@ -134,4 +144,90 @@ func TestGoroutine_Indexing(t *testing.T) {
 
 	must.Eq(t, 20, gd.index[2].ID)
 	must.Eq(t, []int{}, gd.duplicates[gd.index[2].hash])
+}
+
+func TestGoroutine_ParseLabels(t *testing.T) {
+	t.Parallel()
+	test.Eq(t, map[string]string{"foo": "bar"},
+		parseLabels(`foo: bar`))
+
+	test.Eq(t, map[string]string{"foo": "bar", "baz": "qux"},
+		parseLabels(`"foo": "bar", "baz": "qux"`))
+
+	test.Eq(t, map[string]string{"foo": "bar baz", "baz": "qux"},
+		parseLabels(` foo : "bar baz", "baz": "qux"`))
+
+	test.Eq(t, map[string]string{"foo baz": "bar", "baz": "qux"},
+		parseLabels(` "foo baz" : bar, "baz": "qux"`))
+
+	test.Eq(t, map[string]string{"foo:baz": "bar", "baz": "qux"},
+		parseLabels(` "foo:baz" : bar , "baz": "qux"`))
+}
+
+func TestGoroutine_LoadFromHeader(t *testing.T) {
+	t.Parallel()
+	testCases := []struct {
+		name   string
+		header string
+		expect *Goroutine
+	}{
+		{
+			name:   "all fields",
+			header: `goroutine 10 gp=0x3dd90b57a5a0 m=3 mp=0x3dd90b4e9008 [wait, 10 minutes] {"foo": bar}:`,
+			expect: &Goroutine{ID: 10, State: "wait", Duration: 10,
+				Labels: map[string]string{"foo": "bar"}},
+		},
+		{
+			name:   "quoted labels with spaces",
+			header: `goroutine 11 [wait, 10 minutes] {"foo bar": baz}:`,
+			expect: &Goroutine{ID: 11, State: "wait", Duration: 10,
+				Labels: map[string]string{"foo bar": "baz"}},
+		},
+		{
+			name:   "unquoted labels and no duration",
+			header: `goroutine 12 [running] {foobar: baz}:`,
+			expect: &Goroutine{ID: 12, State: "running",
+				Labels: map[string]string{"foobar": "baz"}},
+		},
+		{
+			name:   "state with spaces and duration",
+			header: `goroutine 13 [IO wait, 1 minute]:`,
+			expect: &Goroutine{ID: 13, State: "IO wait", Duration: 1},
+		},
+		{
+			name:   "state with parens",
+			header: `goroutine 14 [force gc (idle)]:`,
+			expect: &Goroutine{ID: 14, State: "force gc (idle)"},
+		},
+		{
+			name:   "state with comma",
+			header: `goroutine 15 [select, locked to thread]:`,
+			expect: &Goroutine{ID: 15, State: "select, locked to thread"},
+		},
+		{
+			name:   "state with comma and duration",
+			header: `goroutine 16 [select, locked to thread, 4 minutes]:`,
+			expect: &Goroutine{ID: 16, State: "select, locked to thread", Duration: 4},
+		},
+		{
+			name:   "state with duration",
+			header: `goroutine 17 [select, 1 minute]:`,
+			expect: &Goroutine{ID: 17, State: "select", Duration: 1},
+		},
+		{
+			name:   "state only",
+			header: `goroutine 18 [select]:`,
+			expect: &Goroutine{ID: 18, State: "select"},
+		},
+	}
+
+	for _, tc := range testCases {
+		g, err := NewGoroutine(tc.header)
+		must.NoError(t, err)
+		must.NotNil(t, g)
+		must.Eq(t, tc.expect.ID, g.ID, must.Sprint(tc.name))
+		must.Eq(t, tc.expect.State, g.State, must.Sprint(tc.name))
+		must.Eq(t, tc.expect.Duration, g.Duration, must.Sprint(tc.name))
+		must.Eq(t, tc.expect.Labels, g.Labels, must.Sprint(tc.name))
+	}
 }
