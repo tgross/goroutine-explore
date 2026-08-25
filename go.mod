@@ -1,6 +1,6 @@
 module github.com/tgross/goroutine-explore
 
-go 1.25
+go 1.27
 
 require (
 	github.com/mattn/go-isatty v0.0.20

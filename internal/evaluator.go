@@ -73,8 +73,7 @@ func (e *Evaluator) Eval(ctx context.Context, src string) error {
 		if errors.Is(err, context.Canceled) {
 			return nil
 		}
-		var cerr CompilerError
-		if errors.As(err, &cerr) {
+		if cerr, ok := errors.AsType[CompilerError](err); ok {
 			fmt.Fprintln(e.stderr.red(), err.Error())
 
 			errLine := cerr.tok.Pos.Line

@@ -244,8 +244,8 @@ func (vm *VM) debug() {
 	}
 
 	fmt.Printf("stack\n")
-	for i := len(vm.stack) - 1; i >= 0; i-- {
-		fmt.Printf("  [%02d] %v\n", i, vm.stack[i])
+	for i, line := range slices.Backward(vm.stack) {
+		fmt.Printf("  [%02d] %v\n", i, line)
 	}
 
 	fmt.Printf("registers\n")
