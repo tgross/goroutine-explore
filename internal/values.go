@@ -18,6 +18,7 @@ const (
 	TagGoroutine         // goroutine
 	TagAddress           // address
 	TagDiff              // diff
+	TagMap               // map
 )
 
 type Value struct {

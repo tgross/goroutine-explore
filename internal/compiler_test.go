@@ -377,6 +377,49 @@ func TestCompiler_ChainedWhere(t *testing.T) {
 	)
 }
 
+func TestCompiler_Labels(t *testing.T) {
+	t.Parallel()
+	src := `g1 = g.where("foo" in labels and label.worker_id == "bar")`
+	body := strings.NewReader(src)
+
+	tokenizer := NewTokenizer()
+	tokenizer.Reset(t.Context(), body)
+	compiler := NewCompiler()
+	code, err := compiler.Compile(tokenizer)
+	must.NoError(t, err, must.Sprint(code.disassemble(0, 0)))
+
+	fmt.Println(code.disassemble(0, 0))
+	must.Eq(t, []any{"g1", "g", "foo", ".labels", ".label.worker_id", "bar"},
+		code.constants)
+	must.Eq(t, []Op{
+		encode(OpCodeLoadGoroutineDump, 1), // 00 load g
+		encode(OpCodeTempDump, 0),          // 01 setup scratch register
+		encode(OpCodeNextGoroutine, 7),     // 02 addr when done
+		encode(OpCodeCall, 1),              // 03 call 1
+		encode(OpCodeJumpIfFalse, 2),       // 04 addr if false
+		encode(OpCodeAddGoroutine, 0),      // 05 keep
+		encode(OpCodeJumpTo, 2),            // 06 unconditional jump to addr
+		encode(OpCodePushDump, 0),          // 07 push temp dump to stack
+		encode(OpCodeAssignment, 0),        // 08 assign to g1
+	},
+		code.chunks[0].ops,
+	)
+	must.Eq(t, []Op{
+		encode(OpCodeLoadString, 2),        // 00 load "foo"
+		encode(OpCodeLoadFieldAccessor, 3), // 01 load .labels
+		encode(OpCodeIn, 0),                // 02 compare in, push bool to stack
+		encode(OpCodeJumpIfTrue, 6),        // 03 skip to next clause if true
+		encode(OpCodePushBool, 0),          // 04 push false
+		encode(OpCodeJumpTo, 9),            // 05 unconditional jump to return
+		encode(OpCodeLoadFieldAccessor, 4), // 06 load .label.worker_id
+		encode(OpCodeLoadString, 5),        // 07 load "bar"
+		encode(OpCodeEqual, 0),             // 08 compare push bool to stack
+		encode(OpCodeReturn, 0),            // 09 return
+	},
+		code.chunks[1].ops,
+	)
+}
+
 func TestCompiler_InGraph(t *testing.T) {
 	t.Parallel()
 	src := `g1 = g.graph(.duration > 10)`

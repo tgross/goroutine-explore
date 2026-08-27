@@ -15,7 +15,7 @@ import (
 func TestTokenizer_SmokeTest(t *testing.T) {
 	t.Parallel()
 
-	src := `g.where(.duration > 10 and .state == "select")
+	src := `g.where(.duration > 10 and .state == "select" or .label.worker_id == "1")
               | union(g1) | as(g2) | show()`
 
 	body := strings.NewReader(src)
@@ -35,6 +35,11 @@ func TestTokenizer_SmokeTest(t *testing.T) {
 		TokenFieldAccessor, // .state
 		TokenEqual,         // ==
 		TokenString,        // "select"
+		TokenKeywordOr,     // or
+		TokenFieldAccessor, // .label
+		TokenFieldAccessor, // .worker_id
+		TokenEqual,         // =-
+		TokenString,        // "1"
 		TokenRightParen,    // )
 		TokenPipe,          // |
 		TokenFunction,      // union

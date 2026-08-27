@@ -86,11 +86,12 @@ func NewTokenizer() *Tokenizer {
 	s.Mode = scanner.ScanIdents | scanner.ScanChars |
 		scanner.ScanInts | scanner.ScanStrings | scanner.SkipComments
 
-	// identifiers can start with . or $
+	// identifiers can start with . or $ and can have internal _
 	s.IsIdentRune = func(ch rune, i int) bool {
 		return (ch == '$' || ch == '.') && i == 0 ||
 			unicode.IsLetter(ch) ||
-			unicode.IsDigit(ch) && i > 0
+			unicode.IsDigit(ch) && i > 0 ||
+			ch == '_' && i != 0
 	}
 
 	return &Tokenizer{
@@ -194,22 +195,16 @@ func (s *Tokenizer) next() (Token, error) {
 			token.Type = TokenCommand
 		case "pragma":
 			token.Type = TokenPragma
-		case "id", ".id", "header", ".header",
-			"trace", ".trace", "lines", ".lines",
-			"duration", ".duration", "state", ".state",
-			"createdby", ".createdby", "createdBy", ".createdBy":
-			token.Type = TokenFieldAccessor
-
-		case ".confirm", ".empty", ".exit",
-			".limits", ".steps", ".stack",
-			".ls", ".format",
-			".color", ".count", ".dedup",
-			".vars", ".display", ".debug", ".disassemble":
+		case "id", "header",
+			"trace", "lines",
+			"duration", "state",
+			"createdby", "createdBy",
+			"labels", "label":
+			token.Lexeme = "." + token.Lexeme
 			token.Type = TokenFieldAccessor
 		}
-		if token.Type != TokenFieldAccessor &&
-			strings.HasPrefix(token.Lexeme, ".") {
-			return token, fmt.Errorf("no such field")
+		if strings.HasPrefix(token.Lexeme, ".") {
+			token.Type = TokenFieldAccessor
 		}
 
 	case scanner.Int:

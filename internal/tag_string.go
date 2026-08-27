@@ -19,11 +19,12 @@ func _() {
 	_ = x[TagGoroutine-8]
 	_ = x[TagAddress-9]
 	_ = x[TagDiff-10]
+	_ = x[TagMap-11]
 }
 
-const _Tag_name = "TagNoneboolnumberstringidentifierfield accessorcommanddumpgoroutineaddressdiff"
+const _Tag_name = "TagNoneboolnumberstringidentifierfield accessorcommanddumpgoroutineaddressdiffmap"
 
-var _Tag_index = [...]uint8{0, 7, 11, 17, 23, 33, 47, 54, 58, 67, 74, 78}
+var _Tag_index = [...]uint8{0, 7, 11, 17, 23, 33, 47, 54, 58, 67, 74, 78, 81}
 
 func (i Tag) String() string {
 	idx := int(i) - 0

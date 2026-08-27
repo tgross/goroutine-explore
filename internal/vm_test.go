@@ -125,7 +125,7 @@ func TestVM_SimpleWhere(t *testing.T) {
 				}},
 				{ops: []Op{
 					encode(OpCodeLoadFieldAccessor, 2), // load .trace
-					encode(OpCodeLoadString, 3),        // load "running"
+					encode(OpCodeLoadString, 3),        // load "sdnotifying"
 					encode(OpCodeContains, 0),          // compare
 					encode(OpCodeReturn, 0),            // return
 				}},
@@ -145,6 +145,79 @@ func TestVM_SimpleWhere(t *testing.T) {
 				must.Eq(t, 2, g2.Next().ID)
 			},
 		},
+
+		{ // source: `g2 = g1.where("worker_id" in .labels)
+			name:      "contains label",
+			constants: []any{"g2", "g1", "worker_id", ".labels"},
+			chunks: []*Chunk{
+				{ops: []Op{
+					encode(OpCodeLoadGoroutineDump, 1), // load g1
+					encode(OpCodeTempDump, 0),          // start
+					encode(OpCodeNextGoroutine, 7),     // addr when done
+					encode(OpCodeCall, 1),              // call 1
+					encode(OpCodeJumpIfFalse, 2),       // addr if false
+					encode(OpCodeAddGoroutine, 0),      // keep
+					encode(OpCodeJumpTo, 2),            // unconditional jump to addr
+					encode(OpCodePushDump, 0),          // push temp dump to stack
+					encode(OpCodeAssignment, 0),        // assign g2
+				}},
+				{ops: []Op{
+					encode(OpCodeLoadString, 2),        // load "worker_id"
+					encode(OpCodeLoadFieldAccessor, 3), // load .labels
+					encode(OpCodeIn, 0),                // compare
+					encode(OpCodeReturn, 0),            // return
+				}},
+			},
+			g1Fn: func(g1 *GoroutineDump) {
+				g1.Add(mockMinGoroutine("goroutine 1 [running]:"))
+				g1.Add(mockMinGoroutine("goroutine 2 [select, 1 minute] {worker_id: \"foo\"}:"))
+				g1.Add(mockMinGoroutine("goroutine 3 [syscall] {worker_id: \"bar\"}:"))
+
+			},
+			expectFn: func(t *testing.T, g2 *GoroutineDump) {
+				t.Helper()
+				must.Eq(t, 2, g2.Len())
+				must.Eq(t, 2, g2.Next().ID)
+				must.Eq(t, 3, g2.Next().ID)
+			},
+		},
+
+		{ // source: `g2 = g1.where(.label.worker_id == "foo")
+			name:      "label comparison",
+			constants: []any{"g2", "g1", "worker_id", ".labels"},
+			chunks: []*Chunk{
+				{ops: []Op{
+					encode(OpCodeLoadGoroutineDump, 1), // load g1
+					encode(OpCodeTempDump, 0),          // start
+					encode(OpCodeNextGoroutine, 7),     // addr when done
+					encode(OpCodeCall, 1),              // call 1
+					encode(OpCodeJumpIfFalse, 2),       // addr if false
+					encode(OpCodeAddGoroutine, 0),      // keep
+					encode(OpCodeJumpTo, 2),            // unconditional jump to addr
+					encode(OpCodePushDump, 0),          // push temp dump to stack
+					encode(OpCodeAssignment, 0),        // assign g2
+				}},
+				{ops: []Op{
+					encode(OpCodeLoadString, 2),        // load "worker_id"
+					encode(OpCodeLoadFieldAccessor, 3), // load .labels
+					encode(OpCodeIn, 0),                // compare
+					encode(OpCodeReturn, 0),            // return
+				}},
+			},
+			g1Fn: func(g1 *GoroutineDump) {
+				g1.Add(mockMinGoroutine("goroutine 1 [running]:"))
+				g1.Add(mockMinGoroutine("goroutine 2 [select, 1 minute] {worker_id: \"foo\"}:"))
+				g1.Add(mockMinGoroutine("goroutine 3 [syscall] {worker_id: \"bar\"}:"))
+
+			},
+			expectFn: func(t *testing.T, g2 *GoroutineDump) {
+				t.Helper()
+				must.Eq(t, 2, g2.Len())
+				must.Eq(t, 2, g2.Next().ID)
+				must.Eq(t, 3, g2.Next().ID)
+			},
+		},
+
 		{ // source: `g2 = g1.where(.trace ~= "sdn.*")`
 			name:      "regex comparison",
 			constants: []any{"g2", "g1", ".trace", "sdn.*"},

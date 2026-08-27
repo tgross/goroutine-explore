@@ -344,20 +344,54 @@ func compare[T ordered](left, right T, instruction OpCode) bool {
 }
 
 func opContains(vm *VM, instruction OpCode, _ uint) error {
-	right, err := vm.popString()
+	right, err := vm.pop()
 	if err != nil {
 		return err
 	}
-	left, err := vm.popString()
+	left, err := vm.pop()
 	if err != nil {
 		return err
 	}
-	var val bool
+	var containerVal, containedVal Value
 	if instruction == OpCodeContains {
-		val = strings.Contains(left, right)
+		// ex. labels contains "foo"
+		containerVal = left
+		containedVal = right
 	} else {
-		val = strings.Contains(right, left)
+		// ex. "foo" in labels
+		containerVal = right
+		containedVal = left
 	}
+
+	var val bool
+	switch containerVal.Tag {
+	case TagString:
+		container, ok := containerVal.Data.(string)
+		if !ok {
+			return fmt.Errorf("%w: expected string", ErrWrongTag)
+		}
+		contained, ok := containedVal.Data.(string)
+		if !ok {
+			return fmt.Errorf(
+				"%w: expected to check for string", ErrInvalidType)
+		}
+		val = strings.Contains(container, contained)
+	case TagMap:
+		container, ok := containerVal.Data.(map[string]string)
+		if !ok {
+			return fmt.Errorf("%w: expected map", ErrWrongTag)
+		}
+		contained, ok := containedVal.Data.(string)
+		if !ok {
+			return fmt.Errorf(
+				"%w: expected to check for string", ErrInvalidType)
+		}
+		_, val = container[contained]
+	default:
+		return fmt.Errorf(
+			"%w: expected container to be string or map", ErrInvalidType)
+	}
+
 	vm.push(Value{Tag: TagBool, Data: val})
 	return nil
 }
@@ -583,6 +617,17 @@ func opLoadFieldAccessor(vm *VM, _ OpCode, index uint) error {
 		vm.push(Value{Tag: TagNumber, Data: g.CreatedBy})
 	case "dups", ".dups":
 		vm.push(Value{Tag: TagNumber, Data: len(g.duplicates)})
+	case "labels", ".labels":
+		vm.push(Value{Tag: TagMap, Data: g.Labels})
+		return nil // to avoid hitting next case
+	}
+	if strings.HasPrefix(name, ".label") {
+		label, _ := strings.CutPrefix(name, ".label.")
+		if val, ok := g.Labels[label]; ok {
+			vm.push(Value{Tag: TagString, Data: val})
+		} else {
+			vm.push(Value{Tag: TagString, Data: "<nil>"})
+		}
 	}
 
 	return nil
