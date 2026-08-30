@@ -379,7 +379,7 @@ func TestCompiler_ChainedWhere(t *testing.T) {
 
 func TestCompiler_Labels(t *testing.T) {
 	t.Parallel()
-	src := `g1 = g.where("foo" in labels and label.worker_id == "bar")`
+	src := `g1 = g.where("foo" in labels and labels.worker_id == "bar")`
 	body := strings.NewReader(src)
 
 	tokenizer := NewTokenizer()
@@ -389,7 +389,7 @@ func TestCompiler_Labels(t *testing.T) {
 	must.NoError(t, err, must.Sprint(code.disassemble(0, 0)))
 
 	fmt.Println(code.disassemble(0, 0))
-	must.Eq(t, []any{"g1", "g", "foo", ".labels", ".label.worker_id", "bar"},
+	must.Eq(t, []any{"g1", "g", "foo", ".labels", ".labels.worker_id", "bar"},
 		code.constants)
 	must.Eq(t, []Op{
 		encode(OpCodeLoadGoroutineDump, 1), // 00 load g
@@ -411,7 +411,7 @@ func TestCompiler_Labels(t *testing.T) {
 		encode(OpCodeJumpIfTrue, 6),        // 03 skip to next clause if true
 		encode(OpCodePushBool, 0),          // 04 push false
 		encode(OpCodeJumpTo, 9),            // 05 unconditional jump to return
-		encode(OpCodeLoadFieldAccessor, 4), // 06 load .label.worker_id
+		encode(OpCodeLoadFieldAccessor, 4), // 06 load .labels.worker_id
 		encode(OpCodeLoadString, 5),        // 07 load "bar"
 		encode(OpCodeEqual, 0),             // 08 compare push bool to stack
 		encode(OpCodeReturn, 0),            // 09 return

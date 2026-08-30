@@ -244,14 +244,13 @@ func (p *Compiler) parseDumpAccessorImpl(m MultiAssignment, tok Token) error {
 }
 
 func (p *Compiler) parseFieldAccessor(tok Token) error {
-	if tok.Lexeme == ".label" {
-		next, err := p.consume(TokenFieldAccessor)
-		if err != nil {
-			return err
+	if tok.Lexeme == ".labels" {
+		next, _ := p.maybeConsume(TokenFieldAccessor)
+		if next != EmptyToken {
+			label := fmt.Sprintf(".labels%s", next.Lexeme)
+			p.emitLoadConst(OpCodeLoadFieldAccessor, label)
+			return nil
 		}
-		label := fmt.Sprintf(".label%s", next.Lexeme)
-		p.emitLoadConst(OpCodeLoadFieldAccessor, label)
-		return nil
 	}
 
 	p.emitLoadConst(OpCodeLoadFieldAccessor, tok.Lexeme)

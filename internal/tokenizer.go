@@ -197,14 +197,19 @@ func (s *Tokenizer) next() (Token, error) {
 			token.Type = TokenPragma
 		case "id", "header",
 			"trace", "lines",
-			"duration", "state",
-			"createdby", "createdBy",
-			"labels", "label":
+			"duration", "state":
 			token.Lexeme = "." + token.Lexeme
 			token.Type = TokenFieldAccessor
-		}
-		if strings.HasPrefix(token.Lexeme, ".") {
+		case "createdby", "createdBy", ".createdby":
+			token.Lexeme = ".createdBy"
 			token.Type = TokenFieldAccessor
+		case "labels", "label", ".label":
+			token.Lexeme = ".labels"
+			token.Type = TokenFieldAccessor
+		default:
+			if strings.HasPrefix(token.Lexeme, ".") {
+				token.Type = TokenFieldAccessor
+			}
 		}
 
 	case scanner.Int:

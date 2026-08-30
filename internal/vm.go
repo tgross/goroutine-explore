@@ -601,28 +601,28 @@ func opLoadFieldAccessor(vm *VM, _ OpCode, index uint) error {
 	}
 
 	switch name {
-	case "id", ".id":
+	case ".id":
 		vm.push(Value{Tag: TagNumber, Data: g.ID})
-	case "header", ".header":
+	case ".header":
 		vm.push(Value{Tag: TagString, Data: g.header})
-	case "trace", ".trace":
+	case ".trace":
 		vm.push(Value{Tag: TagString, Data: g.Trace})
-	case "lines", ".lines":
+	case ".lines":
 		vm.push(Value{Tag: TagNumber, Data: g.LineCount})
-	case "duration", ".duration":
+	case ".duration":
 		vm.push(Value{Tag: TagNumber, Data: g.Duration})
-	case "state", ".state":
+	case ".state":
 		vm.push(Value{Tag: TagString, Data: g.State})
-	case "createdby", ".createdby", "createdBy", ".createdBy":
+	case ".createdBy":
 		vm.push(Value{Tag: TagNumber, Data: g.CreatedBy})
-	case "dups", ".dups":
+	case ".dups":
 		vm.push(Value{Tag: TagNumber, Data: len(g.duplicates)})
-	case "labels", ".labels":
+	case ".labels":
 		vm.push(Value{Tag: TagMap, Data: g.Labels})
 		return nil // to avoid hitting next case
 	}
-	if strings.HasPrefix(name, ".label") {
-		label, _ := strings.CutPrefix(name, ".label.")
+	if strings.HasPrefix(name, ".labels") {
+		label, _ := strings.CutPrefix(name, ".labels.")
 		if val, ok := g.Labels[label]; ok {
 			vm.push(Value{Tag: TagString, Data: val})
 		} else {
