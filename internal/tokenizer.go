@@ -86,12 +86,12 @@ func NewTokenizer() *Tokenizer {
 	s.Mode = scanner.ScanIdents | scanner.ScanChars |
 		scanner.ScanInts | scanner.ScanStrings | scanner.SkipComments
 
-	// identifiers can start with . or $ and can have internal _
+	// identifiers can start with . and these are treated as field accessors
 	s.IsIdentRune = func(ch rune, i int) bool {
-		return (ch == '$' || ch == '.') && i == 0 ||
+		return (ch == '.' && i == 0) ||
 			unicode.IsLetter(ch) ||
 			unicode.IsDigit(ch) && i > 0 ||
-			ch == '_' && i != 0
+			ch == '_'
 	}
 
 	return &Tokenizer{
