@@ -206,7 +206,7 @@ func (p *Compiler) parseDumpAccessorImpl(m MultiAssignment, tok Token) error {
 			p.emitLoadConst(OpCodeLoadGoroutineDump, tok.Lexeme)
 			return nil
 		}
-		return err
+		return compileErr(tok, "%w", err)
 	}
 
 	switch next.Type {
