@@ -184,7 +184,10 @@ The `goroutine-explore` shell understands the following types:
   wrapped in double quotes or backticks. Ex. `"^foo.*bar$"`
 * number: An unsigned integer between 0 and 2147483647.
 * boolean: True or false as the literal `true` or `false` in the shell.
-* field accessor: The name of a goroutine field, prefixed with a period. Ex. `.duration`.
+* field accessor: The name of a goroutine field, prefixed with a period. Ex. `.duration`
+* label map: A map of goroutine labels added via the `runtime/pprof`
+  package. You can access a specific key with a field accessor on the `.labels`
+  field. Ex. `.labels.worker_id`.
 
 ### Variables
 
@@ -538,28 +541,30 @@ expressions can contain any of the following:
 * Logical operators (`and`, `or`): Short-circuiting operators.
 * Numeric comparison (`>`, `>=`, `<`, `<=`, `==`, `!=`): can be applied to the
   numeric fields `.id`, `.dups`, `.lines`, and `.duration`.
-* String comparison (`==`, `!=`): can be applied to string fields `.state` and `.trace`.
+* String comparison (`==`, `!=`): can be applied to string fields `.state` and
+  `.trace`, and to the values in a `.labels` map.
 * Regex comparison (`=~` or `matches`, `!~`): These use Go's standard
   [`regexp`](https://pkg.go.dev/regexp) flavor of regex. The left side is a
   string field like `.trace` and the right side is the literal pattern.
-* `contains`: is a binary operator. The left side is a string field like
-  `.trace` or `state` and the right side of the literal to match.
+* `contains`: is a binary operator. The left side either a string field like
+  `.trace` or `state`, or a map of `.labels`. The right side of the literal to match.
 * `in`: is a binary operator and the opposite of `contains`. The left side is a
   literal to match and the right side is a string field like `.trace` or
-  `.state`.
+  `.state`, or a map of `.labels`.
 
 #### Properties of a Goroutine Dump Item
 
 Each dump item has 5 properties which can be used in conditionals:
 
-| property     | type   | meaning                                             |
-|--------------|--------|-----------------------------------------------------|
-| `.id`        | number | The goroutine ID.                                   |
-| `.createdby` | number | The goroutine ID of the parent goroutine            |
-| `.duration`  | number | The waiting duration (in minutes) of a goroutine.   |
-| `.lines`     | number | The number of lines of the goroutine's stack trace. |
-| `.state`     | string | The running state of the goroutine.                 |
-| `.trace`     | string | The concatenated text of the goroutine stack trace. |
+| property     | type   | meaning                                                |
+|--------------|--------|--------------------------------------------------------|
+| `.id`        | number | The goroutine ID.                                      |
+| `.createdby` | number | The goroutine ID of the parent goroutine               |
+| `.duration`  | number | The waiting duration (in minutes) of a goroutine.      |
+| `.lines`     | number | The number of lines of the goroutine's stack trace.    |
+| `.state`     | string | The running state of the goroutine.                    |
+| `.trace`     | string | The concatenated text of the goroutine stack trace.    |
+| `.labels`    | map    | A map of goroutine labels with string keys and values. |
 
 ### Diff
 
