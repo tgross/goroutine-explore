@@ -125,15 +125,13 @@ func (vm *VM) Run(ctx context.Context) error {
 		case TagDump:
 			dump, ok := val.Data.(*GoroutineDump)
 			if !ok {
-				vm.debug()
-				return fmt.Errorf("%w: expected dump", ErrWrongTag)
+				return vm.newWrongTagErr(val)
 			}
 			dump.Summary(vm.wOut, "")
 		case TagDiff:
 			diff, ok := val.Data.(*Diff)
 			if !ok {
-				vm.debug()
-				return fmt.Errorf("%w: expected diff", ErrWrongTag)
+				return vm.newWrongTagErr(val)
 			}
 			diff.Left.Summary(vm.wOut, "left")
 			diff.Right.Summary(vm.wOut, "right")
@@ -141,22 +139,19 @@ func (vm *VM) Run(ctx context.Context) error {
 		case TagString:
 			s, ok := val.Data.(string)
 			if !ok {
-				vm.debug()
-				return fmt.Errorf("%w: expected string", ErrWrongTag)
+				return vm.newWrongTagErr(val)
 			}
 			fmt.Fprintln(vm.wOut, s)
 		case TagBool:
 			b, ok := val.Data.(bool)
 			if !ok {
-				vm.debug()
-				return fmt.Errorf("%w: expected bool", ErrWrongTag)
+				return vm.newWrongTagErr(val)
 			}
 			fmt.Fprintf(vm.wOut, "%v\n", b)
 		case TagNumber:
 			num, ok := val.Data.(int)
 			if !ok {
-				vm.debug()
-				return fmt.Errorf("%w: expected number", ErrWrongTag)
+				return vm.newWrongTagErr(val)
 			}
 			fmt.Fprintf(vm.wOut, "%d\n", num)
 		}
@@ -230,7 +225,7 @@ func popExpect[T any](vm *VM, tag Tag) (T, error) {
 	if !ok {
 		// arguably this should panic because this state isn't really
 		// recoverable but let's wait until we've stabilized this first
-		return zero, fmt.Errorf("%w: expected %s", ErrWrongTag, tag)
+		return zero, vm.newWrongTagErr(val)
 	}
 	return data, nil
 }
@@ -260,7 +255,7 @@ var (
 	ErrNotIterating              = errors.New("not iterating a goroutine dump")
 	ErrOutOfStackBounds          = errors.New("jump outside of stack bounds")
 	ErrInvalidType               = errors.New("invalid type for operation")
-	ErrWrongTag                  = errors.New("data had wrong tag for type")
+	ErrWrongTag                  = errors.New("value had wrong tag for type (please report as a bug)")
 	ErrInvalidOpArg              = errors.New("invalid argument for operation")
 	ErrArgumentUnset             = errors.New("expected argument is unset")
 	ErrNoSuchOpCode              = errors.New("no such op code")
@@ -275,6 +270,16 @@ var (
 	ErrCommandOk      = errors.New("command ok")
 	ErrCommandConfirm = errors.New("are you sure?")
 )
+
+// newWrongTagErr is for catching bugs where the compiler somehow associated a
+// Value with the wrong type for its tag. These are always bugs, so we print the
+// debug output to make it obvious.
+func (vm *VM) newWrongTagErr(val Value) error {
+	vm.debug()
+	gotType := reflect.TypeOf(reflect.ValueOf(val.Data).Interface())
+	return fmt.Errorf("%w: expected %s got %+v (%v)",
+		ErrWrongTag, val.Tag, val.Data, gotType)
+}
 
 func opNoop(_ *VM, _ OpCode, _ uint) error { return nil }
 
@@ -308,13 +313,13 @@ func opComparison(vm *VM, instruction OpCode, _ uint) error {
 		if r, ok := right.Data.(int); ok {
 			val = compare(left, r, instruction)
 		} else {
-			return fmt.Errorf("%w: expected number", ErrWrongTag)
+			return vm.newWrongTagErr(right)
 		}
 	case string:
 		if r, ok := right.Data.(string); ok {
 			val = compare(left, r, instruction)
 		} else {
-			return fmt.Errorf("%w: expected number", ErrWrongTag)
+			return vm.newWrongTagErr(right)
 		}
 	}
 	vm.push(Value{Tag: TagBool, Data: val})
@@ -368,7 +373,7 @@ func opContains(vm *VM, instruction OpCode, _ uint) error {
 	case TagString:
 		container, ok := containerVal.Data.(string)
 		if !ok {
-			return fmt.Errorf("%w: expected string", ErrWrongTag)
+			return vm.newWrongTagErr(containerVal)
 		}
 		contained, ok := containedVal.Data.(string)
 		if !ok {
@@ -379,7 +384,7 @@ func opContains(vm *VM, instruction OpCode, _ uint) error {
 	case TagMap:
 		container, ok := containerVal.Data.(map[string]string)
 		if !ok {
-			return fmt.Errorf("%w: expected map", ErrWrongTag)
+			return vm.newWrongTagErr(containerVal)
 		}
 		contained, ok := containedVal.Data.(string)
 		if !ok {
@@ -440,7 +445,6 @@ func opLoadNumber(vm *VM, _ OpCode, index uint) error {
 	}
 	num, ok := con.(int)
 	if !ok {
-		vm.debug()
 		return fmt.Errorf("%w: expected number", ErrInvalidType)
 	}
 	vm.push(Value{Tag: TagNumber, Data: num})
@@ -454,7 +458,6 @@ func opLoadString(vm *VM, _ OpCode, index uint) error {
 	}
 	str, ok := con.(string)
 	if !ok {
-		vm.debug()
 		return fmt.Errorf("%w: expected string", ErrInvalidType)
 	}
 	vm.push(Value{Tag: TagString, Data: str})
@@ -476,7 +479,7 @@ func (vm *VM) fetchString(index uint) (string, error) {
 	}
 	val, ok := con.(string)
 	if !ok {
-		return "", ErrInvalidType
+		return "", fmt.Errorf("%w: expected string", ErrInvalidType)
 	}
 	return val, nil
 }
@@ -496,11 +499,6 @@ func opLoadGoroutineDump(vm *VM, _ OpCode, index uint) error {
 	}
 	vm.push(val)
 	return nil
-}
-
-func (vm *VM) newInvalidTypeErr(expected, got Tag) error {
-	vm.debug()
-	return fmt.Errorf("%w: expected %s got %s", ErrInvalidType, expected, got)
 }
 
 func opFuncUnion(vm *VM, _ OpCode, _ uint) error {
@@ -663,7 +661,7 @@ func opNextGoroutine(vm *VM, _ OpCode, addr uint) error {
 		var ok bool
 		dump, ok = val.Data.(*GoroutineDump)
 		if !ok {
-			return fmt.Errorf("%w: expected dump", ErrWrongTag)
+			return vm.newWrongTagErr(val)
 		}
 		dump.StartIter()
 
@@ -679,12 +677,13 @@ func opNextGoroutine(vm *VM, _ OpCode, addr uint) error {
 			return fmt.Errorf("%w: %w", ErrUnexpectedStackState, err)
 		}
 		if val.Tag != TagDump {
-			return vm.newInvalidTypeErr(TagDump, val.Tag)
+			return fmt.Errorf("%w: expected %s got %s",
+				ErrInvalidType, TagDump, val.Tag)
 		}
 		var ok bool
 		dump, ok = val.Data.(*GoroutineDump)
 		if !ok {
-			return fmt.Errorf("%w: expected dump", ErrWrongTag)
+			return vm.newWrongTagErr(val)
 		}
 
 	default:
@@ -820,7 +819,7 @@ func (vm *VM) handleMultiAssignment(m MultiAssignment) error {
 func opConditionalJump(vm *VM, instruction OpCode, addr uint) error {
 	val, err := vm.popBool()
 	if err != nil {
-		return fmt.Errorf("%w conditional jump", err)
+		return fmt.Errorf("missing predicate (%w)", err)
 	}
 	if val == (instruction == OpCodeJumpIfTrue) {
 		vm.frame.ip = int(addr) - 1
@@ -1016,7 +1015,7 @@ func opCommandVars(vm *VM, _ OpCode, _ uint) error {
 				if dump, ok := v.Data.(*GoroutineDump); ok {
 					fmt.Fprintf(vm.wOut, "%s: %d\n", name, dump.Len())
 				} else {
-					return fmt.Errorf("%w: expected dump", ErrWrongTag)
+					return vm.newWrongTagErr(v)
 				}
 			}
 		}
@@ -1027,7 +1026,7 @@ func opCommandVars(vm *VM, _ OpCode, _ uint) error {
 				if dump, ok := v.Data.(*GoroutineDump); ok {
 					dump.Summary(vm.wOut, name)
 				} else {
-					return fmt.Errorf("%w: expected dump", ErrWrongTag)
+					return vm.newWrongTagErr(v)
 				}
 			}
 		}
