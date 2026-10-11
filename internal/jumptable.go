@@ -7,50 +7,50 @@ package internal
 // chunk.go gets a new OpCode or the order is changed, run go generate again to
 // rebuild this table.
 var jumpTable = [46]dispatchFn{
-	opNoop,
-	opLoadGoroutineDump,
-	opLoadFieldAccessor,
-	opLoadNumber,
-	opLoadString,
-	opAssignment,
-	opPushBool,
-	opPushDump,
-	opDup,
-	opAddGoroutine,
-	opNextGoroutine,
-	opTempDump,
-	opResetDump,
-	opContains,
-	opContains,
-	opRegexMatches,
-	opRegexMatches,
-	opComparison,
-	opComparison,
-	opComparison,
-	opComparison,
-	opComparison,
-	opComparison,
-	opConditionalJump,
-	opConditionalJump,
-	opJumpTo,
-	opCall,
-	opReturn,
-	opFuncDiff,
-	opFuncIntersect,
-	opFuncLoad,
-	opFuncSave,
-	opFuncShowDump,
-	opFuncToJSON,
-	opFuncToDot,
-	opFuncUnion,
-	opFuncGraph,
-	opCommandChangeDir,
-	opCommandEmpty,
-	opCommandGetWorkingDir,
-	opCommandHelp,
-	opCommandListDir,
-	opCommandQuit,
-	opCommandVars,
-	opCommandSetPragma,
-	opCommandGetPragma,
+	opNoop,                 // Noop
+	opLoadGoroutineDump,    // LoadGoroutineDump
+	opLoadFieldAccessor,    // LoadFieldAccessor
+	opLoadNumber,           // LoadNumber
+	opLoadString,           // LoadString
+	opAssignment,           // Assignment
+	opPushBool,             // PushBool
+	opPushDump,             // PushDump
+	opDup,                  // Dup
+	opAddGoroutine,         // AddGoroutine
+	opNextGoroutine,        // NextGoroutine
+	opTempDump,             // TempDump
+	opResetDump,            // ResetDump
+	opContains,             // Contains
+	opContains,             // In
+	opRegexMatches,         // RegexMatches
+	opRegexMatches,         // RegexNotMatches
+	opComparison,           // Equal
+	opComparison,           // Greater
+	opComparison,           // GreaterEqual
+	opComparison,           // Less
+	opComparison,           // LessEqual
+	opComparison,           // NotEqual
+	opConditionalJump,      // JumpIfFalse
+	opConditionalJump,      // JumpIfTrue
+	opJumpTo,               // JumpTo
+	opCall,                 // Call
+	opReturn,               // Return
+	opFuncDiff,             // FuncDiff
+	opFuncIntersect,        // FuncIntersect
+	opFuncLoad,             // FuncLoad
+	opFuncSave,             // FuncSave
+	opFuncShowDump,         // FuncShowDump
+	opFuncToJSON,           // FuncToJSON
+	opFuncToDot,            // FuncToDot
+	opFuncUnion,            // FuncUnion
+	opFuncGraph,            // FuncGraph
+	opCommandChangeDir,     // CommandChangeDir
+	opCommandEmpty,         // CommandEmpty
+	opCommandGetWorkingDir, // CommandGetWorkingDir
+	opCommandHelp,          // CommandHelp
+	opCommandListDir,       // CommandListDir
+	opCommandQuit,          // CommandQuit
+	opCommandVars,          // CommandVars
+	opCommandSetPragma,     // CommandSetPragma
+	opCommandGetPragma,     // CommandGetPragma
 }
