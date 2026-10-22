@@ -2,13 +2,13 @@
 
 If you have a small bug fix or documentation fix, please make a pull request!
 
-Generally speaking I'm going to try to resist scope creep. That means I'm not
-going to add large new features to `goroutine-explore` unless they feel
-compellingly useful or especially fun to work on. I'm unlikely to accept PRs for
-major new features rather than working on these features myself. You should
-definitely feel free to fork, remix, and have fun with new features
-yourself. But if you'd like to suggest a feature, please open an issue for
-discussion.
+This project is more or less done. That means I'm not going to add large new
+features to `goroutine-explore` unless they feel compellingly useful or
+especially fun to work on. I'm unlikely to accept PRs for major new features
+rather than working on these features myself. You should definitely feel free to
+fork, remix, and have fun with new features yourself. If you'd like to suggest a
+feature, please open an issue for discussion, but have your expectations set
+appropriately low.
 
 ## Code of Conduct
 
@@ -18,8 +18,8 @@ disabilities, neurodiversity, physical appearance, body size, ethnicity,
 nationality, race, age, religion, caste, or similar personal
 characteristics. However, as this is a personal project, the various formal
 Codes of Conduct used by larger projects aren't appropriate. Should this project
-happen to grow into a larger community, you should expect that a formal Code of
-Conduct will be adopted.
+unfortunately happen to grow into a larger community, you should expect that a
+formal Code of Conduct will be adopted.
 
 That being said, if you participate in this project, you'll be expected to
 generally follow the guidelines of the [Go Community Code of
@@ -48,6 +48,5 @@ human authored will not be accepted. Any pull request to this project will ask
 you to confirm that you are the author and that you are contributing your
 changes under the project's license.
 
-Please do not use LLMs to generate bug reports or in discussions (with the sole
-exception of using them for translation if you cannot communicate in English). I
-want to talk to you, not a machine.
+Do not use LLMs to generate bug reports, issues, or engage in discussion. I want
+to talk to you, not a machine.

@@ -8,3 +8,4 @@ Include Fixes: #XXX if it closes a bug.
 I may contribute this change to the project because... (pick one of the following)
 - [ ] This change is fully authored by me. I license my contribution under the same license as the project, retaining my copyright.
 - [ ] This change is fully authored by me, but my employer owns the copyright. My employer licenses this contribution under the project license, retaining its copyright.
+- [ ] This change is signficantly authored by an LLM. I have read the AI policy in the contributing guide.
