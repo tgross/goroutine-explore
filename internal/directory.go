@@ -55,3 +55,39 @@ func opCommandListDir(vm *VM, _ OpCode, _ uint) error {
 	}
 	return nil
 }
+
+func opCommandGetWorkingDir(vm *VM, _ OpCode, _ uint) error {
+	fmt.Fprint(vm.wOut, vm.cwd+"\n")
+	return nil
+}
+
+func opCommandChangeDir(vm *VM, _ OpCode, index uint) error {
+	con, err := vm.fetchConstant(index)
+	if err != nil {
+		return err
+	}
+	path, ok := con.(string)
+	if !ok {
+		return fmt.Errorf("cd requires a string argument")
+	}
+	if path == "-" {
+		path = vm.pcwd
+	}
+	path = os.ExpandEnv(path)
+
+	fi, err := os.Stat(path)
+	if err != nil {
+		return err
+	}
+	if !fi.IsDir() {
+		return fmt.Errorf("%s is not a directory", path)
+	}
+
+	err = os.Chdir(path)
+	if err != nil {
+		return fmt.Errorf("could not change working directory: %w", err)
+	}
+	vm.pcwd = vm.cwd
+	vm.cwd = path
+	return ErrCommandOk
+}

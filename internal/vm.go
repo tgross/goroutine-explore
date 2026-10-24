@@ -31,6 +31,7 @@ type VM struct {
 	env    map[string]Value
 	pragma *Pragma
 	cwd    string
+	pcwd   string  // previous working directory
 	wOut   *Writer // writer for output
 	wErr   *Writer // writer for errors
 
@@ -49,6 +50,7 @@ func NewVM(cfg *Config) *VM {
 		env:        make(map[string]Value),
 		pragma:     NewPragma(),
 		cwd:        cfg.WorkDir,
+		pcwd:       cfg.WorkDir,
 		gas:        defaultGas,
 		wOut:       wOut,
 		wErr:       wErr,
@@ -850,35 +852,6 @@ func opReturn(vm *VM, _ OpCode, _ uint) error {
 	vm.frame = vm.frames[len(vm.frames)-1]
 	vm.frame.ip = ip
 	return nil
-}
-
-func opCommandGetWorkingDir(vm *VM, _ OpCode, _ uint) error {
-	fmt.Fprint(vm.wOut, vm.cwd+"\n")
-	return nil
-}
-
-func opCommandChangeDir(vm *VM, _ OpCode, index uint) error {
-	con, err := vm.fetchConstant(index)
-	if err != nil {
-		return err
-	}
-	path, ok := con.(string)
-	if !ok {
-		return fmt.Errorf("cd requires a string argument")
-	}
-	fi, err := os.Stat(path)
-	if err != nil {
-		return err
-	}
-	if !fi.IsDir() {
-		return fmt.Errorf("%s is not a directory", path)
-	}
-	err = os.Chdir(path)
-	if err != nil {
-		return fmt.Errorf("could not change working directory: %w", err)
-	}
-	vm.cwd = path
-	return ErrCommandOk
 }
 
 // ConfirmationAction lets us close over a function and smuggle it back out to

@@ -141,10 +141,9 @@ pipeline or filter expression.
 | quit    | Exit the shell (aliased to exit).                               |
 | vars    | Show all variables in the workspace.                            |
 
-* `cd`: Takes a single path argument, which must be quoted if it includes
-  spaces. This command will expand environment variables like `$HOME` and path
-  traversal expressions like `..` and returns to the previous working directory
-  if the argument is `-`
+* `cd`: Takes a single path argument, which must be quoted. This command will
+  expand environment variables like `$HOME` and path traversal expressions like
+  `..` and returns to the previous working directory if the argument is `-`
 
 * `empty`: Erases all variables in the workspace, with confirmation (y/N). You
   can bypass confirmation by setting `pragma.empty.confirm false`.
