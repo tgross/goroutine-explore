@@ -1,14 +1,14 @@
 # Contributing
 
-If you have a small bug fix or documentation fix, please make a pull request!
-
 This project is more or less done. That means I'm not going to add large new
 features to `goroutine-explore` unless they feel compellingly useful or
 especially fun to work on. I'm unlikely to accept PRs for major new features
 rather than working on these features myself. You should definitely feel free to
-fork, remix, and have fun with new features yourself. If you'd like to suggest a
-feature, please open an issue for discussion, but have your expectations set
-appropriately low.
+fork, remix, and have fun with new features yourself.
+
+If you'd like to suggest a feature, please open an issue for discussion, but
+have your expectations set appropriately low. If you have a small bug fix or
+documentation fix, please make a pull request!
 
 ## Code of Conduct
 
@@ -18,7 +18,7 @@ disabilities, neurodiversity, physical appearance, body size, ethnicity,
 nationality, race, age, religion, caste, or similar personal
 characteristics. However, as this is a personal project, the various formal
 Codes of Conduct used by larger projects aren't appropriate. Should this project
-unfortunately happen to grow into a larger community, you should expect that a
+have the misfortunate to grow into a larger community, you should expect that a
 formal Code of Conduct will be adopted.
 
 That being said, if you participate in this project, you'll be expected to

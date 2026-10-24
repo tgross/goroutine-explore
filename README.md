@@ -369,9 +369,10 @@ function is the sole exception), or an expression that returns a goroutine
 dump. Additional arguments may be variables, strings, or other expressions.
 
 Functions can be called as though they were methods on the goroutine dump
-object, omitting their first argument. Or the function form can be used without
-the first argument if it immediately follows a pipe. For example, the following
-lines show equivalent `where` function calls that compile to identical bytecode:
+object, omitting their first argument. Alternately, the function form can be
+used without the first argument if it immediately follows a pipe. For example,
+the following lines show equivalent `where` function calls that compile to
+identical bytecode:
 
 ```
 >> g2 = where(g1, .state == "select")
@@ -472,7 +473,7 @@ command.
 >> g2 = g1.where(.state == "select") |
             where(.duration > 10) |
             where(.trace contains "keepAlive") |
-            save("./including-gRPC.txt")
+            save("./including-gRPC.txt") |
             delete(.trace contains "gRPC")) |
             save("./without-gRPC.txt")
 ```
@@ -703,15 +704,15 @@ to disk, in addition to printing it to the shell.
 
 ## Contributing
 
-If you have a small bug fix or documentation fix, please make a pull request!
-
 This project is more or less done. That means I'm not going to add large new
 features to `goroutine-explore` unless they feel compellingly useful or
 especially fun to work on. I'm unlikely to accept PRs for major new features
 rather than working on these features myself. You should definitely feel free to
-fork, remix, and have fun with new features yourself. If you'd like to suggest a
-feature, please open an issue for discussion, but have your expectations set
-appropriately low.
+fork, remix, and have fun with new features yourself.
+
+If you'd like to suggest a feature, please open an issue for discussion, but
+have your expectations set appropriately low. If you have a small bug fix or
+documentation fix, please make a pull request!
 
 Please follow the [Code of Conduct][] when contributing to this project.
 
